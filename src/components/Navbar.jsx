@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Github, Twitter, Linkedin, Wrench } from 'lucide-react';
+import { Github, Twitter, Linkedin, Wrench, Instagram } from 'lucide-react';
 import './Navbar.css'; // We'll create a dedicated css file
 
 export default function Navbar() {
@@ -44,6 +44,9 @@ export default function Navbar() {
                     </a>
                     <a href="https://www.linkedin.com/in/jaredalanrowe/" target="_blank" rel="noreferrer" className="social-icon">
                         <Linkedin size={18} />
+                    </a>
+                    <a href="https://www.instagram.com/jaredrowe/" target="_blank" rel="noreferrer" className="social-icon">
+                        <Instagram size={18} />
                     </a>
                     <a href="https://starseed.llc/" target="_blank" rel="noreferrer" className="social-icon" title="Starseed Labs">
                         <Wrench size={18} />

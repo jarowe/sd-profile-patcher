@@ -1,0 +1,118 @@
+.game-overlay {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+    pointer-events: none;
+}
+
+.xp-container {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 10px 20px;
+    border-radius: 30px;
+    background: rgba(15, 15, 18, 0.8);
+    border: 1px solid var(--accent-secondary);
+    box-shadow: 0 0 20px rgba(14, 165, 233, 0.2);
+}
+
+.level-badge {
+    font-family: var(--font-display);
+    font-weight: 900;
+    color: #fff;
+    background: linear-gradient(135deg, var(--accent-secondary) 0%, var(--accent-primary) 100%);
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.xp-bar-wrapper {
+    width: 150px;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+}
+
+.xp-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 4px;
+}
+
+.xp-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% {
+        transform: translateX(-100%);
+    }
+
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+.xp-text {
+    font-family: var(--font-display);
+    font-weight: bold;
+    color: var(--accent-secondary);
+    font-size: 0.9rem;
+}
+
+.xp-notification {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 20px;
+    background: rgba(124, 58, 237, 0.2);
+    border: 1px solid var(--accent-primary);
+    border-radius: 20px;
+}
+
+.gain-amount {
+    font-weight: 900;
+    font-family: var(--font-display);
+    color: #fff;
+    text-shadow: 0 0 10px var(--accent-primary);
+}
+
+.gain-reason {
+    color: #ddd;
+    font-size: 0.9rem;
+}
+
+/* Retro Mode Easter Egg */
+body.retro-mode {
+    font-family: 'Courier New', Courier, monospace !important;
+    image-rendering: pixelated;
+}
+
+body.retro-mode .glass-panel {
+    border-radius: 0;
+    border: 2px solid lime;
+    background: #000;
+    backdrop-filter: none;
+}
+
+body.retro-mode * {
+    color: lime !important;
+    text-shadow: none !important;
+    box-shadow: none !important;
+}
