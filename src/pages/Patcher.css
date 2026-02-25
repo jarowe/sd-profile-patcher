@@ -1,0 +1,254 @@
+.patcher-container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.patcher-header {
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.patcher-header h1 {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.drop-zone {
+    min-height: 250px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: 2px dashed rgba(255, 255, 255, 0.1);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.drop-zone:hover,
+.drop-zone.hover {
+    border-color: var(--accent-primary);
+    background: rgba(124, 58, 237, 0.05);
+}
+
+.drop-zone.processing {
+    border-color: var(--border-light);
+    cursor: default;
+}
+
+.drop-zone.done {
+    border-color: #22c55e;
+    background: rgba(34, 197, 94, 0.05);
+}
+
+.drop-zone.error {
+    border-color: #ef4444;
+    background: rgba(239, 68, 68, 0.05);
+}
+
+.drop-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 2rem;
+    gap: 0.75rem;
+    position: absolute;
+}
+
+.drop-icon {
+    color: var(--text-muted);
+}
+
+.drop-zone:hover .drop-icon {
+    color: var(--accent-primary);
+}
+
+.processing-icon {
+    color: var(--accent-secondary) !important;
+}
+
+.success-icon {
+    color: #22c55e !important;
+}
+
+.error-icon {
+    color: #ef4444 !important;
+}
+
+.drop-main {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--text-main);
+}
+
+.drop-sub {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+/* Options Panel */
+.options-panel summary {
+    display: flex;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    cursor: pointer;
+    list-style: none;
+    font-weight: 600;
+}
+
+.options-panel summary::-webkit-details-marker {
+    display: none;
+}
+
+.summary-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.summary-right {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 400;
+}
+
+.options-body {
+    padding: 0 1.25rem 1rem;
+}
+
+.options-divider {
+    height: 1px;
+    background: var(--border-light);
+    margin: 1rem 0;
+}
+
+.options-section-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+}
+
+.opt-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 0.75rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.opt-row:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.opt-row input[type="checkbox"] {
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+    border: 2px solid #444;
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s;
+}
+
+.opt-row input[type="checkbox"]:checked {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+}
+
+.opt-row input[type="checkbox"]:checked::after {
+    content: '';
+    position: absolute;
+    left: 5px;
+    top: 2px;
+    width: 4px;
+    height: 9px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+.opt-name {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text-main);
+    margin-bottom: 0.2rem;
+}
+
+.opt-desc {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.opt-row.dimmed .opt-name,
+.opt-row.dimmed .opt-desc {
+    opacity: 0.5;
+}
+
+.universal-note {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+
+/* Terminal Log */
+.terminal-log {
+    padding: 1rem;
+    font-family: 'Cascadia Code', 'SF Mono', Consolas, monospace;
+    font-size: 0.8rem;
+    max-height: 300px;
+    overflow-y: auto;
+    line-height: 1.6;
+}
+
+.log-line.type-info {
+    color: #888;
+}
+
+.log-line.type-success {
+    color: #22c55e;
+    font-weight: 600;
+}
+
+.log-line.type-category {
+    color: #facc15;
+    font-weight: 600;
+    margin-top: 0.5rem;
+}
+
+.log-line.type-patched {
+    color: var(--accent-primary);
+}
+
+.center-btn {
+    display: flex;
+    justify-content: center;
+}
+
+.btn-secondary {
+    padding: 0.5rem 1.25rem;
+    font-size: 0.9rem;
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+}

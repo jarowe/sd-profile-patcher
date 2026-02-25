@@ -1,0 +1,73 @@
+.navbar {
+    position: sticky;
+    top: 1rem;
+    z-index: 50;
+    margin: 0 auto;
+    max-width: 1000px;
+    width: calc(100% - 2rem);
+    padding: 0.75rem 1.5rem;
+}
+
+.nav-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.nav-brand {
+    font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    color: var(--text-main);
+}
+
+.brand-dot {
+    color: var(--accent-primary);
+}
+
+.nav-links {
+    display: flex;
+    gap: 0.5rem;
+    position: relative;
+}
+
+.nav-link {
+    position: relative;
+    padding: 0.4rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    transition: color 0.2s;
+    z-index: 1;
+}
+
+.nav-link.active {
+    color: #fff;
+}
+
+.nav-link:hover:not(.active) {
+    color: #fff;
+}
+
+.nav-active-bg {
+    position: absolute;
+    inset: 0;
+    background: var(--border-light);
+    border-radius: 9999px;
+    z-index: -1;
+}
+
+.nav-socials {
+    display: flex;
+    gap: 1rem;
+}
+
+.social-icon {
+    color: var(--text-muted);
+    transition: color 0.2s, transform 0.2s;
+}
+
+.social-icon:hover {
+    color: var(--accent-secondary);
+    transform: translateY(-2px);
+}
