@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WL3 Auto-Init Patcher</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0f0f0f;
+    color: #e0e0e0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+  }
+
+  h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    color: #fff;
+  }
+
+  .subtitle {
+    font-size: 0.85rem;
+    color: #888;
+    margin-bottom: 2rem;
+  }
+
+  #drop-zone {
+    width: 100%;
+    max-width: 480px;
+    min-height: 220px;
+    border: 2px dashed #333;
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 2rem;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    position: relative;
+  }
+
+  #drop-zone:hover, #drop-zone.dragover {
+    border-color: #7c3aed;
+    background: rgba(124, 58, 237, 0.06);
+  }
+
+  #drop-zone.processing {
+    border-color: #444;
+    cursor: default;
+    pointer-events: none;
+  }
+
+  #drop-zone.done {
+    border-color: #22c55e;
+    background: rgba(34, 197, 94, 0.06);
+  }
+
+  #drop-zone.error {
+    border-color: #ef4444;
+    background: rgba(239, 68, 68, 0.06);
+  }
+
+  .drop-icon {
+    font-size: 2.5rem;
+    line-height: 1;
+  }
+
+  .drop-label {
+    font-size: 1rem;
+    color: #aaa;
+    text-align: center;
+  }
+
+  .drop-hint {
+    font-size: 0.75rem;
+    color: #555;
+  }
+
+  #file-input { display: none; }
+
+  #log {
+    width: 100%;
+    max-width: 480px;
+    margin-top: 1.5rem;
+    font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+    font-size: 0.75rem;
+    line-height: 1.6;
+    color: #999;
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 0 0.25rem;
+  }
+
+  #log .patched { color: #a78bfa; }
+  #log .summary { color: #22c55e; font-weight: 600; }
+  #log .error   { color: #ef4444; }
+  #log .info    { color: #888; }
+
+  .reset-btn {
+    margin-top: 1rem;
+    padding: 0.5rem 1.25rem;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 8px;
+    color: #ccc;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: none;
+  }
+
+  .reset-btn:hover { background: #252525; border-color: #555; }
+  .reset-btn.show { display: inline-block; }
+</style>
+</head>
+<body>
+
+<h1>WL3 Auto-Init Patcher</h1>
+<p class="subtitle">Strip hardware IDs from Wave Link 3 actions so they auto-discover on any machine</p>
+
+<div id="drop-zone">
+  <div class="drop-icon">📂</div>
+  <div class="drop-label">Drop a <strong>.streamDeckProfile</strong> here</div>
+  <div class="drop-hint">or click to browse</div>
+</div>
+
+<input type="file" id="file-input" accept=".streamDeckProfile">
+
+<div id="log"></div>
+<button class="reset-btn" id="reset-btn">Patch another</button>
+
+<script>
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+const logEl = document.getElementById('log');
+const resetBtn = document.getElementById('reset-btn');
+
+// --- Drag and drop ---
+dropZone.addEventListener('click', () => fileInput.click());
+
+dropZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  dropZone.classList.add('dragover');
+});
+
+dropZone.addEventListener('dragleave', () => {
+  dropZone.classList.remove('dragover');
+});
+
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) processFile(file);
+});
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) processFile(fileInput.files[0]);
+});
+
+resetBtn.addEventListener('click', () => {
+  logEl.innerHTML = '';
+  resetBtn.classList.remove('show');
+  dropZone.className = '';
+  dropZone.innerHTML = `
+    <div class="drop-icon">📂</div>
+    <div class="drop-label">Drop a <strong>.streamDeckProfile</strong> here</div>
+    <div class="drop-hint">or click to browse</div>
+  `;
+  fileInput.value = '';
+});
+
+// --- Logging ---
+function log(text, cls) {
+  const line = document.createElement('div');
+  if (cls) line.className = cls;
+  line.textContent = text;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+// --- Main patching logic ---
+async function processFile(file) {
+  if (!file.name.endsWith('.streamDeckProfile')) {
+    dropZone.classList.add('error');
+    dropZone.innerHTML = `
+      <div class="drop-icon">⚠️</div>
+      <div class="drop-label">Not a .streamDeckProfile file</div>
+      <div class="drop-hint">Please drop a valid Stream Deck profile export</div>
+    `;
+    resetBtn.classList.add('show');
+    return;
+  }
+
+  dropZone.classList.add('processing');
+  dropZone.innerHTML = `
+    <div class="drop-icon">⏳</div>
+    <div class="drop-label">Patching <strong>${file.name}</strong></div>
+    <div class="drop-hint">Please wait...</div>
+  `;
+  logEl.innerHTML = '';
+
+  try {
+    log(`Loading ${file.name} (${(file.size / 1024).toFixed(0)} KB)...`, 'info');
+
+    const buf = await file.arrayBuffer();
+    const zip = await JSZip.loadAsync(buf);
+
+    // Find all manifest.json files
+    const manifestPaths = Object.keys(zip.files).filter(
+      (p) => p.endsWith('manifest.json') && !zip.files[p].dir
+    );
+    log(`Found ${manifestPaths.length} manifest(s)`, 'info');
+
+    let totalPatched = 0;
+
+    for (const mfPath of manifestPaths) {
+      const raw = await zip.file(mfPath).async('string');
+      let manifest;
+      try {
+        manifest = JSON.parse(raw);
+      } catch {
+        continue; // skip unparseable
+      }
+
+      // Skip root profile manifest (has Pages, not Controllers)
+      if (!manifest.Controllers) continue;
+
+      let filePatched = 0;
+
+      for (const controller of manifest.Controllers) {
+        if (!controller.Actions) continue;
+        const label = controller.Type === 'Encoder' ? 'dial' : 'key';
+
+        for (const [coord, action] of Object.entries(controller.Actions)) {
+          if (action.UUID && action.UUID.startsWith('com.elgato.wave-link.')) {
+            const settingsKeys = Object.keys(action.Settings || {});
+            if (settingsKeys.length > 0) {
+              const title = (action.States && action.States[0] && action.States[0].Title) || '';
+              const cleanTitle = title.replace(/\n/g, ' ');
+              log(`  [${coord}] ${label} | ${action.UUID} "${cleanTitle}" -> {} (was ${settingsKeys.length} keys)`, 'patched');
+              action.Settings = {};
+              filePatched++;
+              totalPatched++;
+            }
+          }
+        }
+      }
+
+      if (filePatched > 0) {
+        // Write patched manifest back into zip
+        zip.file(mfPath, JSON.stringify(manifest));
+        const shortPath = mfPath.split('/').slice(-3).join('/');
+        log(`  ${shortPath}: ${filePatched} action(s) patched`, 'info');
+      }
+    }
+
+    if (totalPatched === 0) {
+      log('', 'info');
+      log('No WL3 actions with hardware-specific Settings found.', 'summary');
+      log('Profile is already clean — nothing to patch!', 'info');
+      dropZone.classList.remove('processing');
+      dropZone.classList.add('done');
+      dropZone.innerHTML = `
+        <div class="drop-icon">✅</div>
+        <div class="drop-label">Already clean!</div>
+        <div class="drop-hint">No hardware-specific WL3 settings found</div>
+      `;
+      resetBtn.classList.add('show');
+      return;
+    }
+
+    // Generate output
+    log('', 'info');
+    log(`Repackaging (${totalPatched} action(s) patched)...`, 'info');
+
+    const outBuf = await zip.generateAsync({ type: 'blob' });
+
+    // Build output filename
+    const baseName = file.name.replace(/\.streamDeckProfile$/, '');
+    const outName = `${baseName}_autoinit.streamDeckProfile`;
+
+    // Trigger download
+    const url = URL.createObjectURL(outBuf);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = outName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    log(`${totalPatched} WL3 action(s) patched. Downloading ${outName}`, 'summary');
+
+    dropZone.classList.remove('processing');
+    dropZone.classList.add('done');
+    dropZone.innerHTML = `
+      <div class="drop-icon">✅</div>
+      <div class="drop-label">${totalPatched} action(s) patched</div>
+      <div class="drop-hint">Downloading ${outName}</div>
+    `;
+    resetBtn.classList.add('show');
+
+  } catch (err) {
+    log(`Error: ${err.message}`, 'error');
+    dropZone.classList.remove('processing');
+    dropZone.classList.add('error');
+    dropZone.innerHTML = `
+      <div class="drop-icon">❌</div>
+      <div class="drop-label">Something went wrong</div>
+      <div class="drop-hint">${err.message}</div>
+    `;
+    resetBtn.classList.add('show');
+  }
+}
+</script>
+</body>
+</html>
