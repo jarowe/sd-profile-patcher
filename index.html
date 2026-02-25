@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WL3 Auto-Init Patcher</title>
+<title>Stream Deck Profile Patcher</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -16,137 +16,453 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    padding: 2rem;
+    padding: 3rem 1.5rem;
   }
 
+  .container {
+    width: 100%;
+    max-width: 520px;
+  }
+
+  header { text-align: center; margin-bottom: 2rem; }
+
   h1 {
-    font-size: 1.5rem;
-    font-weight: 600;
-    margin-bottom: 0.25rem;
+    font-size: 1.6rem;
+    font-weight: 700;
     color: #fff;
+    margin-bottom: 0.35rem;
+    letter-spacing: -0.02em;
   }
 
   .subtitle {
-    font-size: 0.85rem;
-    color: #888;
-    margin-bottom: 2rem;
+    font-size: 0.88rem;
+    color: #777;
+    line-height: 1.4;
   }
 
+  /* --- Drop zone --- */
   #drop-zone {
     width: 100%;
-    max-width: 480px;
-    min-height: 220px;
-    border: 2px dashed #333;
+    min-height: 200px;
+    border: 2px dashed #2a2a2a;
     border-radius: 16px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.75rem;
+    gap: 0.6rem;
     padding: 2rem;
     transition: all 0.2s ease;
     cursor: pointer;
-    position: relative;
+    background: #141414;
   }
 
   #drop-zone:hover, #drop-zone.dragover {
     border-color: #7c3aed;
-    background: rgba(124, 58, 237, 0.06);
+    background: rgba(124, 58, 237, 0.05);
   }
 
   #drop-zone.processing {
-    border-color: #444;
+    border-color: #333;
     cursor: default;
     pointer-events: none;
   }
 
   #drop-zone.done {
     border-color: #22c55e;
-    background: rgba(34, 197, 94, 0.06);
+    background: rgba(34, 197, 94, 0.05);
   }
 
   #drop-zone.error {
     border-color: #ef4444;
-    background: rgba(239, 68, 68, 0.06);
+    background: rgba(239, 68, 68, 0.05);
   }
 
-  .drop-icon {
-    font-size: 2.5rem;
-    line-height: 1;
-  }
-
-  .drop-label {
-    font-size: 1rem;
-    color: #aaa;
-    text-align: center;
-  }
-
-  .drop-hint {
-    font-size: 0.75rem;
-    color: #555;
-  }
+  .drop-icon { font-size: 2.25rem; line-height: 1; }
+  .drop-label { font-size: 0.95rem; color: #aaa; text-align: center; }
+  .drop-hint  { font-size: 0.75rem; color: #555; }
 
   #file-input { display: none; }
 
-  #log {
-    width: 100%;
-    max-width: 480px;
-    margin-top: 1.5rem;
-    font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
-    font-size: 0.75rem;
-    line-height: 1.6;
-    color: #999;
-    max-height: 300px;
-    overflow-y: auto;
-    padding: 0 0.25rem;
+  /* --- Options panel --- */
+  .options-panel {
+    margin-top: 1rem;
+    border: 1px solid #1e1e1e;
+    border-radius: 12px;
+    background: #141414;
+    overflow: hidden;
   }
 
-  #log .patched { color: #a78bfa; }
-  #log .summary { color: #22c55e; font-weight: 600; }
-  #log .error   { color: #ef4444; }
-  #log .info    { color: #888; }
+  .options-panel summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    transition: background 0.15s;
+  }
 
+  .options-panel summary::-webkit-details-marker { display: none; }
+  .options-panel summary::marker { display: none; content: ''; }
+
+  .options-panel summary:hover { background: #1a1a1a; }
+
+  .summary-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #ccc;
+  }
+
+  .summary-right {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    color: #666;
+  }
+
+  .chevron {
+    display: inline-block;
+    transition: transform 0.2s ease;
+    font-size: 0.65rem;
+    color: #555;
+  }
+
+  .options-panel[open] .chevron { transform: rotate(180deg); }
+
+  .options-body {
+    padding: 0 0.75rem 0.75rem;
+  }
+
+  .options-divider {
+    height: 1px;
+    background: #222;
+    margin: 0.5rem 0;
+  }
+
+  .options-section-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #555;
+    padding: 0.35rem 0.25rem 0.15rem;
+  }
+
+  /* --- Custom checkboxes --- */
+  .opt-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    padding: 0.45rem 0.25rem;
+    border-radius: 8px;
+    transition: background 0.1s;
+  }
+
+  .opt-row:hover { background: #1a1a1a; }
+
+  .opt-row input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    min-width: 18px;
+    border: 2px solid #333;
+    border-radius: 5px;
+    background: #0f0f0f;
+    cursor: pointer;
+    position: relative;
+    top: 1px;
+    transition: all 0.15s;
+  }
+
+  .opt-row input[type="checkbox"]:checked {
+    background: #7c3aed;
+    border-color: #7c3aed;
+  }
+
+  .opt-row input[type="checkbox"]:checked::after {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 1px;
+    width: 5px;
+    height: 9px;
+    border: solid #fff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+
+  .opt-text { flex: 1; cursor: pointer; }
+
+  .opt-name {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #ddd;
+    line-height: 1.3;
+  }
+
+  .opt-desc {
+    font-size: 0.72rem;
+    color: #666;
+    line-height: 1.35;
+    margin-top: 0.1rem;
+  }
+
+  .opt-row.disabled .opt-name { color: #888; }
+  .opt-row.disabled .opt-desc { color: #555; }
+
+  /* --- Universal list --- */
+  .universal-note {
+    font-size: 0.68rem;
+    color: #444;
+    padding: 0.5rem 0.25rem 0.15rem;
+    line-height: 1.5;
+  }
+
+  .universal-note strong { color: #555; font-weight: 600; }
+
+  /* --- Log --- */
+  #log {
+    width: 100%;
+    margin-top: 1.25rem;
+    font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+    font-size: 0.72rem;
+    line-height: 1.6;
+    color: #999;
+    max-height: 350px;
+    overflow-y: auto;
+    padding: 0 0.15rem;
+  }
+
+  #log::-webkit-scrollbar { width: 4px; }
+  #log::-webkit-scrollbar-track { background: transparent; }
+  #log::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+
+  #log .patched  { color: #a78bfa; }
+  #log .summary  { color: #22c55e; font-weight: 600; }
+  #log .error    { color: #ef4444; }
+  #log .info     { color: #666; }
+  #log .category { color: #facc15; font-weight: 600; margin-top: 0.35rem; }
+
+  /* --- Reset button --- */
   .reset-btn {
     margin-top: 1rem;
     padding: 0.5rem 1.25rem;
     background: #1a1a1a;
-    border: 1px solid #333;
+    border: 1px solid #2a2a2a;
     border-radius: 8px;
-    color: #ccc;
+    color: #aaa;
     font-size: 0.8rem;
     cursor: pointer;
     transition: all 0.15s;
     display: none;
   }
 
-  .reset-btn:hover { background: #252525; border-color: #555; }
+  .reset-btn:hover { background: #222; border-color: #444; color: #ddd; }
   .reset-btn.show { display: inline-block; }
+
+  /* --- Layout helpers --- */
+  .center { display: flex; flex-direction: column; align-items: center; }
 </style>
 </head>
 <body>
 
-<h1>WL3 Auto-Init Patcher</h1>
-<p class="subtitle">Strip hardware IDs from Wave Link 3 actions so they auto-discover on any machine</p>
+<div class="container">
+  <header>
+    <h1>Stream Deck Profile Patcher</h1>
+    <p class="subtitle">Share exported profiles that just work on any machine</p>
+  </header>
 
-<div id="drop-zone">
-  <div class="drop-icon">📂</div>
-  <div class="drop-label">Drop a <strong>.streamDeckProfile</strong> here</div>
-  <div class="drop-hint">or click to browse</div>
+  <div id="drop-zone">
+    <div class="drop-icon">📂</div>
+    <div class="drop-label">Drop a <strong>.streamDeckProfile</strong> here</div>
+    <div class="drop-hint">or click to browse</div>
+  </div>
+
+  <input type="file" id="file-input" accept=".streamDeckProfile">
+
+  <details class="options-panel" id="options-panel">
+    <summary>
+      <span class="summary-left">Patch Options</span>
+      <span class="summary-right">
+        <span id="options-count"></span>
+        <span class="chevron">&#9660;</span>
+      </span>
+    </summary>
+    <div class="options-body" id="options-body"></div>
+  </details>
+
+  <div id="log"></div>
+  <div class="center">
+    <button class="reset-btn" id="reset-btn">Patch another</button>
+  </div>
 </div>
 
-<input type="file" id="file-input" accept=".streamDeckProfile">
-
-<div id="log"></div>
-<button class="reset-btn" id="reset-btn">Patch another</button>
-
 <script>
+// ============================================================
+// Patch Rules — single source of truth for UI + patching logic
+// ============================================================
+const PATCH_RULES = [
+  {
+    id: 'wave-link',
+    name: 'Wave Link 3',
+    desc: 'Clear hardware IDs — channels auto-discover on any setup',
+    defaultOn: true,
+    group: 'recommended',
+    match: (uuid) => uuid.startsWith('com.elgato.wave-link.'),
+    patch: (action) => {
+      if (Object.keys(action.Settings || {}).length > 0) {
+        action.Settings = {};
+        return true;
+      }
+      return false;
+    }
+  },
+  {
+    id: 'window-mover',
+    name: 'Window Mover',
+    desc: 'Clear monitor IDs — auto-detects your displays',
+    defaultOn: true,
+    group: 'recommended',
+    match: (uuid) => uuid.startsWith('com.elgato.window-mover.'),
+    patch: (action) => stripKeys(action, ['deviceName','manufacturerId','modelId','screenId','screenLabel'])
+  },
+  {
+    id: 'weather',
+    name: 'Weather',
+    desc: 'Clear location & IP address — prompts to set location',
+    defaultOn: true,
+    group: 'recommended',
+    match: (uuid) => uuid.startsWith('com.elgato.weather.'),
+    patch: (action) => stripKeys(action, [
+      'city','location','userLocation',
+      'forecastStartDateOffset','hScrollOffset',
+      'indicatorType','selection','temperature','show_units'
+    ])
+  },
+  {
+    id: 'open-app',
+    name: 'Open App',
+    desc: 'Clear app paths — keeps app name, user re-selects the app',
+    defaultOn: true,
+    group: 'recommended',
+    match: (uuid) => uuid === 'com.elgato.streamdeck.system.openapp',
+    patch: (action) => stripKeys(action, ['bundle_id','bundle_path','exec','source'])
+  },
+  {
+    id: 'system-vitals',
+    name: 'System Vitals',
+    desc: 'Clear custom IP & exe path — keeps all visual styling',
+    defaultOn: true,
+    group: 'recommended',
+    match: (uuid) => uuid.startsWith('com.vivremotion.systemvitals.'),
+    patch: (action) => stripKeys(action, ['my_custom_ip','my_execute_url'])
+  },
+  {
+    id: 'discord-voice',
+    name: 'Discord Voice',
+    desc: 'Clear channel ID — user re-selects voice channel',
+    defaultOn: true,
+    group: 'recommended',
+    match: (uuid) => uuid === 'com.elgato.discord.channel.voice',
+    patch: (action) => stripKeys(action, ['channel'])
+  },
+  {
+    id: 'soundboard',
+    name: 'Soundboard',
+    desc: 'Clear audio file paths — only needed if files aren\'t bundled in the profile',
+    defaultOn: false,
+    group: 'optional',
+    match: (uuid) => uuid.startsWith('com.elgato.streamdeck.soundboard.'),
+    patch: (action) => stripKeys(action, ['path'])
+  },
+  {
+    id: 'open',
+    name: 'Open (File/Folder)',
+    desc: 'Clear file & folder paths — user re-selects the target',
+    defaultOn: false,
+    group: 'optional',
+    match: (uuid) => uuid === 'com.elgato.streamdeck.system.open',
+    patch: (action) => stripKeys(action, ['path'])
+  },
+];
+
+const UNIVERSAL_PLUGINS = 'Spotify, Hotkeys, Multimedia, Clocks, Website, Volume Controller, Text/Emoji, Discord Mute/Deafen';
+
+// ============================================================
+// DOM
+// ============================================================
 const dropZone = document.getElementById('drop-zone');
 const fileInput = document.getElementById('file-input');
 const logEl = document.getElementById('log');
 const resetBtn = document.getElementById('reset-btn');
+const optionsBody = document.getElementById('options-body');
+const optionsCount = document.getElementById('options-count');
 
-// --- Drag and drop ---
+// ============================================================
+// Build options UI
+// ============================================================
+function buildOptions() {
+  let html = '';
+  let lastGroup = '';
+
+  for (const rule of PATCH_RULES) {
+    if (rule.group !== lastGroup) {
+      if (lastGroup) html += '<div class="options-divider"></div>';
+      const label = rule.group === 'recommended' ? 'Enabled by default' : 'Optional';
+      html += `<div class="options-section-label">${label}</div>`;
+      lastGroup = rule.group;
+    }
+
+    const checked = rule.defaultOn ? 'checked' : '';
+    const dimClass = rule.defaultOn ? '' : ' disabled';
+    html += `
+      <label class="opt-row${dimClass}" id="row-${rule.id}">
+        <input type="checkbox" id="opt-${rule.id}" ${checked}>
+        <div class="opt-text">
+          <div class="opt-name">${rule.name}</div>
+          <div class="opt-desc">${rule.desc}</div>
+        </div>
+      </label>`;
+  }
+
+  html += '<div class="options-divider"></div>';
+  html += `<div class="universal-note"><strong>Already universal</strong> (never patched): ${UNIVERSAL_PLUGINS}</div>`;
+
+  optionsBody.innerHTML = html;
+
+  // Wire up change events
+  for (const rule of PATCH_RULES) {
+    const cb = document.getElementById(`opt-${rule.id}`);
+    cb.addEventListener('change', () => {
+      const row = document.getElementById(`row-${rule.id}`);
+      row.classList.toggle('disabled', !cb.checked);
+      updateCount();
+    });
+  }
+
+  updateCount();
+}
+
+function updateCount() {
+  const enabled = PATCH_RULES.filter(r => document.getElementById(`opt-${r.id}`).checked).length;
+  optionsCount.textContent = `${enabled} of ${PATCH_RULES.length}`;
+}
+
+function getEnabledRules() {
+  return PATCH_RULES.filter(r => document.getElementById(`opt-${r.id}`).checked);
+}
+
+buildOptions();
+
+// ============================================================
+// Drag and drop
+// ============================================================
 dropZone.addEventListener('click', () => fileInput.click());
 
 dropZone.addEventListener('dragover', (e) => {
@@ -181,7 +497,9 @@ resetBtn.addEventListener('click', () => {
   fileInput.value = '';
 });
 
-// --- Logging ---
+// ============================================================
+// Logging
+// ============================================================
 function log(text, cls) {
   const line = document.createElement('div');
   if (cls) line.className = cls;
@@ -190,7 +508,65 @@ function log(text, cls) {
   logEl.scrollTop = logEl.scrollHeight;
 }
 
-// --- Main patching logic ---
+// ============================================================
+// Patching helpers
+// ============================================================
+function stripKeys(action, keys) {
+  if (!action.Settings) return false;
+  let removed = false;
+  for (const key of keys) {
+    if (key in action.Settings) {
+      delete action.Settings[key];
+      removed = true;
+    }
+  }
+  return removed;
+}
+
+// Patch a single action against enabled rules.
+// Returns {ruleId, ruleName} if patched, or null.
+function patchAction(action, enabledRules) {
+  const uuid = action.UUID || '';
+  for (const rule of enabledRules) {
+    if (rule.match(uuid)) {
+      if (rule.patch(action)) {
+        return { ruleId: rule.id, ruleName: rule.name };
+      }
+      return null; // matched but nothing to strip
+    }
+  }
+  return null;
+}
+
+// Recursively patch action + nested sub-actions.
+function patchActionRecursive(action, coord, label, enabledRules) {
+  const patches = [];
+
+  const result = patchAction(action, enabledRules);
+  if (result) {
+    patches.push({ ...result, coord, label, action });
+  }
+
+  // Recurse into sub-actions (dial stacks, multi-actions, keys adaptors)
+  if (Array.isArray(action.Actions)) {
+    for (const subGroup of action.Actions) {
+      if (subGroup && Array.isArray(subGroup.Actions)) {
+        for (const subAction of subGroup.Actions) {
+          patches.push(...patchActionRecursive(subAction, coord, label, enabledRules));
+        }
+      }
+      if (subGroup && subGroup.UUID) {
+        patches.push(...patchActionRecursive(subGroup, coord, label, enabledRules));
+      }
+    }
+  }
+
+  return patches;
+}
+
+// ============================================================
+// Main processing
+// ============================================================
 async function processFile(file) {
   if (!file.name.endsWith('.streamDeckProfile')) {
     dropZone.classList.add('error');
@@ -198,6 +574,18 @@ async function processFile(file) {
       <div class="drop-icon">⚠️</div>
       <div class="drop-label">Not a .streamDeckProfile file</div>
       <div class="drop-hint">Please drop a valid Stream Deck profile export</div>
+    `;
+    resetBtn.classList.add('show');
+    return;
+  }
+
+  const enabledRules = getEnabledRules();
+  if (enabledRules.length === 0) {
+    dropZone.classList.add('error');
+    dropZone.innerHTML = `
+      <div class="drop-icon">⚠️</div>
+      <div class="drop-label">No patch rules enabled</div>
+      <div class="drop-hint">Enable at least one option below</div>
     `;
     resetBtn.classList.add('show');
     return;
@@ -217,13 +605,12 @@ async function processFile(file) {
     const buf = await file.arrayBuffer();
     const zip = await JSZip.loadAsync(buf);
 
-    // Find all manifest.json files
     const manifestPaths = Object.keys(zip.files).filter(
       (p) => p.endsWith('manifest.json') && !zip.files[p].dir
     );
     log(`Found ${manifestPaths.length} manifest(s)`, 'info');
 
-    let totalPatched = 0;
+    const allPatches = [];
 
     for (const mfPath of manifestPaths) {
       const raw = await zip.file(mfPath).async('string');
@@ -231,10 +618,9 @@ async function processFile(file) {
       try {
         manifest = JSON.parse(raw);
       } catch {
-        continue; // skip unparseable
+        continue;
       }
 
-      // Skip root profile manifest (has Pages, not Controllers)
       if (!manifest.Controllers) continue;
 
       let filePatched = 0;
@@ -244,54 +630,64 @@ async function processFile(file) {
         const label = controller.Type === 'Encoder' ? 'dial' : 'key';
 
         for (const [coord, action] of Object.entries(controller.Actions)) {
-          if (action.UUID && action.UUID.startsWith('com.elgato.wave-link.')) {
-            const settingsKeys = Object.keys(action.Settings || {});
-            if (settingsKeys.length > 0) {
-              const title = (action.States && action.States[0] && action.States[0].Title) || '';
-              const cleanTitle = title.replace(/\n/g, ' ');
-              log(`  [${coord}] ${label} | ${action.UUID} "${cleanTitle}" -> {} (was ${settingsKeys.length} keys)`, 'patched');
-              action.Settings = {};
-              filePatched++;
-              totalPatched++;
-            }
+          const patches = patchActionRecursive(action, coord, label, enabledRules);
+          if (patches.length > 0) {
+            allPatches.push(...patches);
+            filePatched += patches.length;
           }
         }
       }
 
       if (filePatched > 0) {
-        // Write patched manifest back into zip
         zip.file(mfPath, JSON.stringify(manifest));
-        const shortPath = mfPath.split('/').slice(-3).join('/');
-        log(`  ${shortPath}: ${filePatched} action(s) patched`, 'info');
       }
     }
 
-    if (totalPatched === 0) {
+    if (allPatches.length === 0) {
       log('', 'info');
-      log('No WL3 actions with hardware-specific Settings found.', 'summary');
-      log('Profile is already clean — nothing to patch!', 'info');
+      log('No machine-specific settings found.', 'summary');
+      log('Profile is already clean!', 'info');
       dropZone.classList.remove('processing');
       dropZone.classList.add('done');
       dropZone.innerHTML = `
         <div class="drop-icon">✅</div>
         <div class="drop-label">Already clean!</div>
-        <div class="drop-hint">No hardware-specific WL3 settings found</div>
+        <div class="drop-hint">No machine-specific settings found</div>
       `;
       resetBtn.classList.add('show');
       return;
     }
 
-    // Generate output
+    // Group by rule and log
+    const byRule = {};
+    for (const p of allPatches) {
+      if (!byRule[p.ruleId]) byRule[p.ruleId] = { name: p.ruleName, patches: [] };
+      byRule[p.ruleId].patches.push(p);
+    }
+
     log('', 'info');
-    log(`Repackaging (${totalPatched} action(s) patched)...`, 'info');
+    for (const [ruleId, group] of Object.entries(byRule)) {
+      log(`${group.name} (${group.patches.length})`, 'category');
+      for (const p of group.patches) {
+        const title = (p.action.States && p.action.States[0] && p.action.States[0].Title) || '';
+        const cleanTitle = title.replace(/\n/g, ' ');
+        const shortUuid = (p.action.UUID || '').split('.').slice(-1)[0];
+        const titleStr = cleanTitle ? ` "${cleanTitle}"` : '';
+        log(`  [${p.coord}] ${p.label} | .${shortUuid}${titleStr}`, 'patched');
+      }
+    }
+
+    // Summary
+    const summaryParts = Object.values(byRule).map(g => `${g.patches.length} ${g.name}`);
+
+    log('', 'info');
+    log(`Repackaging...`, 'info');
 
     const outBuf = await zip.generateAsync({ type: 'blob' });
 
-    // Build output filename
     const baseName = file.name.replace(/\.streamDeckProfile$/, '');
-    const outName = `${baseName}_autoinit.streamDeckProfile`;
+    const outName = `${baseName}_patched.streamDeckProfile`;
 
-    // Trigger download
     const url = URL.createObjectURL(outBuf);
     const a = document.createElement('a');
     a.href = url;
@@ -301,13 +697,13 @@ async function processFile(file) {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    log(`${totalPatched} WL3 action(s) patched. Downloading ${outName}`, 'summary');
+    log(`Done: ${summaryParts.join(', ')}`, 'summary');
 
     dropZone.classList.remove('processing');
     dropZone.classList.add('done');
     dropZone.innerHTML = `
       <div class="drop-icon">✅</div>
-      <div class="drop-label">${totalPatched} action(s) patched</div>
+      <div class="drop-label">${allPatches.length} action(s) patched</div>
       <div class="drop-hint">Downloading ${outName}</div>
     `;
     resetBtn.classList.add('show');
