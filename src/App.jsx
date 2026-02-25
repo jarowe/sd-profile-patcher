@@ -7,7 +7,7 @@ import StarseedProject from './pages/StarseedProject';
 
 function App() {
   return (
-    <Router>
+    <Router basename={import.meta.env.BASE_URL}>
       <div className="app-container">
         <Navbar />
         <main className="main-content">
