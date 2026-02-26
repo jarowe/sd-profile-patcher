@@ -234,7 +234,8 @@ export default function Home() {
           globe.customUniforms = {
             time: { value: 0 },
             audioPulse: { value: 0 },
-            prismPulse: { value: 0.0 }
+            prismPulse: { value: 0.0 },
+            introIntensity: { value: 1.0 } // Starts hot, decays during intro
           };
         }
 
@@ -303,7 +304,7 @@ export default function Home() {
 
               void main() {
                 vec4 texCol = texture2D(earthMap, vUv);
-                float waterVal = 1.0 - texture2D(waterMask, vUv).r;
+                float waterVal = texture2D(waterMask, vUv).r;
                 float isWater = smoothstep(0.3, 0.7, waterVal);
 
                 vec3 viewDir = normalize(-vViewPos);
@@ -382,12 +383,14 @@ export default function Home() {
               uniform float time;
               uniform float audioPulse;
               uniform float prismPulse;
+              uniform float introIntensity;
               varying vec3 vNormal;
               varying vec3 vPosition;
               const vec3 auroraGreen = vec3(0.0, 0.95, 0.5);
               const vec3 auroraPurple = vec3(0.5, 0.1, 0.95);
               const vec3 auroraBlue = vec3(0.1, 0.5, 1.0);
               const vec3 auroraRed = vec3(0.8, 0.1, 0.3);
+              const vec3 auroraGold = vec3(1.0, 0.8, 0.3);
 
               vec4 permute(vec4 x){return mod(((x*34.0)+1.0)*x, 289.0);}
               vec4 taylorInvSqrt(vec4 r){return 1.79284291400159 - 0.85373472095314 * r;}
@@ -420,21 +423,28 @@ export default function Home() {
               }
               void main() {
                 vec3 viewDir = normalize(cameraPosition - vPosition);
-                float fresnel = clamp(1.0 - dot(viewDir, vNormal), 0.0, 1.0);
-                // Graduated fresnel: strong at edges, gentle wash across face
-                fresnel = pow(fresnel, max(0.8, 2.0 - prismPulse * 1.2));
+                float rawFresnel = clamp(1.0 - dot(viewDir, vNormal), 0.0, 1.0);
 
-                float speed = time * (0.18 + prismPulse * 0.25);
+                // During intro: aurora wraps ENTIRE globe (fresnel min near 0 = full coverage)
+                // After intro: settles to edge-focused glow
+                float fresnelPow = max(0.15, 2.0 - introIntensity * 1.8 - prismPulse * 1.2);
+                float fresnel = pow(rawFresnel, fresnelPow);
+
+                // Faster swirling during intro for dramatic effect
+                float speed = time * (0.18 + introIntensity * 0.4 + prismPulse * 0.25);
                 float n1 = snoise(vPosition * 0.012 + vec3(0.0, speed, speed * 0.5));
                 float n2 = snoise(vPosition * 0.025 + vec3(speed * 0.3, 0.0, speed));
-                float n = n1 * 0.7 + n2 * 0.3; // layered noise for richer patterns
+                // Third noise layer for extra richness during intro
+                float n3 = snoise(vPosition * 0.008 + vec3(speed * 0.15, speed * 0.2, 0.0));
+                float n = n1 * 0.5 + n2 * 0.3 + n3 * 0.2;
                 float mask = smoothstep(0.0, 1.0, n * 0.5 + 0.5);
 
-                // Multi-color aurora bands
+                // Multi-color aurora bands with gold highlights during intro
                 vec3 col = mix(auroraGreen, auroraPurple, mask);
                 col = mix(col, auroraBlue, smoothstep(0.3, 0.7, n2 * 0.5 + 0.5));
-                col = mix(col, auroraRed, smoothstep(0.7, 1.0, fresnel) * 0.3);
-                col = mix(col, col * 1.5, audioPulse * fresnel);
+                col = mix(col, auroraRed, smoothstep(0.7, 1.0, rawFresnel) * 0.3);
+                col = mix(col, auroraGold, introIntensity * smoothstep(0.4, 0.8, n3 * 0.5 + 0.5) * 0.4);
+                col = mix(col, col * 1.5, audioPulse * rawFresnel);
 
                 // Prismatic rainbow on prism bop
                 vec3 hitColor = vec3(
@@ -444,10 +454,14 @@ export default function Home() {
                 );
                 col = mix(col, hitColor, prismPulse * 0.6);
 
-                // Flowing curtain alpha - visible across surface, intense at edges
+                // During intro: full coverage curtain. After: flowing edge bands
                 float curtain = smoothstep(-0.2, 0.6, n1) * smoothstep(-0.3, 0.5, n2);
-                float alpha = fresnel * curtain * (0.7 + audioPulse * 0.5 + prismPulse * 0.8);
-                gl_FragColor = vec4(col * (1.2 + audioPulse*0.5 + prismPulse*0.6), alpha * 0.55);
+                float introBoost = introIntensity * (0.6 + n3 * 0.4); // swirling full-globe coverage
+                float alpha = max(fresnel * curtain, introBoost) * (0.7 + audioPulse * 0.5 + prismPulse * 0.8);
+
+                float brightness = 1.2 + introIntensity * 0.6 + audioPulse * 0.5 + prismPulse * 0.6;
+                float alphaOut = alpha * (0.55 + introIntensity * 0.3);
+                gl_FragColor = vec4(col * brightness, alphaOut);
               }
             `,
             transparent: true,
@@ -622,6 +636,11 @@ export default function Home() {
               const dt = clock.getDelta();
               const elTs = clock.getElapsedTime();
               globe.customUniforms.time.value = elTs;
+
+              // Decay intro aurora (swirling orb fades over ~5 seconds)
+              if (globe.customUniforms.introIntensity.value > 0) {
+                globe.customUniforms.introIntensity.value = Math.max(0, globe.customUniforms.introIntensity.value - dt * 0.2);
+              }
 
               // Decay Prism Pulse organically
               if (globe.customUniforms.prismPulse.value > 0) {
