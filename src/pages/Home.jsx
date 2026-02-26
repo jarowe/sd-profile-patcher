@@ -327,17 +327,17 @@ export default function Home() {
                 // --- LAND: matte terrain + bump detail + night lights ---
                 float landFresnel = pow(rawFresnel, 3.5);
                 float bumpVal = packed.r;
-                float bumpLight = 1.0 + (bumpVal - 0.5) * 0.2 * dayStrength;
-                vec3 landDay = dayCol.rgb * dayLight * bumpLight + dayCol.rgb * landFresnel * 0.06;
+                float bumpLight = 1.0 + (bumpVal - 0.5) * 0.35 * dayStrength;
+                vec3 landDay = dayCol.rgb * dayLight * bumpLight + dayCol.rgb * landFresnel * 0.10;
                 float roughness = packed.g;
-                float landSpec = (1.0 - roughness) * pow(max(dot(vNormal, halfDir), 0.0), 80.0) * 0.04;
+                float landSpec = (1.0 - roughness) * pow(max(dot(vNormal, halfDir), 0.0), 60.0) * 0.12;
                 landDay += vec3(0.7, 0.75, 0.8) * landSpec;
                 vec3 landNight = nightCol * 1.8;
                 vec3 landColor = mix(landNight, landDay, dayStrength);
 
                 // --- WATER: animated undulating ocean + specular + Fresnel ---
-                vec2 waveUv = vUv * 18.0;
-                vec2 bigWaveUv = vUv * 4.0;
+                vec2 waveUv = vUv * 120.0;
+                vec2 bigWaveUv = vUv * 30.0;
                 float t = time * 0.12;
 
                 // Large ocean swells (visible undulation)
@@ -584,9 +584,9 @@ export default function Home() {
                 // Latitude constraint: aurora in polar regions only (after intro)
                 float latitude = abs(normalize(vWorldPos).y);
                 // Northern lights event: ~30s cycle with sharp burst extending south
-                float eventCycle = sin(time * 0.21) * 0.5 + 0.5;
-                float eventPulse = pow(eventCycle, 10.0); // Sharp peaks
-                float auroraZone = smoothstep(0.35 - eventPulse * 0.2, 0.7, latitude);
+                float eventCycle = sin(time * 0.3) * 0.5 + 0.5;
+                float eventPulse = pow(eventCycle, 6.0); // More frequent, gentler peaks
+                float auroraZone = smoothstep(0.25 - eventPulse * 0.25, 0.65, latitude);
                 // During intro: full globe coverage, then settle to poles
                 auroraZone = mix(auroraZone, 1.0, introIntensity);
                 // Prism bop briefly extends aurora (slower, gentler)
@@ -610,7 +610,7 @@ export default function Home() {
                 col = mix(col, auroraRed, smoothstep(0.7, 1.0, rawFresnel) * 0.3);
                 col = mix(col, auroraGold, introIntensity * smoothstep(0.4, 0.8, n3 * 0.5 + 0.5) * 0.4);
                 // Electric event burst: brighter green during events
-                col = mix(col, auroraGreen * 1.8, eventPulse * auroraZone * 0.3);
+                col = mix(col, auroraGreen * 2.5, eventPulse * auroraZone * 0.4);
                 col = mix(col, col * 1.5, audioPulse * rawFresnel);
 
                 // Slow prismatic color shift on bop
@@ -626,7 +626,7 @@ export default function Home() {
                 float introBoost = introIntensity * (0.6 + n3 * 0.4);
                 float alpha = max(fresnel * curtain * auroraZone, introBoost) * (0.7 + audioPulse * 0.5 + prismPulse * 0.2);
 
-                float brightness = 1.6 + introIntensity * 0.8 + audioPulse * 0.6 + eventPulse * 0.5 + prismPulse * 0.2;
+                float brightness = 2.0 + introIntensity * 0.8 + audioPulse * 0.6 + eventPulse * 0.8 + prismPulse * 0.3;
                 float alphaOut = alpha * (0.55 + introIntensity * 0.3);
                 gl_FragColor = vec4(col * brightness, alphaOut);
               }
@@ -1543,6 +1543,7 @@ export default function Home() {
   const [peekPosition, setPeekPosition] = useState({ cell: 0, side: 'right' });
   const [prismBops, setPrismBops] = useState(0);
   const [prismBubble, setPrismBubble] = useState(null);
+  const [prismSparkles, setPrismSparkles] = useState([]);
   const [showSpeedGame, setShowSpeedGame] = useState(false);
 
   const prismPhrases = [
@@ -1604,6 +1605,19 @@ export default function Home() {
       drift: 0.5,
       ticks: 150,
     });
+
+    // Spawn sparkle trail particles
+    const sparkles = Array.from({ length: 16 }, (_, i) => ({
+      id: Date.now() + i,
+      x: (Math.random() - 0.5) * 100,
+      y: (Math.random() - 0.5) * 100 - 20,
+      color: ['#7c3aed', '#38bdf8', '#f472b6', '#22c55e', '#fbbf24', '#ef4444', '#a78bfa', '#34d399'][i % 8],
+      delay: Math.random() * 0.6,
+      size: 2 + Math.random() * 5,
+      duration: 1.5 + Math.random() * 1.5,
+    }));
+    setPrismSparkles(sparkles);
+    setTimeout(() => setPrismSparkles([]), 3500);
 
     // Every 3 bops, trigger the speed puzzle game
     if (newBops % 3 === 0) {
@@ -1985,96 +1999,161 @@ export default function Home() {
                   </motion.div>
                 )}
               </AnimatePresence>
-              <svg className="peek-prism" width="64" height="60" viewBox="-8 0 72 60" fill="none">
-                <defs>
-                  <linearGradient id="prism-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#7c3aed">
-                      <animate attributeName="stop-color" values="#7c3aed;#38bdf8;#f472b6;#22c55e;#fbbf24;#7c3aed" dur="5s" repeatCount="indefinite" />
-                    </stop>
-                    <stop offset="50%" stopColor="#38bdf8">
-                      <animate attributeName="stop-color" values="#38bdf8;#f472b6;#22c55e;#fbbf24;#7c3aed;#38bdf8" dur="5s" repeatCount="indefinite" />
-                    </stop>
-                    <stop offset="100%" stopColor="#f472b6">
-                      <animate attributeName="stop-color" values="#f472b6;#22c55e;#fbbf24;#7c3aed;#38bdf8;#f472b6" dur="5s" repeatCount="indefinite" />
-                    </stop>
-                  </linearGradient>
-                  <linearGradient id="prism-glass" x1="30%" y1="0%" x2="70%" y2="100%">
-                    <stop offset="0%" stopColor="rgba(255,255,255,0.5)" />
-                    <stop offset="35%" stopColor="rgba(255,255,255,0.05)" />
-                    <stop offset="55%" stopColor="rgba(255,255,255,0.18)" />
-                    <stop offset="100%" stopColor="rgba(255,255,255,0.25)" />
-                  </linearGradient>
-                  <linearGradient id="prism-edge" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="rgba(255,255,255,0.5)" />
-                    <stop offset="50%" stopColor="rgba(255,255,255,0.1)" />
-                    <stop offset="100%" stopColor="rgba(255,255,255,0.4)" />
-                  </linearGradient>
-                  <filter id="prism-glow">
-                    <feGaussianBlur stdDeviation="2" result="blur" />
-                    <feColorMatrix type="saturate" values="2" in="blur" result="sat" />
-                    <feMerge><feMergeNode in="sat" /><feMergeNode in="SourceGraphic" /></feMerge>
-                  </filter>
-                  {/* Soft glow filter for realistic light rays */}
-                  <filter id="ray-glow" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur stdDeviation="2.5" result="blur" />
-                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                  </filter>
-                  {/* Gradient for each ray color to fade out */}
-                  <linearGradient id="ray-red" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#ef4444" stopOpacity="0.9" /><stop offset="100%" stopColor="#ef4444" stopOpacity="0" /></linearGradient>
-                  <linearGradient id="ray-orange" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#f59e0b" stopOpacity="0.85" /><stop offset="100%" stopColor="#f59e0b" stopOpacity="0" /></linearGradient>
-                  <linearGradient id="ray-green" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#22c55e" stopOpacity="0.8" /><stop offset="100%" stopColor="#22c55e" stopOpacity="0" /></linearGradient>
-                  <linearGradient id="ray-blue" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#38bdf8" stopOpacity="0.85" /><stop offset="100%" stopColor="#38bdf8" stopOpacity="0" /></linearGradient>
-                  <linearGradient id="ray-purple" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#7c3aed" stopOpacity="0.9" /><stop offset="100%" stopColor="#7c3aed" stopOpacity="0" /></linearGradient>
-                  <linearGradient id="ray-pink" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#ec4899" stopOpacity="0.8" /><stop offset="100%" stopColor="#ec4899" stopOpacity="0" /></linearGradient>
-                  <linearGradient id="beam-in" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="white" stopOpacity="0" /><stop offset="70%" stopColor="white" stopOpacity="0.6" /><stop offset="100%" stopColor="white" stopOpacity="0.8" /></linearGradient>
-                  <clipPath id="prism-clip"><polygon points="28,4 50,48 6,48" /></clipPath>
-                </defs>
-                {/* Soft incoming light beam */}
-                <line x1="-4" y1="22" x2="20" y2="28" stroke="url(#beam-in)" strokeWidth="3.5" strokeLinecap="round" filter="url(#ray-glow)">
-                  <animate attributeName="opacity" values="0.7;0.4;0.7" dur="3s" repeatCount="indefinite" />
-                </line>
-                {/* Glass body */}
-                <polygon points="28,4 50,48 6,48" fill="url(#prism-gradient)" filter="url(#prism-glow)" opacity="0.85" />
-                <polygon points="28,4 50,48 6,48" fill="url(#prism-glass)" />
-                <polygon points="28,4 50,48 6,48" fill="none" stroke="url(#prism-edge)" strokeWidth="0.8" opacity="0.6" />
-                {/* Internal caustic shimmer */}
-                <g clipPath="url(#prism-clip)" opacity="0.3">
-                  <line x1="28" y1="10" x2="15" y2="44" stroke="white" strokeWidth="0.4">
-                    <animate attributeName="x2" values="15;19;15" dur="3s" repeatCount="indefinite" />
-                  </line>
-                  <line x1="28" y1="10" x2="41" y2="44" stroke="white" strokeWidth="0.4">
-                    <animate attributeName="x2" values="41;37;41" dur="3.5s" repeatCount="indefinite" />
-                  </line>
-                </g>
-                {/* Eye */}
-                <circle cx="28" cy="30" r="5" fill="rgba(0,0,0,0.35)" />
-                <circle cx="28" cy="30" r="3.2" fill="rgba(255,255,255,0.9)">
-                  <animate attributeName="r" values="3.2;3.6;3.2" dur="2s" repeatCount="indefinite" />
-                </circle>
-                <circle cx="28" cy="30" r="1.6" fill="#050510" />
-                <circle cx="29.3" cy="28.5" r="0.8" fill="white" />
-                {/* Prismatic light rays - realistic glowing beams */}
-                <g filter="url(#ray-glow)">
-                  <line x1="42" y1="26" x2="64" y2="14" stroke="url(#ray-red)" strokeWidth="2.5" strokeLinecap="round">
-                    <animate attributeName="y2" values="14;16;14" dur="2.2s" repeatCount="indefinite" />
-                  </line>
-                  <line x1="43" y1="29" x2="64" y2="22" stroke="url(#ray-orange)" strokeWidth="2.2" strokeLinecap="round">
-                    <animate attributeName="y2" values="22;24;22" dur="2.5s" repeatCount="indefinite" />
-                  </line>
-                  <line x1="44" y1="32" x2="64" y2="30" stroke="url(#ray-green)" strokeWidth="2" strokeLinecap="round">
-                    <animate attributeName="y2" values="30;32;30" dur="2.8s" repeatCount="indefinite" />
-                  </line>
-                  <line x1="44" y1="35" x2="64" y2="38" stroke="url(#ray-blue)" strokeWidth="2.2" strokeLinecap="round">
-                    <animate attributeName="y2" values="38;36;38" dur="2.3s" repeatCount="indefinite" />
-                  </line>
-                  <line x1="43" y1="38" x2="64" y2="46" stroke="url(#ray-purple)" strokeWidth="2.5" strokeLinecap="round">
-                    <animate attributeName="y2" values="46;44;46" dur="2.6s" repeatCount="indefinite" />
-                  </line>
-                  <line x1="42" y1="41" x2="64" y2="54" stroke="url(#ray-pink)" strokeWidth="2" strokeLinecap="round">
-                    <animate attributeName="y2" values="54;52;54" dur="2.1s" repeatCount="indefinite" />
-                  </line>
-                </g>
-              </svg>
+              <div className="prism-3d">
+                <svg className="peek-prism" width="70" height="65" viewBox="-10 -2 76 64" fill="none">
+                  <defs>
+                    {/* Multi-layer glass gradient - simulates internal dispersion */}
+                    <linearGradient id="prism-glass-base" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="rgba(167,139,250,0.55)">
+                        <animate attributeName="stop-color" values="rgba(167,139,250,0.55);rgba(56,189,248,0.5);rgba(244,114,182,0.45);rgba(34,197,94,0.5);rgba(167,139,250,0.55)" dur="6s" repeatCount="indefinite" />
+                      </stop>
+                      <stop offset="50%" stopColor="rgba(56,189,248,0.25)">
+                        <animate attributeName="stop-color" values="rgba(56,189,248,0.25);rgba(244,114,182,0.25);rgba(251,191,36,0.25);rgba(124,58,237,0.25);rgba(56,189,248,0.25)" dur="6s" repeatCount="indefinite" />
+                      </stop>
+                      <stop offset="100%" stopColor="rgba(244,114,182,0.5)">
+                        <animate attributeName="stop-color" values="rgba(244,114,182,0.5);rgba(34,197,94,0.45);rgba(167,139,250,0.5);rgba(56,189,248,0.45);rgba(244,114,182,0.5)" dur="6s" repeatCount="indefinite" />
+                      </stop>
+                    </linearGradient>
+                    {/* Glass surface specular highlight */}
+                    <linearGradient id="prism-specular" x1="20%" y1="0%" x2="80%" y2="100%">
+                      <stop offset="0%" stopColor="rgba(255,255,255,0.7)">
+                        <animate attributeName="stop-color" values="rgba(255,255,255,0.7);rgba(255,255,255,0.4);rgba(255,255,255,0.7)" dur="3s" repeatCount="indefinite" />
+                      </stop>
+                      <stop offset="25%" stopColor="rgba(255,255,255,0.04)" />
+                      <stop offset="50%" stopColor="rgba(255,255,255,0.02)" />
+                      <stop offset="75%" stopColor="rgba(255,255,255,0.12)" />
+                      <stop offset="100%" stopColor="rgba(255,255,255,0.35)" />
+                    </linearGradient>
+                    {/* Internal radial light */}
+                    <radialGradient id="prism-inner-light" cx="45%" cy="40%" r="50%">
+                      <stop offset="0%" stopColor="rgba(255,255,255,0.3)">
+                        <animate attributeName="stop-color" values="rgba(255,255,255,0.3);rgba(167,139,250,0.2);rgba(56,189,248,0.2);rgba(255,255,255,0.3)" dur="4s" repeatCount="indefinite" />
+                      </stop>
+                      <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+                    </radialGradient>
+                    {/* Edge highlight for glass depth */}
+                    <linearGradient id="prism-edge-glow" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="rgba(255,255,255,0.8)" />
+                      <stop offset="15%" stopColor="rgba(255,255,255,0.15)" />
+                      <stop offset="85%" stopColor="rgba(255,255,255,0.1)" />
+                      <stop offset="100%" stopColor="rgba(255,255,255,0.6)" />
+                    </linearGradient>
+                    {/* Glass luminosity glow */}
+                    <filter id="glass-glow" x="-40%" y="-40%" width="180%" height="180%">
+                      <feGaussianBlur stdDeviation="3.5" result="glow" />
+                      <feColorMatrix type="saturate" values="2.5" in="glow" result="sat" />
+                      <feMerge><feMergeNode in="sat" /><feMergeNode in="SourceGraphic" /></feMerge>
+                    </filter>
+                    {/* Wide soft ray glow */}
+                    <filter id="ray-soft" x="-100%" y="-100%" width="300%" height="300%">
+                      <feGaussianBlur stdDeviation="3.5" result="blur" />
+                      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                    </filter>
+                    {/* Clip for internal effects */}
+                    <clipPath id="prism-clip"><polygon points="28,4 50,48 6,48" /></clipPath>
+                    {/* Ray gradients - wider bands with soft falloff */}
+                    <linearGradient id="ray-r" x1="0%" x2="100%"><stop offset="0%" stopColor="#ff4444" stopOpacity="0.9"/><stop offset="50%" stopColor="#ff4444" stopOpacity="0.35"/><stop offset="100%" stopColor="#ff4444" stopOpacity="0"/></linearGradient>
+                    <linearGradient id="ray-o" x1="0%" x2="100%"><stop offset="0%" stopColor="#ff9900" stopOpacity="0.85"/><stop offset="50%" stopColor="#ff9900" stopOpacity="0.3"/><stop offset="100%" stopColor="#ff9900" stopOpacity="0"/></linearGradient>
+                    <linearGradient id="ray-y" x1="0%" x2="100%"><stop offset="0%" stopColor="#ffdd00" stopOpacity="0.8"/><stop offset="50%" stopColor="#ffdd00" stopOpacity="0.25"/><stop offset="100%" stopColor="#ffdd00" stopOpacity="0"/></linearGradient>
+                    <linearGradient id="ray-g" x1="0%" x2="100%"><stop offset="0%" stopColor="#22cc66" stopOpacity="0.85"/><stop offset="50%" stopColor="#22cc66" stopOpacity="0.3"/><stop offset="100%" stopColor="#22cc66" stopOpacity="0"/></linearGradient>
+                    <linearGradient id="ray-b" x1="0%" x2="100%"><stop offset="0%" stopColor="#4499ff" stopOpacity="0.85"/><stop offset="50%" stopColor="#4499ff" stopOpacity="0.3"/><stop offset="100%" stopColor="#4499ff" stopOpacity="0"/></linearGradient>
+                    <linearGradient id="ray-v" x1="0%" x2="100%"><stop offset="0%" stopColor="#9944ff" stopOpacity="0.9"/><stop offset="50%" stopColor="#9944ff" stopOpacity="0.35"/><stop offset="100%" stopColor="#9944ff" stopOpacity="0"/></linearGradient>
+                    {/* Incoming beam */}
+                    <linearGradient id="beam-in" x1="0%" x2="100%"><stop offset="0%" stopColor="white" stopOpacity="0"/><stop offset="60%" stopColor="white" stopOpacity="0.4"/><stop offset="100%" stopColor="white" stopOpacity="0.85"/></linearGradient>
+                  </defs>
+                  {/* Ambient light spill from refraction onto surrounding area */}
+                  <ellipse cx="50" cy="32" rx="18" ry="22" fill="none" stroke="rgba(124,58,237,0.08)" strokeWidth="8" filter="url(#ray-soft)">
+                    <animate attributeName="rx" values="18;22;18" dur="4s" repeatCount="indefinite" />
+                  </ellipse>
+                  {/* Incoming white light beam - wider, more physical */}
+                  <rect x="-8" y="24" width="24" height="5" rx="2.5" fill="url(#beam-in)" filter="url(#ray-soft)">
+                    <animate attributeName="opacity" values="0.8;0.45;0.8" dur="3s" repeatCount="indefinite" />
+                  </rect>
+                  {/* Shadow underneath for 3D grounding */}
+                  <ellipse cx="28" cy="52" rx="16" ry="3" fill="rgba(0,0,0,0.2)" filter="url(#ray-soft)" />
+                  {/* Glass body - base refraction color */}
+                  <polygon points="28,4 50,48 6,48" fill="url(#prism-glass-base)" filter="url(#glass-glow)" opacity="0.92" />
+                  {/* Glass body - specular highlight layer */}
+                  <polygon points="28,4 50,48 6,48" fill="url(#prism-specular)" />
+                  {/* Glass body - internal radial light */}
+                  <polygon points="28,4 50,48 6,48" fill="url(#prism-inner-light)" />
+                  {/* Glass facet edge - left face (slightly darker for depth) */}
+                  <polygon points="28,4 6,48 28,48" fill="rgba(0,0,0,0.08)" />
+                  {/* Glass edge outline - crisp glass border */}
+                  <polygon points="28,4 50,48 6,48" fill="none" stroke="url(#prism-edge-glow)" strokeWidth="1.2" strokeLinejoin="round" opacity="0.8" />
+                  {/* Internal caustic shimmer - animated light lines inside glass */}
+                  <g clipPath="url(#prism-clip)" opacity="0.5">
+                    <line x1="28" y1="8" x2="12" y2="46" stroke="rgba(255,255,255,0.7)" strokeWidth="0.6">
+                      <animate attributeName="x2" values="12;20;12" dur="3s" repeatCount="indefinite" />
+                      <animate attributeName="opacity" values="0.7;0.2;0.7" dur="3s" repeatCount="indefinite" />
+                    </line>
+                    <line x1="28" y1="8" x2="44" y2="46" stroke="rgba(255,255,255,0.6)" strokeWidth="0.6">
+                      <animate attributeName="x2" values="44;36;44" dur="3.5s" repeatCount="indefinite" />
+                      <animate attributeName="opacity" values="0.6;0.15;0.6" dur="3.5s" repeatCount="indefinite" />
+                    </line>
+                    {/* Rainbow caustics inside glass body */}
+                    <line x1="28" y1="14" x2="17" y2="44" stroke="rgba(124,58,237,0.5)" strokeWidth="1.2">
+                      <animate attributeName="x2" values="17;23;17" dur="2.8s" repeatCount="indefinite" />
+                    </line>
+                    <line x1="28" y1="14" x2="39" y2="44" stroke="rgba(56,189,248,0.4)" strokeWidth="1.2">
+                      <animate attributeName="x2" values="39;33;39" dur="3.2s" repeatCount="indefinite" />
+                    </line>
+                    <line x1="28" y1="18" x2="22" y2="44" stroke="rgba(244,114,182,0.3)" strokeWidth="0.8">
+                      <animate attributeName="x2" values="22;28;22" dur="2.5s" repeatCount="indefinite" />
+                    </line>
+                  </g>
+                  {/* Eye - larger, more expressive */}
+                  <circle cx="28" cy="30" r="6" fill="rgba(0,0,0,0.3)" />
+                  <circle cx="28" cy="30" r="4.2" fill="rgba(255,255,255,0.93)">
+                    <animate attributeName="r" values="4.2;4.6;4.2" dur="2s" repeatCount="indefinite" />
+                  </circle>
+                  <circle cx="28" cy="30" r="2" fill="#050510" />
+                  <circle cx="29.8" cy="28" r="1.1" fill="white" opacity="0.95" />
+                  <circle cx="26.3" cy="31.2" r="0.5" fill="white" opacity="0.4" />
+                  {/* Prismatic refraction rays - WIDE soft beams, not thin lines */}
+                  <g filter="url(#ray-soft)">
+                    <rect x="43" y="14" width="26" height="4" rx="2" fill="url(#ray-r)" transform="rotate(-12, 43, 16)">
+                      <animate attributeName="opacity" values="0.9;0.5;0.9" dur="2.2s" repeatCount="indefinite" />
+                      <animate attributeName="width" values="26;22;26" dur="2.2s" repeatCount="indefinite" />
+                    </rect>
+                    <rect x="44" y="21" width="24" height="3.5" rx="1.75" fill="url(#ray-o)" transform="rotate(-6, 44, 22.75)">
+                      <animate attributeName="opacity" values="0.85;0.45;0.85" dur="2.5s" repeatCount="indefinite" />
+                      <animate attributeName="width" values="24;20;24" dur="2.5s" repeatCount="indefinite" />
+                    </rect>
+                    <rect x="45" y="27.5" width="24" height="3.5" rx="1.75" fill="url(#ray-y)" transform="rotate(-1, 45, 29.25)">
+                      <animate attributeName="opacity" values="0.8;0.4;0.8" dur="2.8s" repeatCount="indefinite" />
+                      <animate attributeName="width" values="24;19;24" dur="2.8s" repeatCount="indefinite" />
+                    </rect>
+                    <rect x="45" y="34" width="24" height="3.5" rx="1.75" fill="url(#ray-g)" transform="rotate(5, 45, 35.75)">
+                      <animate attributeName="opacity" values="0.85;0.45;0.85" dur="2.3s" repeatCount="indefinite" />
+                      <animate attributeName="width" values="24;20;24" dur="2.3s" repeatCount="indefinite" />
+                    </rect>
+                    <rect x="44" y="40.5" width="24" height="4" rx="2" fill="url(#ray-b)" transform="rotate(10, 44, 42.5)">
+                      <animate attributeName="opacity" values="0.85;0.5;0.85" dur="2.6s" repeatCount="indefinite" />
+                      <animate attributeName="width" values="24;20;24" dur="2.6s" repeatCount="indefinite" />
+                    </rect>
+                    <rect x="43" y="47" width="26" height="3.5" rx="1.75" fill="url(#ray-v)" transform="rotate(15, 43, 48.75)">
+                      <animate attributeName="opacity" values="0.9;0.5;0.9" dur="2.1s" repeatCount="indefinite" />
+                      <animate attributeName="width" values="26;21;26" dur="2.1s" repeatCount="indefinite" />
+                    </rect>
+                  </g>
+                </svg>
+                {/* Sparkle trail particles */}
+                {prismSparkles.map(s => (
+                  <div
+                    key={s.id}
+                    className="prism-sparkle"
+                    style={{
+                      '--sparkle-x': `${s.x}px`,
+                      '--sparkle-y': `${s.y}px`,
+                      '--sparkle-color': s.color,
+                      '--sparkle-delay': `${s.delay}s`,
+                      '--sparkle-size': `${s.size}px`,
+                      '--sparkle-duration': `${s.duration}s`,
+                    }}
+                  />
+                ))}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
