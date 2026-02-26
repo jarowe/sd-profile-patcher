@@ -101,6 +101,36 @@ export default function Home() {
   const [globeSize, setGlobeSize] = useState({ width: 0, height: 0 });
   const [globeMounted, setGlobeMounted] = useState(false);
 
+  // Create globe material once as a ref - passed as prop, NOT as a method call
+  const globePhysMat = useRef(null);
+  if (!globePhysMat.current) {
+    const loader = new THREE.TextureLoader();
+    globePhysMat.current = new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color(0x334466),
+      emissive: new THREE.Color(0x0a1628),
+      roughness: 0.2,
+      metalness: 0.7,
+      iridescence: 1.0,
+      iridescenceIOR: 1.2,
+      iridescenceThicknessRange: [100, 400],
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.15,
+    });
+    loader.load('//unpkg.com/three-globe/example/img/earth-blue-marble.jpg', (tex) => {
+      globePhysMat.current.map = tex;
+      globePhysMat.current.needsUpdate = true;
+    });
+    loader.load('//unpkg.com/three-globe/example/img/earth-topology.png', (tex) => {
+      globePhysMat.current.bumpMap = tex;
+      globePhysMat.current.bumpScale = 1.0;
+      globePhysMat.current.needsUpdate = true;
+    });
+    loader.load('//unpkg.com/three-globe/example/img/earth-water.png', (tex) => {
+      globePhysMat.current.roughnessMap = tex;
+      globePhysMat.current.needsUpdate = true;
+    });
+  }
+
   useEffect(() => {
     const observer = new ResizeObserver((entries) => {
       if (entries[0]) {
@@ -155,34 +185,11 @@ export default function Home() {
     const globe = globeRef.current;
     if (!globe) return;
 
-    // ------------------------------------------------------------------
-    // 1. MATERIAL SETUP
-    // ------------------------------------------------------------------
-    const textureLoader = new THREE.TextureLoader();
-    const mapTexture = textureLoader.load('//unpkg.com/three-globe/example/img/earth-blue-marble.jpg');
-    const bumpTexture = textureLoader.load('//unpkg.com/three-globe/example/img/earth-topology.png');
-    const waterTexture = textureLoader.load('//unpkg.com/three-globe/example/img/earth-water.png');
+    // Material is passed as a prop (globeMaterial={...}) - no method call needed here
 
-    const physMat = new THREE.MeshPhysicalMaterial({
-      map: mapTexture,
-      bumpMap: bumpTexture,
-      bumpScale: 1.0,
-      roughnessMap: waterTexture,
-      color: new THREE.Color(0x334466),
-      emissive: new THREE.Color(0x0a1628),
-      roughness: 0.2, // Water will be shiny thanks to roughnessMap
-      metalness: 0.7,
-      iridescence: 1.0,
-      iridescenceIOR: 1.2,
-      iridescenceThicknessRange: [100, 400],
-      clearcoat: 1.0,
-      clearcoatRoughness: 0.15,
-    });
-
-    globe.globeMaterial(physMat);
-
+    try {
     // ------------------------------------------------------------------
-    // 2. CONTROLS SETUP
+    // CONTROLS SETUP
     // ------------------------------------------------------------------
     const controls = globe.controls();
     controls.autoRotate = false;
@@ -443,6 +450,10 @@ export default function Home() {
         requestAnimationFrame(animateOverrides);
       };
       animateOverrides();
+    }
+
+    } catch (e) {
+      console.warn('Globe ready init error:', e);
     }
   }, [startGlobeCycle]);
 
@@ -771,8 +782,7 @@ export default function Home() {
                     onGlobeReady={handleGlobeReady}
                     width={globeSize.width}
                     height={globeSize.height}
-
-
+                    globeMaterial={globePhysMat.current}
                     backgroundColor="rgba(0,0,0,0)"
                     arcsData={arcsData}
                     arcColor="color"
