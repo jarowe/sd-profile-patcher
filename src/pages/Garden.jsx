@@ -289,9 +289,13 @@ export default function Garden() {
     const container = useRef();
     const [activeNote, setActiveNote] = useState(null);
 
+    // Photo lightbox
+    const [lightboxPhoto, setLightboxPhoto] = useState(null);
+
     // Gallery drag-to-scroll + wheel-to-scroll
     const galleryScrollRef = useRef(null);
     const isDragging = useRef(false);
+    const hasDragged = useRef(false);
     const dragStartX = useRef(0);
     const dragScrollLeft = useRef(0);
 
@@ -315,6 +319,7 @@ export default function Garden() {
         const el = galleryScrollRef.current;
         if (!el) return;
         isDragging.current = true;
+        hasDragged.current = false;
         dragStartX.current = e.pageX;
         dragScrollLeft.current = el.scrollLeft;
         el.style.cursor = 'grabbing';
@@ -332,12 +337,28 @@ export default function Garden() {
 
     const handleGalleryMouseMove = useCallback((e) => {
         if (!isDragging.current) return;
+        hasDragged.current = true;
         e.preventDefault();
         const el = galleryScrollRef.current;
         if (!el) return;
         const walk = (e.pageX - dragStartX.current) * 1.5;
         el.scrollLeft = dragScrollLeft.current - walk;
     }, []);
+
+    const handlePhotoClick = useCallback((src) => {
+        if (hasDragged.current) return;
+        playClickSound();
+        setLightboxPhoto(src);
+    }, []);
+
+    // Close lightbox on Escape
+    useEffect(() => {
+        const handleKey = (e) => {
+            if (e.key === 'Escape' && lightboxPhoto) setLightboxPhoto(null);
+        };
+        window.addEventListener('keydown', handleKey);
+        return () => window.removeEventListener('keydown', handleKey);
+    }, [lightboxPhoto]);
 
     useGSAP(() => {
         gsap.from('.garden-header', {
@@ -452,6 +473,40 @@ export default function Garden() {
                 })}
             </div>
 
+            {/* Photo lightbox with film effect */}
+            <AnimatePresence>
+                {lightboxPhoto && (
+                    <motion.div
+                        className="photo-lightbox-backdrop"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.3 }}
+                        onClick={() => setLightboxPhoto(null)}
+                    >
+                        <motion.div
+                            className="film-frame"
+                            initial={{ scale: 0.85, opacity: 0, rotateX: 8 }}
+                            animate={{ scale: 1, opacity: 1, rotateX: 0 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <img src={lightboxPhoto} className="film-photo" alt="Photo" />
+                            <div className="film-grain" />
+                            <div className="film-vignette" />
+                            <div className="film-info">
+                                <span className="film-brand">JAROWE</span>
+                                <span className="film-detail">WORLDSCHOOL JOURNAL</span>
+                            </div>
+                            <button className="film-close" onClick={() => setLightboxPhoto(null)} aria-label="Close">
+                                <X size={24} />
+                            </button>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* Full overlay / modal */}
             <AnimatePresence>
                 {activeNote && (
@@ -531,7 +586,7 @@ export default function Garden() {
                                             onMouseLeave={handleGalleryMouseUp}
                                         >
                                             {activeNote.gallery.map((src, i) => (
-                                                <div key={i} className="gallery-item">
+                                                <div key={i} className="gallery-item" onClick={() => handlePhotoClick(src)}>
                                                     <img
                                                         src={src}
                                                         alt={`${activeNote.title} photo ${i + 1}`}

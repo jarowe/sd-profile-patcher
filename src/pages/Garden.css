@@ -494,6 +494,129 @@
     50% { transform: translateX(6px); opacity: 1; }
 }
 
+/* ---------- Photo Lightbox (Fuji/Leica film effect) ---------- */
+
+.photo-lightbox-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    background: rgba(0, 0, 0, 0.88);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: zoom-out;
+}
+
+.film-frame {
+    position: relative;
+    max-width: 85vw;
+    max-height: 85vh;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow:
+        0 25px 80px rgba(0, 0, 0, 0.8),
+        0 0 0 1px rgba(255, 255, 255, 0.08),
+        0 0 60px rgba(124, 58, 237, 0.1);
+    cursor: default;
+    background: #0a0a0f;
+}
+
+.film-photo {
+    display: block;
+    max-width: 85vw;
+    max-height: 85vh;
+    object-fit: contain;
+    border-radius: 16px;
+    filter: contrast(1.05) saturate(1.08);
+}
+
+.film-grain {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: 16px;
+    opacity: 0.04;
+    background-image:
+        repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255, 255, 255, 0.03) 2px, rgba(255, 255, 255, 0.03) 4px),
+        repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(255, 255, 255, 0.02) 2px, rgba(255, 255, 255, 0.02) 4px);
+    mix-blend-mode: overlay;
+    animation: grainShift 0.5s steps(4) infinite;
+}
+
+@keyframes grainShift {
+    0% { transform: translate(0, 0); }
+    25% { transform: translate(-1px, 1px); }
+    50% { transform: translate(1px, -1px); }
+    75% { transform: translate(-1px, -1px); }
+    100% { transform: translate(1px, 1px); }
+}
+
+.film-vignette {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, transparent 45%, rgba(0, 0, 0, 0.55) 100%);
+    pointer-events: none;
+    border-radius: 16px;
+}
+
+.film-info {
+    position: absolute;
+    bottom: 20px;
+    right: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 3px;
+    pointer-events: none;
+}
+
+.film-brand {
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.4);
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+.film-detail {
+    font-size: 0.55rem;
+    letter-spacing: 2px;
+    color: rgba(255, 255, 255, 0.25);
+    text-transform: uppercase;
+}
+
+.film-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(10px);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.film-close:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: scale(1.1) rotate(90deg);
+}
+
+/* Gallery item cursor for lightbox */
+.gallery-item {
+    cursor: zoom-in;
+}
+
 /* ---------- Responsive ---------- */
 
 @media (max-width: 768px) {

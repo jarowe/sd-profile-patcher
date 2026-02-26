@@ -11,7 +11,7 @@ import { playHoverSound, playClickSound } from '../utils/sounds';
 import DailyCipher from '../components/DailyCipher';
 import SpeedPuzzle from '../components/SpeedPuzzle';
 import './Home.css';
-import { Color } from 'three';
+import { Color, TextureLoader } from 'three';
 const Globe = lazy(() => import('react-globe.gl'));
 
 const quotes = [
@@ -33,6 +33,25 @@ const currentlyMessages = [
   "Maria says I need to sleep more. She's right.",
   "Jace asked me to explain quantum computing today",
   "Three boys. Zero chill. Maximum adventure.",
+];
+
+const worldschoolMessages = [
+  { from: 'Maria', text: "Found a gluten-free bakery in Athens!! The boys lost it" },
+  { from: 'Jace', text: "Dad, glaciers move like 1 inch per day. I measured." },
+  { from: 'Jax', text: "I negotiated in Greek today. Got 2 euros off." },
+  { from: 'Dad', text: "Today's lesson: live volcano. No textbook needed." },
+  { from: 'Jole', text: "Can gelato count as lunch? It's educational." },
+  { from: 'Maria', text: "Did you pack the GF bread? ...Please say yes." },
+  { from: 'Jace', text: "The Greek market lady taught me to count to 10!" },
+  { from: 'Dad', text: "WiFi from the Austrian Alps: surprisingly excellent." },
+  { from: 'Jax', text: "I navigated the whole city. I'm basically a GPS now." },
+  { from: 'Jole', text: "Museum guard said I asked the best question today!" },
+  { from: 'Maria', text: "3 countries, 2 weeks. The boys didn't even blink." },
+  { from: 'Dad', text: "Celiac life hack: pack snacks for every timezone." },
+  { from: 'Jace', text: "Can we homeschool on the beach? Asking for myself." },
+  { from: 'Jax', text: "Spain has the BEST gluten-free pizza. Fight me." },
+  { from: 'Jole', text: "I drew the Acropolis. It's better than the real one." },
+  { from: 'Maria', text: "This is the 4th cafe. We WILL find GF waffles." },
 ];
 
 const avatarEffects = ['float', 'glitch', 'spin', 'ripple'];
@@ -113,7 +132,7 @@ export default function Home() {
         setActiveExpedition(prev => {
           const next = (prev + 1) % expeditions.length;
           const loc = expeditions[next];
-          globeRef.current.pointOfView({ lat: loc.lat, lng: loc.lng, altitude: 0.4 }, 2500);
+          globeRef.current.pointOfView({ lat: loc.lat, lng: loc.lng, altitude: 1.2 }, 2500);
           setHoveredMarker(loc);
           // Clear marker tooltip after a moment
           setTimeout(() => {
@@ -138,41 +157,41 @@ export default function Home() {
       try {
         const controls = globe.controls();
         controls.autoRotate = true;
-        controls.autoRotateSpeed = 1.2;
+        controls.autoRotateSpeed = 0.5;
         controls.enableZoom = true;
-        controls.minDistance = 80;
-        controls.maxDistance = 400;
+        controls.minDistance = 120;
+        controls.maxDistance = 500;
         controls.enableDamping = true;
-        controls.dampingFactor = 0.05;
+        controls.dampingFactor = 0.02;
+        controls.rotateSpeed = 0.6;
 
         // Cinematic entrance
-        globe.pointOfView({ lat: 20, lng: 0, altitude: 3.5 });
+        globe.pointOfView({ lat: 20, lng: 0, altitude: 2.8 });
         setTimeout(() => {
           if (globeRef.current) {
             const first = expeditions[0];
-            globeRef.current.pointOfView({ lat: first.lat, lng: first.lng, altitude: 0.4 }, 4000);
+            globeRef.current.pointOfView({ lat: first.lat, lng: first.lng, altitude: 1.5 }, 5000);
           }
-        }, 300);
+        }, 400);
 
-        // Enhance Globe Material (may not be ready, wrap in try)
+        // Enhance Globe Material - MeshPhongMaterial: reflective oceans, matte land
+        const setupMaterial = (gm) => {
+          gm.color = new Color(0x88aacc);
+          gm.emissive = new Color(0x0a1628);
+          gm.emissiveIntensity = 0.15;
+          gm.specular = new Color(0x4488bb);
+          gm.shininess = 18;
+          // Water specular map: makes oceans reflective, land stays matte
+          new TextureLoader().load('//unpkg.com/three-globe/example/img/earth-water.png', (texture) => {
+            gm.specularMap = texture;
+            gm.needsUpdate = true;
+          });
+        };
         try {
-          const globeMaterial = globe.globeMaterial();
-          globeMaterial.color = new Color(0xffffff);
-          globeMaterial.emissive = new Color(0x1a1040);
-          globeMaterial.emissiveIntensity = 0.3;
-          globeMaterial.roughness = 0.3;
-          globeMaterial.metalness = 0.7;
+          setupMaterial(globe.globeMaterial());
         } catch (_) {
-          // Material not ready yet, try once more after a frame
           requestAnimationFrame(() => {
-            try {
-              const gm = globe.globeMaterial();
-              gm.color = new Color(0xffffff);
-              gm.emissive = new Color(0x1a1040);
-              gm.emissiveIntensity = 0.3;
-              gm.roughness = 0.3;
-              gm.metalness = 0.7;
-            } catch (_) { /* Globe material unavailable, skip */ }
+            try { setupMaterial(globe.globeMaterial()); } catch (_) {}
           });
         }
 
@@ -189,10 +208,10 @@ export default function Home() {
             controls.autoRotateSpeed = 0;
             controls.autoRotate = true;
             const ramp = setInterval(() => {
-              if (controls.autoRotateSpeed < 1.2) {
-                controls.autoRotateSpeed += 0.03;
+              if (controls.autoRotateSpeed < 0.5) {
+                controls.autoRotateSpeed += 0.015;
               } else {
-                controls.autoRotateSpeed = 1.2;
+                controls.autoRotateSpeed = 0.5;
                 clearInterval(ramp);
               }
             }, 50);
@@ -324,7 +343,7 @@ export default function Home() {
     setActiveExpedition(newIdx);
     const loc = expeditions[newIdx];
     if (globeRef.current) {
-      globeRef.current.pointOfView({ lat: loc.lat, lng: loc.lng, altitude: 0.4 }, 1000);
+      globeRef.current.pointOfView({ lat: loc.lat, lng: loc.lng, altitude: 1.2 }, 1500);
     }
     setHoveredMarker(loc);
     playClickSound();
@@ -393,6 +412,23 @@ export default function Home() {
       setQuoteIndex(prev => (prev + 1) % quotes.length);
     }, 8000);
     return () => clearInterval(timer);
+  }, []);
+
+  // Globe text message blurbs
+  const [globeMessage, setGlobeMessage] = useState(null);
+  const globeMsgIdx = useRef(0);
+
+  useEffect(() => {
+    const cycle = () => {
+      const msg = worldschoolMessages[globeMsgIdx.current % worldschoolMessages.length];
+      globeMsgIdx.current++;
+      setGlobeMessage({ phase: 'typing', from: msg.from });
+      setTimeout(() => setGlobeMessage({ phase: 'visible', ...msg }), 1800);
+      setTimeout(() => setGlobeMessage(null), 7000);
+    };
+    const delay = setTimeout(cycle, 3000);
+    const interval = setInterval(cycle, 10000);
+    return () => { clearTimeout(delay); clearInterval(interval); };
   }, []);
 
   // Hidden character peek-a-boo
@@ -525,11 +561,11 @@ export default function Home() {
                     ref={handleGlobeRef}
                     width={globeSize.width}
                     height={globeSize.height}
-                    globeImageUrl="//unpkg.com/three-globe/example/img/earth-dark.jpg"
+                    globeImageUrl="//unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
                     bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
                     backgroundColor="rgba(0,0,0,0)"
-                    atmosphereColor="#a78bfa"
-                    atmosphereAltitude={0.35}
+                    atmosphereColor="#7c3aed"
+                    atmosphereAltitude={0.45}
                     arcsData={arcsData}
                     arcColor="color"
                     arcDashLength={0.4}
@@ -594,6 +630,39 @@ export default function Home() {
                 )}
               </AnimatePresence>
             </div>
+            {/* Fog / particle overlay */}
+            <div className="globe-fog-layer" />
+            <div className="globe-particles-layer" />
+            {/* WORLDSCHOOLING FAMILY badge */}
+            <div className="worldschool-badge">
+              <span className="ws-dot" />
+              WORLDSCHOOLING FAMILY
+            </div>
+            {/* Text message blurbs */}
+            <AnimatePresence>
+              {globeMessage && (
+                <motion.div
+                  className="globe-msg-bubble"
+                  key={globeMsgIdx.current}
+                  initial={{ opacity: 0, y: 20, scale: 0.8 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -10, scale: 0.9 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                >
+                  {globeMessage.phase === 'typing' ? (
+                    <>
+                      <span className="msg-sender">{globeMessage.from}</span>
+                      <div className="typing-dots"><span /><span /><span /></div>
+                    </>
+                  ) : (
+                    <>
+                      <span className="msg-sender">{globeMessage.from}</span>
+                      <span className="msg-text">{globeMessage.text}</span>
+                    </>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
             <div className="map-badge">
               <button className="globe-nav-btn" onClick={(e) => { e.stopPropagation(); navigateGlobe('prev'); }} aria-label="Previous location">
                 <ChevronLeft size={14} />
