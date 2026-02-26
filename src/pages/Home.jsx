@@ -315,70 +315,98 @@ export default function Home() {
                 vec3 nightCol = texture2D(nightMap, vUv).rgb;
                 float waterVal = 1.0 - texture2D(waterMask, vUv).r;
                 float isWater = smoothstep(0.3, 0.7, waterVal);
+                vec3 packed = texture2D(packedTex, vUv).rgb;
 
                 vec3 viewDir = normalize(-vViewPos);
                 float NdotL = dot(vNormal, sunDir);
                 float dayStrength = smoothstep(-0.1, 0.25, NdotL);
                 float dayLight = 0.08 + max(NdotL, 0.0) * 0.92;
                 float rawFresnel = clamp(1.0 - dot(viewDir, vNormal), 0.0, 1.0);
+                vec3 halfDir = normalize(sunDir + viewDir);
 
-                // --- LAND: day texture + NASA night lights blend ---
-                float landFresnel = pow(rawFresnel, 3.0);
-                vec3 landDay = dayCol.rgb * dayLight + dayCol.rgb * landFresnel * 0.12;
+                // --- LAND: matte terrain + bump detail + night lights ---
+                float landFresnel = pow(rawFresnel, 3.5);
+                float bumpVal = packed.r;
+                float bumpLight = 1.0 + (bumpVal - 0.5) * 0.2 * dayStrength;
+                vec3 landDay = dayCol.rgb * dayLight * bumpLight + dayCol.rgb * landFresnel * 0.06;
+                float roughness = packed.g;
+                float landSpec = (1.0 - roughness) * pow(max(dot(vNormal, halfDir), 0.0), 80.0) * 0.04;
+                landDay += vec3(0.7, 0.75, 0.8) * landSpec;
                 vec3 landNight = nightCol * 1.8;
                 vec3 landColor = mix(landNight, landDay, dayStrength);
 
-                // --- WATER: animated waves + specular + day/night ---
+                // --- WATER: animated undulating ocean + specular + Fresnel ---
                 vec2 waveUv = vUv * 50.0;
+                vec2 bigWaveUv = vUv * 10.0;
                 float t = time * 0.12;
+
+                // Large ocean swells (visible undulation)
+                float bigW1 = fbm(bigWaveUv + vec2(t * 0.8, t * 0.5));
+                float bigW2 = fbm(bigWaveUv * 0.6 - vec2(t * 0.3, t * 0.6));
+                float bigWaves = (bigW1 + bigW2) * 0.5;
+
+                // Fine detail ripples
                 float w1 = fbm(waveUv + vec2(t, t * 0.7));
                 float w2 = fbm(waveUv * 0.7 - vec2(t * 0.5, t * 0.3));
                 float waves = (w1 + w2) * 0.5;
 
+                // Combined wave normals: big swells + fine ripples
                 float dx = fbm(waveUv + vec2(0.01, 0.0) + vec2(t, t*0.7)) - w1;
                 float dy = fbm(waveUv + vec2(0.0, 0.01) + vec2(t, t*0.7)) - w1;
-                vec3 waveN = normalize(vNormal + vec3(dx, dy, 0.0) * 5.0);
+                float bdx = fbm(bigWaveUv + vec2(0.02, 0.0) + vec2(t*0.8, t*0.5)) - bigW1;
+                float bdy = fbm(bigWaveUv + vec2(0.0, 0.02) + vec2(t*0.8, t*0.5)) - bigW1;
+                vec3 waveN = normalize(vNormal + vec3(dx + bdx * 2.0, dy + bdy * 2.0, 0.0) * 8.0);
 
-                vec3 halfDir = normalize(sunDir + viewDir);
                 float spec = pow(max(dot(waveN, halfDir), 0.0), 120.0);
                 float glare = pow(max(dot(waveN, halfDir), 0.0), 12.0);
                 float wFresnel = pow(1.0 - max(dot(viewDir, waveN), 0.0), 4.0);
 
+                // Ocean color with depth variation from swells
                 vec3 deepSea = vec3(0.005, 0.02, 0.08);
                 vec3 midSea = vec3(0.02, 0.08, 0.22);
+                vec3 shallowSea = vec3(0.06, 0.18, 0.38);
                 vec3 oceanBase = mix(deepSea, midSea, waves);
-                vec3 oceanCol = mix(dayCol.rgb * 0.5, oceanBase, 0.5);
+                oceanBase = mix(oceanBase, shallowSea, bigWaves * 0.4);
+                vec3 oceanCol = mix(dayCol.rgb * 0.35, oceanBase, 0.65);
+
+                // Sky reflection via Fresnel
+                vec3 skyReflection = mix(vec3(0.15, 0.3, 0.6), vec3(0.5, 0.65, 0.85), wFresnel);
 
                 vec3 waterDay = oceanCol * dayLight
-                  + vec3(1.0, 0.95, 0.85) * spec * 1.5
-                  + vec3(0.9, 0.85, 0.7) * glare * 0.3
-                  + vec3(0.2, 0.35, 0.6) * wFresnel * 0.35
-                  + vec3(0.3, 0.5, 0.8) * waves * audioPulse * 0.25;
-                vec3 waterNight = deepSea * 0.15;
+                  + vec3(1.0, 0.95, 0.85) * spec * 2.5
+                  + vec3(0.9, 0.85, 0.7) * glare * 0.5
+                  + skyReflection * wFresnel * 0.5
+                  + vec3(0.3, 0.5, 0.8) * waves * audioPulse * 0.3;
+                vec3 waterNight = deepSea * 0.15 + vec3(0.01, 0.02, 0.05) * bigWaves;
                 vec3 waterColor = mix(waterNight, waterDay, dayStrength);
+
+                // Liquid glass shimmer on prism bop (water goes prismatic)
+                vec3 prismWater = vec3(
+                  0.5 + 0.5 * sin(time * 2.0 + vUv.x * 20.0),
+                  0.5 + 0.5 * sin(time * 2.0 + vUv.x * 20.0 + 2.094),
+                  0.5 + 0.5 * sin(time * 2.0 + vUv.x * 20.0 + 4.189)
+                );
+                waterColor = mix(waterColor, prismWater * waterColor * 2.0, prismPulse * 0.3 * isWater);
 
                 vec3 finalColor = mix(landColor, waterColor, isWater);
 
-                // --- PACKED TEXTURE: roughness + cloud shadows ---
-                vec3 packed = texture2D(packedTex, vUv).rgb;
-                // Green channel = roughness (reserved for future use)
-
-                // Blue channel = cloud density - cast soft shadows on surface
+                // Cloud shadows from packed blue channel
                 float cloudDensity = smoothstep(0.2, 0.7, packed.b);
                 finalColor *= (1.0 - cloudDensity * 0.3 * dayStrength);
 
-                // --- ATMOSPHERIC SCATTERING at terminator ---
-                float terminatorBand = smoothstep(0.0, 0.15, max(NdotL, 0.0)) * smoothstep(0.35, 0.15, max(NdotL, 0.0));
-                vec3 sunsetColor = mix(vec3(1.0, 0.25, 0.05), vec3(1.0, 0.55, 0.2), max(NdotL, 0.0) * 3.0);
-                finalColor += sunsetColor * terminatorBand * rawFresnel * 0.6;
+                // --- ATMOSPHERIC SCATTERING at terminator (subtle, narrow) ---
+                float tNdotL = max(NdotL, 0.0);
+                float terminatorBand = smoothstep(0.0, 0.1, tNdotL) * smoothstep(0.25, 0.1, tNdotL);
+                vec3 sunsetColor = mix(vec3(1.0, 0.25, 0.05), vec3(1.0, 0.55, 0.2), tNdotL * 3.0);
+                finalColor += sunsetColor * terminatorBand * rawFresnel * 0.2;
 
-                // --- Atmospheric rim haze ---
-                float rimHaze = pow(rawFresnel, 4.5);
+                // --- Atmospheric rim haze (subtle blue glow at edges) ---
+                float rimHaze = pow(rawFresnel, 4.0);
                 vec3 dayHaze = vec3(0.2, 0.4, 1.0);
                 vec3 nightHaze = vec3(0.04, 0.02, 0.12);
                 vec3 hazeColor = mix(nightHaze, dayHaze, dayStrength);
                 hazeColor = mix(hazeColor, vec3(1.0, 0.4, 0.1), terminatorBand);
-                finalColor += hazeColor * rimHaze * 0.1;
+                finalColor += hazeColor * rimHaze * 0.15;
 
                 gl_FragColor = vec4(finalColor, 1.0);
               }
@@ -499,9 +527,11 @@ export default function Home() {
             vertexShader: `
               varying vec3 vNormal;
               varying vec3 vPosition;
+              varying vec3 vWorldPos;
               void main() {
                 vNormal = normalize(normalMatrix * normal);
                 vPosition = (modelViewMatrix * vec4(position, 1.0)).xyz;
+                vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
                 gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
               }
             `,
@@ -512,6 +542,7 @@ export default function Home() {
               uniform float introIntensity;
               varying vec3 vNormal;
               varying vec3 vPosition;
+              varying vec3 vWorldPos;
               const vec3 auroraGreen = vec3(0.0, 0.95, 0.5);
               const vec3 auroraPurple = vec3(0.5, 0.1, 0.95);
               const vec3 auroraBlue = vec3(0.1, 0.5, 1.0);
@@ -551,41 +582,52 @@ export default function Home() {
                 vec3 viewDir = normalize(cameraPosition - vPosition);
                 float rawFresnel = clamp(1.0 - dot(viewDir, vNormal), 0.0, 1.0);
 
-                // During intro: aurora wraps ENTIRE globe (fresnel min near 0 = full coverage)
-                // After intro: settles to edge-focused glow
-                float fresnelPow = max(0.15, 2.0 - introIntensity * 1.8 - prismPulse * 1.2);
+                // Latitude constraint: aurora in polar regions only (after intro)
+                float latitude = abs(normalize(vWorldPos).y);
+                // Northern lights event: ~30s cycle with sharp burst extending south
+                float eventCycle = sin(time * 0.21) * 0.5 + 0.5;
+                float eventPulse = pow(eventCycle, 10.0); // Sharp peaks
+                float auroraZone = smoothstep(0.35 - eventPulse * 0.2, 0.7, latitude);
+                // During intro: full globe coverage, then settle to poles
+                auroraZone = mix(auroraZone, 1.0, introIntensity);
+                // Prism bop briefly extends aurora (slower, gentler)
+                auroraZone = mix(auroraZone, 1.0, prismPulse * 0.4);
+
+                // Fresnel: intro wraps globe, settles to edge glow
+                float fresnelPow = max(0.15, 2.0 - introIntensity * 1.8 - prismPulse * 0.6);
                 float fresnel = pow(rawFresnel, fresnelPow);
 
-                // Faster swirling during intro for dramatic effect
-                float speed = time * (0.18 + introIntensity * 0.4 + prismPulse * 0.25);
+                // Flowing aurora speed (slower prism response)
+                float speed = time * (0.18 + introIntensity * 0.4 + prismPulse * 0.1);
                 float n1 = snoise(vPosition * 0.012 + vec3(0.0, speed, speed * 0.5));
                 float n2 = snoise(vPosition * 0.025 + vec3(speed * 0.3, 0.0, speed));
-                // Third noise layer for extra richness during intro
                 float n3 = snoise(vPosition * 0.008 + vec3(speed * 0.15, speed * 0.2, 0.0));
                 float n = n1 * 0.5 + n2 * 0.3 + n3 * 0.2;
                 float mask = smoothstep(0.0, 1.0, n * 0.5 + 0.5);
 
-                // Multi-color aurora bands with gold highlights during intro
+                // Multi-color aurora bands
                 vec3 col = mix(auroraGreen, auroraPurple, mask);
                 col = mix(col, auroraBlue, smoothstep(0.3, 0.7, n2 * 0.5 + 0.5));
                 col = mix(col, auroraRed, smoothstep(0.7, 1.0, rawFresnel) * 0.3);
                 col = mix(col, auroraGold, introIntensity * smoothstep(0.4, 0.8, n3 * 0.5 + 0.5) * 0.4);
+                // Electric event burst: brighter green during events
+                col = mix(col, auroraGreen * 1.8, eventPulse * auroraZone * 0.3);
                 col = mix(col, col * 1.5, audioPulse * rawFresnel);
 
-                // Prismatic rainbow on prism bop (subtle, not blinding)
+                // Slow prismatic color shift on bop
                 vec3 hitColor = vec3(
-                  0.5 + 0.5 * sin(time * 2.5),
-                  0.5 + 0.5 * sin(time * 2.5 + 2.094),
-                  0.5 + 0.5 * sin(time * 2.5 + 4.189)
+                  0.5 + 0.5 * sin(time * 1.5),
+                  0.5 + 0.5 * sin(time * 1.5 + 2.094),
+                  0.5 + 0.5 * sin(time * 1.5 + 4.189)
                 );
-                col = mix(col, hitColor, prismPulse * 0.35);
+                col = mix(col, hitColor, prismPulse * 0.25);
 
-                // During intro: full coverage curtain. After: flowing edge bands
+                // Curtain bands + intro coverage
                 float curtain = smoothstep(-0.2, 0.6, n1) * smoothstep(-0.3, 0.5, n2);
                 float introBoost = introIntensity * (0.6 + n3 * 0.4);
-                float alpha = max(fresnel * curtain, introBoost) * (0.7 + audioPulse * 0.5 + prismPulse * 0.4);
+                float alpha = max(fresnel * curtain * auroraZone, introBoost) * (0.7 + audioPulse * 0.5 + prismPulse * 0.2);
 
-                float brightness = 1.6 + introIntensity * 0.8 + audioPulse * 0.6 + prismPulse * 0.4;
+                float brightness = 1.6 + introIntensity * 0.8 + audioPulse * 0.6 + eventPulse * 0.5 + prismPulse * 0.2;
                 float alphaOut = alpha * (0.55 + introIntensity * 0.3);
                 gl_FragColor = vec4(col * brightness, alphaOut);
               }
@@ -633,7 +675,13 @@ export default function Home() {
               varying vec3 vWorldNormal;
               void main() {
                 vec3 viewDir = normalize(-vPosition);
-                float fresnel = pow(1.0 - dot(viewDir, vNormal), 5.5);
+                float baseFresnel = pow(1.0 - dot(viewDir, vNormal), 4.5);
+
+                // Dynamic atmospheric shimmer (breathing, alive)
+                float shimmer = sin(vWorldNormal.x * 10.0 + time * 0.5) * 0.12
+                              + sin(vWorldNormal.y * 8.0 + time * 0.35) * 0.08
+                              + sin(vWorldNormal.z * 6.0 + time * 0.25) * 0.05;
+                float fresnel = baseFresnel * (1.0 + shimmer);
 
                 float sunFacing = dot(vWorldNormal, sunDir) * 0.5 + 0.5;
                 vec3 dayAtmos = vec3(0.3, 0.55, 1.0);
@@ -642,10 +690,15 @@ export default function Home() {
 
                 float terminatorLine = smoothstep(0.3, 0.5, sunFacing) * smoothstep(0.7, 0.5, sunFacing);
                 vec3 atmosColor = mix(nightAtmos, dayAtmos, smoothstep(0.25, 0.7, sunFacing));
-                atmosColor += terminatorGlow * terminatorLine * 2.0;
+                atmosColor += terminatorGlow * terminatorLine * 1.5;
 
-                float alpha = fresnel * (0.3 + introIntensity * 0.2);
-                gl_FragColor = vec4(atmosColor * (1.0 + introIntensity * 0.3), alpha);
+                // Intro sweep: light wave sweeps around the globe
+                float sweepAngle = time * 1.8;
+                float sweepMask = pow(sin(vWorldNormal.x * 2.0 + vWorldNormal.z * 2.0 + sweepAngle) * 0.5 + 0.5, 3.0);
+                float introSweep = introIntensity * sweepMask * 0.4;
+
+                float alpha = fresnel * (0.35 + introIntensity * 0.25) + introSweep;
+                gl_FragColor = vec4(atmosColor * (1.1 + introIntensity * 0.4), alpha);
               }
             `,
             transparent: true,
@@ -683,7 +736,7 @@ export default function Home() {
               varying vec3 vPosition;
               void main() {
                 vec3 viewDir = normalize(-vPosition);
-                float fresnel = pow(dot(viewDir, vNormal), 3.5);
+                float fresnel = pow(dot(viewDir, vNormal), 3.0);
 
                 float sunFacing = dot(vWorldNormal, sunDir) * 0.5 + 0.5;
                 vec3 dayGlow = vec3(0.25, 0.5, 1.0);
@@ -692,10 +745,10 @@ export default function Home() {
 
                 float terminator = smoothstep(0.3, 0.5, sunFacing) * smoothstep(0.7, 0.5, sunFacing);
                 vec3 color = mix(nightGlow, dayGlow, smoothstep(0.2, 0.65, sunFacing));
-                color += twilightGlow * terminator * 2.5;
+                color += twilightGlow * terminator * 2.0;
 
-                float alpha = fresnel * (0.18 + introIntensity * 0.1);
-                gl_FragColor = vec4(color * 0.9, alpha);
+                float alpha = fresnel * (0.22 + introIntensity * 0.12);
+                gl_FragColor = vec4(color * 1.0, alpha);
               }
             `,
             transparent: true,
@@ -1038,30 +1091,92 @@ export default function Home() {
           globe.particleSystem = pts;
         }
 
-        // --- F. Tiny Orbiting Satellites / Vehicles ---
+        // --- F. Orbiting Objects + Micro Hidden Gems ---
         if (!globe.satellitesGroup) {
           globe.satellitesGroup = new THREE.Group();
           scene.add(globe.satellitesGroup);
 
           const satColors = [0xffffff, 0x38bdf8, 0xfbbf24, 0xf472b6];
-          for(let i=0; i<30; i++) {
-            const isHighObj = Math.random() > 0.5; // High alt satellite or low alt plane
-            const geo = isHighObj ? new THREE.BoxGeometry(0.5, 0.2, 0.5) : new THREE.CylinderGeometry(0.2, 0.2, 0.6, 4);
-            const mat = new THREE.MeshBasicMaterial({ 
-              color: satColors[i % satColors.length], 
-              wireframe: isHighObj // High alt satellites have sci-fi wireframe
-            });
+          // High-orbit satellites
+          for(let i=0; i<15; i++) {
+            const geo = new THREE.BoxGeometry(0.5, 0.2, 0.5);
+            const mat = new THREE.MeshBasicMaterial({ color: satColors[i % satColors.length], wireframe: true });
             const m = new THREE.Mesh(geo, mat);
-            
-            const r = isHighObj ? (115 + Math.random() * 20) : (101.5 + Math.random() * 3);
             m.userData = {
-              r: r,
-              lat: (Math.random() - 0.5) * Math.PI, // -PI/2 to PI/2
+              r: 115 + Math.random() * 20,
+              lat: (Math.random() - 0.5) * Math.PI,
               lng: (Math.random() - 0.5) * Math.PI * 2,
               speedLat: (Math.random() - 0.5) * 0.05,
               speedLng: (Math.random() - 0.5) * 0.08 + 0.02
             };
             globe.satellitesGroup.add(m);
+          }
+
+          // Micro wireframe planes (TINY - need to zoom very close)
+          for(let i=0; i<12; i++) {
+            const planeGroup = new THREE.Group();
+            // Fuselage
+            const body = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.02, 0.015, 0.15, 4),
+              new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.6 })
+            );
+            body.rotation.z = Math.PI / 2;
+            planeGroup.add(body);
+            // Wings
+            const wing = new THREE.Mesh(
+              new THREE.BoxGeometry(0.04, 0.005, 0.12),
+              new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true, transparent: true, opacity: 0.5 })
+            );
+            planeGroup.add(wing);
+            planeGroup.userData = {
+              r: 100.6 + Math.random() * 0.8,
+              lat: (Math.random() - 0.5) * Math.PI * 0.8,
+              lng: Math.random() * Math.PI * 2,
+              speedLat: (Math.random() - 0.5) * 0.01,
+              speedLng: 0.03 + Math.random() * 0.04,
+              type: 'plane'
+            };
+            globe.satellitesGroup.add(planeGroup);
+          }
+
+          // Micro wireframe cars (MICROSCOPIC - on the surface)
+          for(let i=0; i<8; i++) {
+            const car = new THREE.Mesh(
+              new THREE.BoxGeometry(0.04, 0.02, 0.02),
+              new THREE.MeshBasicMaterial({ color: [0xef4444, 0xfbbf24, 0x22c55e, 0x38bdf8][i%4], wireframe: true, transparent: true, opacity: 0.5 })
+            );
+            car.userData = {
+              r: 100.15,
+              lat: (Math.random() - 0.5) * Math.PI * 0.6,
+              lng: Math.random() * Math.PI * 2,
+              speedLat: 0,
+              speedLng: 0.005 + Math.random() * 0.01,
+              type: 'car'
+            };
+            globe.satellitesGroup.add(car);
+          }
+
+          // Ghost spirit wisps (tiny glowing entities near surface)
+          for(let i=0; i<20; i++) {
+            const wispGeo = new THREE.SphereGeometry(0.03 + Math.random() * 0.02, 4, 4);
+            const wispMat = new THREE.MeshBasicMaterial({
+              color: [0x7c3aed, 0x38bdf8, 0xf472b6, 0x22c55e, 0xfbbf24][i%5],
+              wireframe: true,
+              transparent: true,
+              opacity: 0.3 + Math.random() * 0.3
+            });
+            const wisp = new THREE.Mesh(wispGeo, wispMat);
+            wisp.userData = {
+              r: 100.3 + Math.random() * 1.0,
+              lat: (Math.random() - 0.5) * Math.PI,
+              lng: Math.random() * Math.PI * 2,
+              speedLat: (Math.random() - 0.5) * 0.02,
+              speedLng: (Math.random() - 0.5) * 0.03,
+              type: 'wisp',
+              bobPhase: Math.random() * Math.PI * 2,
+              bobSpeed: 1.0 + Math.random() * 2.0
+            };
+            globe.satellitesGroup.add(wisp);
           }
         }
 
@@ -1107,11 +1222,11 @@ export default function Home() {
                 globe.customUniforms.introIntensity.value = Math.max(0, globe.customUniforms.introIntensity.value - dt * 0.2);
               }
 
-              // Decay Prism Pulse slowly and organically (5+ second fade)
+              // Decay Prism Pulse slowly and gracefully (8+ second fade)
               if (globe.customUniforms.prismPulse.value > 0) {
-                 const pp = globe.customUniforms.prismPulse.value;
-                 // Exponential decay: fast at first, then slow graceful return
-                 globe.customUniforms.prismPulse.value = Math.max(0, pp - dt * (0.15 + pp * 0.1));
+                 const ppv = globe.customUniforms.prismPulse.value;
+                 // Slower exponential decay: gentle return to normal
+                 globe.customUniforms.prismPulse.value = Math.max(0, ppv - dt * (0.08 + ppv * 0.06));
               }
 
               if (window.globalAnalyser) {
@@ -1177,20 +1292,37 @@ export default function Home() {
 
               // Animate Satellites & Planes
               if (globe.satellitesGroup) {
-                const globalPrismMultiplier = 1.0 + (globe.customUniforms.prismPulse.value * 2.0); // Gentle acceleration on bop
+                const pp = globe.customUniforms.prismPulse.value;
+                const globalPrismMultiplier = 1.0 + pp * 1.5;
                 globe.satellitesGroup.children.forEach(m => {
-                  m.userData.lat += m.userData.speedLat * dt * globalPrismMultiplier;
-                  m.userData.lng += m.userData.speedLng * dt * globalPrismMultiplier;
-                  
-                  // convert back to x, y, z
-                  const r = m.userData.r;
-                  const phi = Math.PI / 2 - m.userData.lat;
-                  const theta = m.userData.lng;
-                  
-                  m.position.x = r * Math.sin(phi) * Math.cos(theta);
-                  m.position.y = r * Math.cos(phi);
-                  m.position.z = r * Math.sin(phi) * Math.sin(theta);
-                  m.lookAt(0,0,0); // Orient towards planet, optional
+                  const ud = m.userData;
+                  ud.lat += ud.speedLat * dt * globalPrismMultiplier;
+                  ud.lng += ud.speedLng * dt * globalPrismMultiplier;
+
+                  const phi = Math.PI / 2 - ud.lat;
+                  const theta = ud.lng;
+                  // Wisps bob up and down gently
+                  const bobR = ud.type === 'wisp'
+                    ? ud.r + Math.sin(elTs * ud.bobSpeed + ud.bobPhase) * 0.15
+                    : ud.r;
+
+                  m.position.x = bobR * Math.sin(phi) * Math.cos(theta);
+                  m.position.y = bobR * Math.cos(phi);
+                  m.position.z = bobR * Math.sin(phi) * Math.sin(theta);
+
+                  if (ud.type === 'plane') {
+                    // Planes orient in direction of travel
+                    const fwdTheta = theta + ud.speedLng * 10;
+                    const fwdX = ud.r * Math.sin(phi) * Math.cos(fwdTheta);
+                    const fwdY = ud.r * Math.cos(phi);
+                    const fwdZ = ud.r * Math.sin(phi) * Math.sin(fwdTheta);
+                    m.lookAt(fwdX, fwdY, fwdZ);
+                  } else if (ud.type === 'wisp') {
+                    // Wisps pulse opacity
+                    m.material.opacity = 0.3 + Math.sin(elTs * ud.bobSpeed + ud.bobPhase) * 0.2;
+                  } else {
+                    m.lookAt(0, 0, 0);
+                  }
                 });
               }
             }
@@ -1854,47 +1986,97 @@ export default function Home() {
                   </motion.div>
                 )}
               </AnimatePresence>
-              <svg className="peek-prism" width="48" height="56" viewBox="0 0 48 56" fill="none">
+              <svg className="peek-prism" width="56" height="64" viewBox="0 0 56 64" fill="none">
                 <defs>
                   <linearGradient id="prism-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
                     <stop offset="0%" stopColor="#7c3aed">
-                      <animate attributeName="stop-color" values="#7c3aed;#38bdf8;#f472b6;#22c55e;#7c3aed" dur="4s" repeatCount="indefinite" />
+                      <animate attributeName="stop-color" values="#7c3aed;#38bdf8;#f472b6;#22c55e;#fbbf24;#7c3aed" dur="5s" repeatCount="indefinite" />
                     </stop>
                     <stop offset="50%" stopColor="#38bdf8">
-                      <animate attributeName="stop-color" values="#38bdf8;#f472b6;#22c55e;#7c3aed;#38bdf8" dur="4s" repeatCount="indefinite" />
+                      <animate attributeName="stop-color" values="#38bdf8;#f472b6;#22c55e;#fbbf24;#7c3aed;#38bdf8" dur="5s" repeatCount="indefinite" />
                     </stop>
                     <stop offset="100%" stopColor="#f472b6">
-                      <animate attributeName="stop-color" values="#f472b6;#22c55e;#7c3aed;#38bdf8;#f472b6" dur="4s" repeatCount="indefinite" />
+                      <animate attributeName="stop-color" values="#f472b6;#22c55e;#fbbf24;#7c3aed;#38bdf8;#f472b6" dur="5s" repeatCount="indefinite" />
                     </stop>
                   </linearGradient>
-                  <linearGradient id="prism-shine" x1="0%" y1="0%" x2="50%" y2="50%">
-                    <stop offset="0%" stopColor="rgba(255,255,255,0.6)" />
-                    <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+                  {/* Glass internal reflection layers */}
+                  <linearGradient id="prism-glass" x1="30%" y1="0%" x2="70%" y2="100%">
+                    <stop offset="0%" stopColor="rgba(255,255,255,0.5)">
+                      <animate attributeName="stopColor" values="rgba(255,255,255,0.5);rgba(255,255,255,0.2);rgba(255,255,255,0.5)" dur="3s" repeatCount="indefinite" />
+                    </stop>
+                    <stop offset="35%" stopColor="rgba(255,255,255,0.05)" />
+                    <stop offset="55%" stopColor="rgba(255,255,255,0.15)">
+                      <animate attributeName="stopColor" values="rgba(255,255,255,0.15);rgba(255,255,255,0.3);rgba(255,255,255,0.15)" dur="4s" repeatCount="indefinite" />
+                    </stop>
+                    <stop offset="100%" stopColor="rgba(255,255,255,0.25)" />
+                  </linearGradient>
+                  <linearGradient id="prism-edge" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="rgba(255,255,255,0.4)" />
+                    <stop offset="50%" stopColor="rgba(255,255,255,0.1)" />
+                    <stop offset="100%" stopColor="rgba(255,255,255,0.3)" />
                   </linearGradient>
                   <filter id="prism-glow">
-                    <feGaussianBlur stdDeviation="3" result="blur" />
+                    <feGaussianBlur stdDeviation="2.5" result="blur" />
+                    <feColorMatrix type="saturate" values="1.8" in="blur" result="saturated" />
                     <feMerge>
-                      <feMergeNode in="blur" />
+                      <feMergeNode in="saturated" />
                       <feMergeNode in="SourceGraphic" />
                     </feMerge>
                   </filter>
+                  <clipPath id="prism-clip">
+                    <polygon points="28,4 50,48 6,48" />
+                  </clipPath>
                 </defs>
-                <polygon points="24,4 44,44 4,44" fill="url(#prism-gradient)" filter="url(#prism-glow)" opacity="0.9" />
-                <polygon points="24,4 44,44 4,44" fill="url(#prism-shine)" />
-                <line x1="24" y1="12" x2="14" y2="38" stroke="rgba(255,255,255,0.3)" strokeWidth="0.5" />
-                <line x1="24" y1="12" x2="34" y2="38" stroke="rgba(255,255,255,0.2)" strokeWidth="0.5" />
-                <circle cx="24" cy="28" r="5" fill="rgba(0,0,0,0.3)" />
-                <circle cx="24" cy="28" r="3" fill="rgba(255,255,255,0.9)">
-                  <animate attributeName="r" values="3;3.5;3" dur="2s" repeatCount="indefinite" />
+                {/* Glass body with color-cycling gradient */}
+                <polygon points="28,4 50,48 6,48" fill="url(#prism-gradient)" filter="url(#prism-glow)" opacity="0.85" />
+                {/* Glass highlight layer */}
+                <polygon points="28,4 50,48 6,48" fill="url(#prism-glass)" />
+                {/* Glass edge highlight */}
+                <polygon points="28,4 50,48 6,48" fill="none" stroke="url(#prism-edge)" strokeWidth="1" opacity="0.7" />
+                {/* Internal caustic refraction lines */}
+                <g clipPath="url(#prism-clip)" opacity="0.35">
+                  <line x1="28" y1="10" x2="14" y2="44" stroke="rgba(255,255,255,0.5)" strokeWidth="0.5">
+                    <animate attributeName="x2" values="14;18;14" dur="3s" repeatCount="indefinite" />
+                  </line>
+                  <line x1="28" y1="10" x2="42" y2="44" stroke="rgba(255,255,255,0.4)" strokeWidth="0.5">
+                    <animate attributeName="x2" values="42;38;42" dur="3.5s" repeatCount="indefinite" />
+                  </line>
+                  <line x1="28" y1="10" x2="28" y2="44" stroke="rgba(255,255,255,0.2)" strokeWidth="0.3">
+                    <animate attributeName="opacity" values="0.2;0.4;0.2" dur="2s" repeatCount="indefinite" />
+                  </line>
+                </g>
+                {/* Eye */}
+                <circle cx="28" cy="30" r="5.5" fill="rgba(0,0,0,0.35)" />
+                <circle cx="28" cy="30" r="3.5" fill="rgba(255,255,255,0.9)">
+                  <animate attributeName="r" values="3.5;4;3.5" dur="2s" repeatCount="indefinite" />
                 </circle>
-                <circle cx="24" cy="28" r="1.5" fill="#050510" />
-                <circle cx="25.5" cy="26.5" r="0.8" fill="rgba(255,255,255,0.8)" />
-                <g opacity="0.6">
-                  <line x1="38" y1="36" x2="46" y2="48" stroke="#ef4444" strokeWidth="1.5" />
-                  <line x1="39" y1="37" x2="47" y2="50" stroke="#f59e0b" strokeWidth="1.5" />
-                  <line x1="40" y1="38" x2="48" y2="52" stroke="#22c55e" strokeWidth="1.5" />
-                  <line x1="41" y1="39" x2="48" y2="54" stroke="#38bdf8" strokeWidth="1.5" />
-                  <line x1="42" y1="40" x2="47" y2="56" stroke="#7c3aed" strokeWidth="1.5" />
+                <circle cx="28" cy="30" r="1.8" fill="#050510" />
+                <circle cx="29.5" cy="28.5" r="0.9" fill="rgba(255,255,255,0.9)" />
+                {/* Light beam entering prism */}
+                <line x1="0" y1="24" x2="18" y2="28" stroke="rgba(255,255,255,0.5)" strokeWidth="2.5" strokeLinecap="round">
+                  <animate attributeName="opacity" values="0.5;0.25;0.5" dur="2.5s" repeatCount="indefinite" />
+                </line>
+                {/* Rainbow refraction rays exiting prism */}
+                <g opacity="0.75">
+                  <line x1="42" y1="28" x2="56" y2="18" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round">
+                    <animate attributeName="x2" values="56;52;56" dur="2.2s" repeatCount="indefinite" />
+                    <animate attributeName="opacity" values="0.8;0.5;0.8" dur="3s" repeatCount="indefinite" />
+                  </line>
+                  <line x1="43" y1="30" x2="56" y2="24" stroke="#f59e0b" strokeWidth="1.5" strokeLinecap="round">
+                    <animate attributeName="x2" values="56;53;56" dur="2.5s" repeatCount="indefinite" />
+                  </line>
+                  <line x1="44" y1="32" x2="56" y2="30" stroke="#22c55e" strokeWidth="1.5" strokeLinecap="round">
+                    <animate attributeName="x2" values="56;54;56" dur="2.8s" repeatCount="indefinite" />
+                  </line>
+                  <line x1="44" y1="34" x2="56" y2="36" stroke="#38bdf8" strokeWidth="1.5" strokeLinecap="round">
+                    <animate attributeName="x2" values="56;53;56" dur="2.3s" repeatCount="indefinite" />
+                  </line>
+                  <line x1="43" y1="36" x2="56" y2="42" stroke="#7c3aed" strokeWidth="1.5" strokeLinecap="round">
+                    <animate attributeName="x2" values="56;52;56" dur="2.6s" repeatCount="indefinite" />
+                  </line>
+                  <line x1="42" y1="38" x2="56" y2="48" stroke="#ec4899" strokeWidth="1.5" strokeLinecap="round">
+                    <animate attributeName="x2" values="56;51;56" dur="2.1s" repeatCount="indefinite" />
+                  </line>
                 </g>
               </svg>
             </motion.div>
