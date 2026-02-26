@@ -307,7 +307,7 @@ export default function Home() {
 
               void main() {
                 vec4 texCol = texture2D(earthMap, vUv);
-                float waterVal = texture2D(waterMask, vUv).r;
+                float waterVal = 1.0 - texture2D(waterMask, vUv).r;
                 float isWater = smoothstep(0.3, 0.7, waterVal);
 
                 vec3 viewDir = normalize(-vViewPos);
@@ -392,9 +392,23 @@ export default function Home() {
                 // Paint clouds
                 finalColor = mix(finalColor, finalCloudColor, cloudAlpha * 0.9);
 
-                // Night-side city glow on land
-                float nightGlow = max(0.0, 1.0 - NdotL * 3.0);
-                finalColor += texCol.rgb * nightGlow * 0.12 * (1.0 - isWater);
+                // Night-side city glow on land (golden dots of civilization)
+                float nightMask = smoothstep(0.1, 0.0, NdotL);
+                float cityNoise = vnoise(vUv * 300.0) * vnoise(vUv * 150.0 + 42.0);
+                float cityLights = smoothstep(0.3, 0.7, cityNoise) * nightMask * (1.0 - isWater);
+                finalColor += vec3(1.0, 0.85, 0.5) * cityLights * 0.35;
+                // Subtle overall night glow on land
+                finalColor += texCol.rgb * nightMask * 0.08 * (1.0 - isWater);
+
+                // --- ATMOSPHERIC SCATTERING at terminator ---
+                float terminatorBand = smoothstep(0.0, 0.2, NdotL) * smoothstep(0.4, 0.2, NdotL);
+                vec3 sunsetColor = mix(vec3(1.0, 0.3, 0.05), vec3(1.0, 0.6, 0.2), NdotL * 3.0);
+                finalColor += sunsetColor * terminatorBand * rawFresnel * 0.5;
+
+                // --- Atmospheric rim haze (blue glow on edges) ---
+                float rimHaze = pow(rawFresnel, 2.5);
+                vec3 hazeColor = mix(vec3(0.15, 0.3, 0.8), vec3(0.8, 0.4, 0.1), terminatorBand);
+                finalColor += hazeColor * rimHaze * 0.2 * dayLight;
 
                 gl_FragColor = vec4(finalColor, 1.0);
               }
@@ -517,6 +531,198 @@ export default function Home() {
           const auroraMesh = new THREE.Mesh(new THREE.SphereGeometry(101.5, 64, 64), auroraMat);
           scene.add(auroraMesh);
           globe.auroraShell = auroraMesh;
+        }
+
+        // --- D. Atmospheric Glow Shell (blue halo from space) ---
+        if (!globe.atmosShell) {
+          const atmosMat = new THREE.ShaderMaterial({
+            uniforms: {
+              time: globe.customUniforms.time,
+              introIntensity: globe.customUniforms.introIntensity,
+              sunDir: { value: new THREE.Vector3(1.0, 0.5, 1.0).normalize() }
+            },
+            vertexShader: `
+              varying vec3 vNormal;
+              varying vec3 vPosition;
+              varying vec3 vWorldNormal;
+              void main() {
+                vNormal = normalize(normalMatrix * normal);
+                vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+                vPosition = (modelViewMatrix * vec4(position, 1.0)).xyz;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+              }
+            `,
+            fragmentShader: `
+              uniform float time;
+              uniform float introIntensity;
+              uniform vec3 sunDir;
+              varying vec3 vNormal;
+              varying vec3 vPosition;
+              varying vec3 vWorldNormal;
+              void main() {
+                vec3 viewDir = normalize(-vPosition);
+                float fresnel = pow(1.0 - dot(viewDir, vNormal), 4.0);
+
+                // Sun-facing side gets brighter blue, dark side gets deep indigo
+                float sunFacing = dot(vWorldNormal, sunDir) * 0.5 + 0.5;
+                vec3 dayAtmos = vec3(0.25, 0.45, 1.0);
+                vec3 nightAtmos = vec3(0.08, 0.03, 0.25);
+                vec3 terminatorGlow = vec3(1.0, 0.35, 0.08);
+
+                float terminatorLine = smoothstep(0.3, 0.5, sunFacing) * smoothstep(0.7, 0.5, sunFacing);
+                vec3 atmosColor = mix(nightAtmos, dayAtmos, smoothstep(0.3, 0.7, sunFacing));
+                atmosColor += terminatorGlow * terminatorLine * 1.5;
+
+                float alpha = fresnel * (0.5 + introIntensity * 0.3);
+                gl_FragColor = vec4(atmosColor * (1.3 + introIntensity * 0.4), alpha);
+              }
+            `,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            depthTest: false,
+            side: THREE.FrontSide
+          });
+          const atmosMesh = new THREE.Mesh(new THREE.SphereGeometry(104, 64, 64), atmosMat);
+          scene.add(atmosMesh);
+          globe.atmosShell = atmosMesh;
+        }
+
+        // --- D2. Cinematic Lens Flare (procedural, at sun position) ---
+        if (!globe.lensFlare) {
+          const sunDir = new THREE.Vector3(1.0, 0.5, 1.0).normalize();
+
+          // Generate radial gradient texture
+          const makeFlareTexture = (size, stops) => {
+            const c = document.createElement('canvas');
+            c.width = c.height = size;
+            const ctx = c.getContext('2d');
+            const g = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+            stops.forEach(([pos, color]) => g.addColorStop(pos, color));
+            ctx.fillStyle = g;
+            ctx.fillRect(0, 0, size, size);
+            return new THREE.CanvasTexture(c);
+          };
+
+          // Main warm sun glow
+          const mainTex = makeFlareTexture(256, [
+            [0, 'rgba(255,255,240,1)'],
+            [0.05, 'rgba(255,245,220,0.9)'],
+            [0.15, 'rgba(255,220,150,0.5)'],
+            [0.4, 'rgba(255,180,80,0.15)'],
+            [1, 'rgba(255,150,50,0)']
+          ]);
+
+          // Diffuse outer halo
+          const haloTex = makeFlareTexture(256, [
+            [0, 'rgba(255,200,100,0.3)'],
+            [0.3, 'rgba(200,150,255,0.1)'],
+            [0.6, 'rgba(100,150,255,0.05)'],
+            [1, 'rgba(50,100,255,0)']
+          ]);
+
+          // Star-burst rays texture
+          const rayTex = (() => {
+            const c = document.createElement('canvas');
+            c.width = c.height = 256;
+            const ctx = c.getContext('2d');
+            ctx.translate(128, 128);
+            const rayCount = 8;
+            for (let i = 0; i < rayCount; i++) {
+              ctx.save();
+              ctx.rotate((Math.PI * 2 / rayCount) * i);
+              const g = ctx.createLinearGradient(0, 0, 120, 0);
+              g.addColorStop(0, 'rgba(255,240,200,0.6)');
+              g.addColorStop(0.3, 'rgba(255,220,150,0.2)');
+              g.addColorStop(1, 'rgba(255,200,100,0)');
+              ctx.fillStyle = g;
+              ctx.beginPath();
+              ctx.moveTo(0, -1.5);
+              ctx.lineTo(120, -0.5);
+              ctx.lineTo(120, 0.5);
+              ctx.lineTo(0, 1.5);
+              ctx.closePath();
+              ctx.fill();
+              ctx.restore();
+            }
+            return new THREE.CanvasTexture(c);
+          })();
+
+          const flarePos = sunDir.clone().multiplyScalar(350);
+
+          // Layer 1: Main sun glow
+          const mainMat = new THREE.SpriteMaterial({
+            map: mainTex, transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false, depthTest: false, opacity: 0.7
+          });
+          const mainFlare = new THREE.Sprite(mainMat);
+          mainFlare.position.copy(flarePos);
+          mainFlare.scale.set(60, 60, 1);
+          scene.add(mainFlare);
+
+          // Layer 2: Starburst rays
+          const rayMat = new THREE.SpriteMaterial({
+            map: rayTex, transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false, depthTest: false, opacity: 0.5
+          });
+          const rays = new THREE.Sprite(rayMat);
+          rays.position.copy(flarePos);
+          rays.scale.set(120, 120, 1);
+          scene.add(rays);
+
+          // Layer 3: Wide halo
+          const haloMat = new THREE.SpriteMaterial({
+            map: haloTex, transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false, depthTest: false, opacity: 0.25
+          });
+          const halo = new THREE.Sprite(haloMat);
+          halo.position.copy(flarePos);
+          halo.scale.set(250, 250, 1);
+          scene.add(halo);
+
+          // Lens artifacts along sun-to-center line
+          const hexTex = (() => {
+            const c = document.createElement('canvas');
+            c.width = c.height = 64;
+            const ctx = c.getContext('2d');
+            const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 28);
+            g.addColorStop(0, 'rgba(120,180,255,0.35)');
+            g.addColorStop(0.6, 'rgba(160,100,255,0.1)');
+            g.addColorStop(1, 'rgba(100,150,255,0)');
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            for (let i = 0; i < 6; i++) {
+              const a = (Math.PI / 3) * i - Math.PI / 6;
+              const x = 32 + 26 * Math.cos(a);
+              const y = 32 + 26 * Math.sin(a);
+              i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+            ctx.fill();
+            return new THREE.CanvasTexture(c);
+          })();
+
+          const artifacts = [];
+          [0.3, 0.55, -0.15, -0.4, -0.7].forEach((t, i) => {
+            const mat = new THREE.SpriteMaterial({
+              map: hexTex, transparent: true,
+              blending: THREE.AdditiveBlending,
+              depthWrite: false, depthTest: false,
+              opacity: 0.2 - i * 0.02,
+              color: i % 2 === 0 ? 0x88aaff : 0xcc88ff
+            });
+            const s = new THREE.Sprite(mat);
+            s.position.copy(sunDir.clone().multiplyScalar(350 * (1 - t)));
+            const size = 12 + i * 8;
+            s.scale.set(size, size, 1);
+            scene.add(s);
+            artifacts.push(s);
+          });
+
+          globe.lensFlare = { main: mainFlare, rays, halo, artifacts };
         }
 
         // --- E. Tri-Layer Particles (TINY twinkling magic + deep stars + reaction bursts) ---
@@ -696,6 +902,23 @@ export default function Home() {
                 let sum = 0;
                 for (let k = 0; k < 32; k++) sum += audioDataArray[k];
                 globe.customUniforms.audioPulse.value = (sum / 32) / 255.0;
+              }
+
+              // Animate lens flare (subtle ray rotation + breathing)
+              if (globe.lensFlare) {
+                const lf = globe.lensFlare;
+                if (lf.rays) {
+                  lf.rays.material.rotation = elTs * 0.05;
+                  lf.rays.material.opacity = 0.35 + Math.sin(elTs * 0.8) * 0.1;
+                }
+                if (lf.main) {
+                  const breathe = 1.0 + Math.sin(elTs * 1.2) * 0.08;
+                  lf.main.scale.set(60 * breathe, 60 * breathe, 1);
+                }
+                if (lf.halo) {
+                  const hBreath = 1.0 + Math.sin(elTs * 0.5) * 0.05;
+                  lf.halo.scale.set(250 * hBreath, 250 * hBreath, 1);
+                }
               }
 
               // Animate Satellites & Planes
