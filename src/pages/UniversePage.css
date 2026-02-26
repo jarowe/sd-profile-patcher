@@ -29,22 +29,6 @@
 
 .universe-ui .back-link {
     pointer-events: auto;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.8rem 1.5rem;
-    color: #fff;
-    text-decoration: none;
-    font-family: var(--font-body);
-    font-weight: 500;
-    transition: all 0.2s;
-    background: rgba(15, 15, 18, 0.4);
-}
-
-.universe-ui .back-link:hover {
-    background: rgba(124, 58, 237, 0.3);
-    border-color: rgba(124, 58, 237, 0.5);
-    box-shadow: 0 0 15px rgba(124, 58, 237, 0.3);
 }
 
 .universe-title {
@@ -64,6 +48,16 @@
 .universe-title p {
     color: var(--text-muted);
     font-size: 0.9rem;
+}
+
+.discovery-counter {
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: #7c3aed;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    text-shadow: 0 0 10px rgba(124, 58, 237, 0.5);
 }
 
 @media (max-width: 600px) {

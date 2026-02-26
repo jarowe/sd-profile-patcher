@@ -116,7 +116,7 @@ export default function Workshop() {
     return (
         <div className="workshop-container" ref={container}>
             <div className="workshop-header">
-                <Link to="/" viewTransition className="back-link glass-panel">
+                <Link to="/" viewTransition className="back-link">
                     <ArrowLeft size={18} /> Back to Hub
                 </Link>
                 <h1><Wrench size={32} /> The Workshop</h1>

@@ -7,12 +7,13 @@ import * as random from 'maath/random/dist/maath-random.esm';
 import { motion } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import gsap from 'gsap';
 import { playHoverSound, playClickSound } from '../utils/sounds';
 import './UniversePage.css';
 
 function Starfield(props) {
     const ref = useRef();
-    const [sphere] = useState(() => random.inSphere(new Float32Array(5000), { radius: 10 }));
+    const [sphere] = useState(() => random.inSphere(new Float32Array(8000), { radius: 12 }));
     useFrame((state, delta) => {
         ref.current.rotation.x -= delta / 15;
         ref.current.rotation.y -= delta / 20;
@@ -82,8 +83,10 @@ const nodes = [
     { id: 'projects', label: 'The Workshop', color: '#7c3aed', link: '/workshop', speed: 0.2, orbitRadius: 4, tilt: [0.1, 0, 0.2] },
     { id: 'starseed', label: 'Starseed Labs', color: '#38bdf8', link: '/projects/starseed', speed: 0.3, orbitRadius: 5, tilt: [-0.2, 0, 0.1] },
     { id: 'patcher', label: 'SD Patcher', color: '#f472b6', link: '/tools/sd-profile-patcher', speed: 0.15, orbitRadius: 3.5, tilt: [0.3, 0, -0.1] },
-    { id: 'garden', label: 'Digital Garden', color: '#10b981', link: '/garden', speed: 0.25, orbitRadius: 4.5, tilt: [-0.1, 0, -0.2] },
-    { id: 'now', label: 'Now', color: '#f59e0b', link: '/now', speed: 0.1, orbitRadius: 5.5, tilt: [0.2, 0, 0.3] }
+    { id: 'garden', label: 'Brain Dump', color: '#10b981', link: '/garden', speed: 0.25, orbitRadius: 4.5, tilt: [-0.1, 0, -0.2] },
+    { id: 'now', label: 'Now', color: '#f59e0b', link: '/now', speed: 0.1, orbitRadius: 5.5, tilt: [0.2, 0, 0.3] },
+    { id: 'favorites', label: 'Into Right Now', color: '#ec4899', link: '/favorites', speed: 0.18, orbitRadius: 6, tilt: [0.15, 0, -0.15] },
+    { id: 'vault', label: 'The Vault', color: '#ef4444', link: '/vault', speed: 0.08, orbitRadius: 7, tilt: [-0.1, 0, 0.2] },
 ];
 
 function CoreNode() {
@@ -123,7 +126,7 @@ function CoreNode() {
     );
 }
 
-function InteractiveNode({ id, label, color, link, speed, orbitRadius, tilt }) {
+function InteractiveNode({ id, label, color, link, speed, orbitRadius, tilt, onDiscover }) {
     const group = useRef();
     const mesh = useRef();
     const [hovered, setHover] = useState(false);
@@ -161,7 +164,7 @@ function InteractiveNode({ id, label, color, link, speed, orbitRadius, tilt }) {
             <group ref={group}>
                 <mesh
                     ref={mesh}
-                    onPointerOver={(e) => { e.stopPropagation(); setHover(true); document.body.style.cursor = 'pointer'; playHoverSound(); }}
+                    onPointerOver={(e) => { e.stopPropagation(); setHover(true); document.body.style.cursor = 'pointer'; playHoverSound(); if (onDiscover) onDiscover(id); }}
                     onPointerOut={(e) => { setHover(false); document.body.style.cursor = 'auto'; }}
                     onClick={(e) => {
                         e.stopPropagation();
@@ -220,20 +223,37 @@ function InteractiveNode({ id, label, color, link, speed, orbitRadius, tilt }) {
 }
 
 export default function UniversePage() {
+    const [discovered, setDiscovered] = useState(() => {
+        const saved = localStorage.getItem('jarowe_discovered_nodes');
+        return saved ? JSON.parse(saved) : [];
+    });
+
+    const handleNodeDiscover = (nodeId) => {
+        setDiscovered(prev => {
+            if (prev.includes(nodeId)) return prev;
+            const next = [...prev, nodeId];
+            localStorage.setItem('jarowe_discovered_nodes', JSON.stringify(next));
+            return next;
+        });
+    };
+
     return (
         <div className="universe-container">
             <motion.div
                 className="universe-ui"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ duration: 1 }}
+                transition={{ duration: 1, delay: 0.5 }}
             >
-                <Link to="/" viewTransition className="back-link glass-panel" onClick={() => playClickSound()}>
+                <Link to="/" viewTransition className="back-link" onClick={() => playClickSound()}>
                     <ArrowLeft size={18} /> BACK TO HUB
                 </Link>
                 <div className="universe-title">
                     <h1 style={{ textShadow: '0 0 20px rgba(124, 58, 237, 0.8)' }}>The Constellation</h1>
-                    <p>Everything I'm building, all connected. Orbiting the core. Click to travel.</p>
+                    <p>Everything I'm building, all connected. Hover to discover. Click to travel.</p>
+                    <div className="discovery-counter">
+                        {discovered.length} / {nodes.length} discovered
+                    </div>
                 </div>
             </motion.div>
 
@@ -249,7 +269,7 @@ export default function UniversePage() {
                     <CoreNode />
 
                     {nodes.map(node => (
-                        <InteractiveNode key={node.id} {...node} />
+                        <InteractiveNode key={node.id} {...node} onDiscover={handleNodeDiscover} />
                     ))}
 
                     <Suspense fallback={null}>

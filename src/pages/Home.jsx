@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Sparkles, Globe2, BookOpen, ArrowRight, Instagram, Github, Linkedin, Quote } from 'lucide-react';
+import { Sparkles, Globe2, BookOpen, ArrowRight, ChevronLeft, ChevronRight, Instagram, Github, Linkedin, Quote } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
@@ -61,6 +61,7 @@ export default function Home() {
 
   const [photoIndex, setPhotoIndex] = useState(0);
   const [hoveredMarker, setHoveredMarker] = useState(null);
+  const [activeExpedition, setActiveExpedition] = useState(0);
 
   const globeRef = useRef();
   const mapContainerRef = useRef();
@@ -86,10 +87,12 @@ export default function Home() {
       const controls = globeRef.current.controls();
       controls.autoRotate = true;
       controls.autoRotateSpeed = 0.8;
-      controls.enableZoom = false;
+      controls.enableZoom = true;
+      controls.minDistance = 150;
+      controls.maxDistance = 350;
       controls.enableDamping = true;
       controls.dampingFactor = 0.1;
-      globeRef.current.pointOfView({ lat: 35, lng: -40, altitude: 1.8 });
+      globeRef.current.pointOfView({ lat: 35, lng: -40, altitude: 1.3 });
 
       // Pause autoRotate on interaction, resume after 3s
       const handleStart = () => {
@@ -227,6 +230,20 @@ export default function Home() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [navigate]);
+
+  // Globe location navigation
+  const navigateGlobe = useCallback((direction) => {
+    const newIdx = direction === 'next'
+      ? (activeExpedition + 1) % expeditions.length
+      : (activeExpedition - 1 + expeditions.length) % expeditions.length;
+    setActiveExpedition(newIdx);
+    const loc = expeditions[newIdx];
+    if (globeRef.current) {
+      globeRef.current.pointOfView({ lat: loc.lat, lng: loc.lng, altitude: 1.3 }, 1000);
+    }
+    setHoveredMarker(loc);
+    playClickSound();
+  }, [activeExpedition]);
 
   // Avatar click effects
   const [avatarEffect, setAvatarEffect] = useState(null);
@@ -375,8 +392,8 @@ export default function Home() {
                     globeImageUrl="//unpkg.com/three-globe/example/img/earth-dark.jpg"
                     bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
                     backgroundColor="rgba(0,0,0,0)"
-                    atmosphereColor="#7c3aed"
-                    atmosphereAltitude={0.25}
+                    atmosphereColor="#a78bfa"
+                    atmosphereAltitude={0.35}
                     arcsData={arcsData}
                     arcColor="color"
                     arcDashLength={0.4}
@@ -441,11 +458,19 @@ export default function Home() {
                 )}
               </AnimatePresence>
             </div>
-            <div className="map-badge" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', justifyContent: 'space-between', width: '100%' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <Globe2 size={16} /> Worldschooling Family
+            <div className="map-badge">
+              <button className="globe-nav-btn" onClick={(e) => { e.stopPropagation(); navigateGlobe('prev'); }} aria-label="Previous location">
+                <ChevronLeft size={14} />
+              </button>
+              <div className="map-badge-center">
+                <Globe2 size={14} />
+                <span className="map-badge-location">
+                  {hoveredMarker ? hoveredMarker.name : expeditions[activeExpedition].name}
+                </span>
               </div>
-              <div style={{ fontSize: '0.8rem', color: '#0ea5e9' }}>{hoveredMarker ? `Hovering: ${hoveredMarker.name}` : 'Hover for locations'}</div>
+              <button className="globe-nav-btn" onClick={(e) => { e.stopPropagation(); navigateGlobe('next'); }} aria-label="Next location">
+                <ChevronRight size={14} />
+              </button>
             </div>
           </div>
 
@@ -589,9 +614,9 @@ export default function Home() {
             </div>
           </div>
 
-          {/* DAILY CIPHER GAME CELL */}
-          <div className="bento-cell cell-game">
-            <DailyCipher onUnlock={() => playClickSound()} />
+          {/* DAILY CIPHER + VAULT CELL */}
+          <div className="bento-cell cell-game-vault">
+            <DailyCipher showVault={true} />
           </div>
 
         </div>
@@ -608,11 +633,54 @@ export default function Home() {
               onClick={handleCatchCharacter}
               style={{ cursor: 'pointer' }}
             >
-              <div className="peek-astronaut">
-                <div className="astronaut-helmet"></div>
-                <div className="astronaut-visor"></div>
-                <div className="astronaut-body"></div>
-              </div>
+              <svg className="peek-prism" width="48" height="56" viewBox="0 0 48 56" fill="none">
+                <defs>
+                  <linearGradient id="prism-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#7c3aed">
+                      <animate attributeName="stop-color" values="#7c3aed;#38bdf8;#f472b6;#22c55e;#7c3aed" dur="4s" repeatCount="indefinite" />
+                    </stop>
+                    <stop offset="50%" stopColor="#38bdf8">
+                      <animate attributeName="stop-color" values="#38bdf8;#f472b6;#22c55e;#7c3aed;#38bdf8" dur="4s" repeatCount="indefinite" />
+                    </stop>
+                    <stop offset="100%" stopColor="#f472b6">
+                      <animate attributeName="stop-color" values="#f472b6;#22c55e;#7c3aed;#38bdf8;#f472b6" dur="4s" repeatCount="indefinite" />
+                    </stop>
+                  </linearGradient>
+                  <linearGradient id="prism-shine" x1="0%" y1="0%" x2="50%" y2="50%">
+                    <stop offset="0%" stopColor="rgba(255,255,255,0.6)" />
+                    <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+                  </linearGradient>
+                  <filter id="prism-glow">
+                    <feGaussianBlur stdDeviation="3" result="blur" />
+                    <feMerge>
+                      <feMergeNode in="blur" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                </defs>
+                {/* Main prism body */}
+                <polygon points="24,4 44,44 4,44" fill="url(#prism-gradient)" filter="url(#prism-glow)" opacity="0.9" />
+                {/* Glass shine overlay */}
+                <polygon points="24,4 44,44 4,44" fill="url(#prism-shine)" />
+                {/* Inner refraction lines */}
+                <line x1="24" y1="12" x2="14" y2="38" stroke="rgba(255,255,255,0.3)" strokeWidth="0.5" />
+                <line x1="24" y1="12" x2="34" y2="38" stroke="rgba(255,255,255,0.2)" strokeWidth="0.5" />
+                {/* Eye */}
+                <circle cx="24" cy="28" r="5" fill="rgba(0,0,0,0.3)" />
+                <circle cx="24" cy="28" r="3" fill="rgba(255,255,255,0.9)">
+                  <animate attributeName="r" values="3;3.5;3" dur="2s" repeatCount="indefinite" />
+                </circle>
+                <circle cx="24" cy="28" r="1.5" fill="#050510" />
+                <circle cx="25.5" cy="26.5" r="0.8" fill="rgba(255,255,255,0.8)" />
+                {/* Rainbow refraction beam */}
+                <g opacity="0.6">
+                  <line x1="38" y1="36" x2="46" y2="48" stroke="#ef4444" strokeWidth="1.5" />
+                  <line x1="39" y1="37" x2="47" y2="50" stroke="#f59e0b" strokeWidth="1.5" />
+                  <line x1="40" y1="38" x2="48" y2="52" stroke="#22c55e" strokeWidth="1.5" />
+                  <line x1="41" y1="39" x2="48" y2="54" stroke="#38bdf8" strokeWidth="1.5" />
+                  <line x1="42" y1="40" x2="47" y2="56" stroke="#7c3aed" strokeWidth="1.5" />
+                </g>
+              </svg>
             </motion.div>
           )}
         </AnimatePresence>

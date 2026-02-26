@@ -11,8 +11,8 @@ export default function BeamyProject() {
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
             >
-                <Link to="/" className="back-link">
-                    <ArrowLeft size={18} /> Back to Portfolio
+                <Link to="/workshop" className="back-link">
+                    <ArrowLeft size={18} /> Back to Workshop
                 </Link>
                 <div className="project-meta">
                     <span className="tagline">Next-Gen Creative Tool</span>

@@ -10,9 +10,7 @@
 }
 
 .now-header .back-link {
-    display: inline-flex;
     margin-bottom: 2rem;
-    background: rgba(15, 15, 18, 0.4);
 }
 
 .now-header h1 {

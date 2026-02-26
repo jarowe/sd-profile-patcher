@@ -115,6 +115,29 @@ a {
   box-shadow: 0 6px 20px 0 rgba(124, 58, 237, 0.4);
 }
 
+/* Global Back Link Pill */
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.4rem 1rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 100px;
+  font-size: 0.8rem;
+  color: #aaa;
+  text-decoration: none;
+  font-family: var(--font-body);
+  transition: all 0.2s ease;
+  width: fit-content;
+}
+
+.back-link:hover {
+  background: rgba(124, 58, 237, 0.15);
+  border-color: rgba(124, 58, 237, 0.4);
+  color: #fff;
+}
+
 .app-container {
   display: flex;
   flex-direction: column;

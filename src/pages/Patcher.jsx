@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react';
 import JSZip from 'jszip';
 import { motion, AnimatePresence } from 'framer-motion';
-import { UploadCloud, CheckCircle2, AlertTriangle, Settings2, RefreshCw, Layers } from 'lucide-react';
+import { ArrowLeft, UploadCloud, CheckCircle2, AlertTriangle, Settings2, RefreshCw, Layers } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import './Patcher.css';
 
 // ============================================================
@@ -288,6 +289,9 @@ export default function Patcher() {
     return (
         <div className="patcher-container">
             <div className="patcher-header">
+                <Link to="/workshop" className="back-link">
+                    <ArrowLeft size={18} /> Back to Workshop
+                </Link>
                 <h1>Stream Deck Profile Patcher</h1>
                 <p className="subtitle">Share exported profiles that just work on any machine.</p>
             </div>

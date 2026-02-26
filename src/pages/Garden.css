@@ -1,11 +1,98 @@
+/* =========================================================
+   Garden / Brain Dump  --  Card Grid + Overlay redesign
+   ========================================================= */
+
+/* ---------- Container & floating particles ---------- */
+
 .garden-container {
     max-width: 1000px;
     margin: 0 auto;
-    padding: 4rem 2rem;
+    padding: 4rem 2rem 6rem;
+    position: relative;
+    min-height: 100vh;
 }
+
+/* Subtle floating particle dots (CSS-only) */
+.garden-particles {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.garden-particles::before,
+.garden-particles::after {
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    will-change: transform;
+}
+
+.garden-particles::before {
+    width: 2px;
+    height: 2px;
+    top: 0;
+    left: 0;
+    box-shadow:
+        120px 80px 0 rgba(167, 139, 250, 0.35),
+        340px 200px 0 rgba(56, 189, 248, 0.3),
+        560px 120px 0 rgba(34, 197, 94, 0.3),
+        780px 300px 0 rgba(244, 114, 182, 0.3),
+        200px 450px 0 rgba(251, 191, 36, 0.25),
+        640px 520px 0 rgba(167, 139, 250, 0.3),
+        90px 650px 0 rgba(56, 189, 248, 0.25),
+        420px 700px 0 rgba(34, 197, 94, 0.25),
+        750px 680px 0 rgba(244, 114, 182, 0.25),
+        300px 150px 0 rgba(251, 191, 36, 0.3),
+        500px 380px 0 rgba(167, 139, 250, 0.2),
+        150px 500px 0 rgba(14, 165, 233, 0.2),
+        700px 100px 0 rgba(34, 197, 94, 0.2),
+        50px 300px 0 rgba(244, 114, 182, 0.2),
+        850px 500px 0 rgba(167, 139, 250, 0.25);
+    animation: particleDrift1 25s ease-in-out infinite alternate;
+}
+
+.garden-particles::after {
+    width: 2px;
+    height: 2px;
+    top: 0;
+    left: 0;
+    box-shadow:
+        180px 160px 0 rgba(34, 197, 94, 0.3),
+        400px 80px 0 rgba(244, 114, 182, 0.3),
+        620px 350px 0 rgba(56, 189, 248, 0.25),
+        260px 550px 0 rgba(167, 139, 250, 0.3),
+        480px 480px 0 rgba(251, 191, 36, 0.3),
+        720px 220px 0 rgba(34, 197, 94, 0.25),
+        100px 400px 0 rgba(244, 114, 182, 0.2),
+        540px 600px 0 rgba(56, 189, 248, 0.25),
+        350px 300px 0 rgba(167, 139, 250, 0.2),
+        800px 450px 0 rgba(251, 191, 36, 0.2);
+    animation: particleDrift2 30s ease-in-out infinite alternate;
+}
+
+@keyframes particleDrift1 {
+    0% { transform: translate(0, 0); }
+    25% { transform: translate(12px, -18px); }
+    50% { transform: translate(-8px, 14px); }
+    75% { transform: translate(16px, 8px); }
+    100% { transform: translate(-6px, -12px); }
+}
+
+@keyframes particleDrift2 {
+    0% { transform: translate(0, 0); }
+    33% { transform: translate(-14px, 10px); }
+    66% { transform: translate(10px, -16px); }
+    100% { transform: translate(6px, 14px); }
+}
+
+/* ---------- Header ---------- */
 
 .garden-header {
     margin-bottom: 3rem;
+    position: relative;
+    z-index: 1;
 }
 
 .garden-header h1 {
@@ -17,199 +104,347 @@
     color: transparent;
 }
 
-.garden-header p {
+.garden-subtitle {
     color: var(--text-muted);
     font-size: 1.2rem;
+    line-height: 1.5;
 }
 
-.garden-timeline {
+/* ---------- Card grid (masonry-ish) ---------- */
+
+.garden-grid {
     position: relative;
-    max-width: 800px;
-    margin: 4rem auto;
-    padding: 2rem 0;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+    margin-top: 2rem;
 }
 
-.vine-line {
-    position: absolute;
-    left: 50%;
-    top: 0;
-    bottom: 0;
-    width: 2px;
-    background: linear-gradient(180deg, transparent, rgba(167, 139, 250, 0.3) 10%, rgba(56, 189, 248, 0.3) 90%, transparent);
-    transform: translateX(-50%);
-    border-radius: 2px;
+/* Offset every other card for organic stagger feel */
+.garden-grid .growth-card:nth-child(even) {
+    margin-top: 2.5rem;
 }
 
-.garden-node {
+/* ---------- Growth card ---------- */
+
+.growth-card {
     position: relative;
-    width: 50%;
-    padding: 2rem 3rem;
-    box-sizing: border-box;
-}
-
-.garden-node.left {
-    left: 0;
-    text-align: right;
-}
-
-.garden-node.right {
-    left: 50%;
-    text-align: left;
-}
-
-.vine-bud {
-    position: absolute;
-    top: 50%;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    transform: translateY(-50%);
-    box-shadow: 0 0 10px currentColor;
-    z-index: 2;
-}
-
-.garden-node.left .vine-bud {
-    right: -7px;
-}
-
-.garden-node.right .vine-bud {
-    left: -7px;
-}
-
-.node-content {
-    padding: 2rem;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
-    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    cursor: pointer;
+    transition:
+        transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+        box-shadow 0.35s ease;
     background: rgba(20, 20, 25, 0.6);
 }
 
-.node-content:hover {
-    transform: scale(1.02);
-    border-color: rgba(167, 139, 250, 0.5);
-    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+.growth-card:hover {
+    transform: translateY(-6px) scale(1.015);
+    box-shadow:
+        0 18px 40px rgba(0, 0, 0, 0.45),
+        0 0 24px -4px var(--card-accent, rgba(167, 139, 250, 0.35));
+    border-color: var(--card-accent, rgba(167, 139, 250, 0.5));
 }
 
-.garden-node.left .node-content {
-    align-items: flex-end;
+/* Colored accent bar across top */
+.card-accent-bar {
+    height: 4px;
+    background: var(--card-accent);
+    border-radius: 4px 4px 0 0;
+    flex-shrink: 0;
 }
 
-.garden-node.right .node-content {
-    align-items: flex-start;
+.card-body {
+    padding: 1.5rem 1.5rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
 }
 
-.node-header {
+/* Top row: icon + stage badge */
+.card-top-row {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    justify-content: space-between;
     margin-bottom: 1rem;
 }
 
-.garden-node.left .node-header {
-    flex-direction: row-reverse;
-}
-
-.node-icon {
+.card-icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 48px;
-    height: 48px;
+    width: 44px;
+    height: 44px;
     background: rgba(255, 255, 255, 0.05);
     border-radius: 12px;
+    flex-shrink: 0;
 }
 
-.garden-node h2 {
-    font-size: 1.5rem;
+.card-stage-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    border: 1px solid currentColor;
+    border-radius: 20px;
+    padding: 3px 10px;
+    opacity: 0.9;
+}
+
+.stage-emoji {
+    font-size: 0.9rem;
+    line-height: 1;
+}
+
+/* Title / date / excerpt */
+.card-title {
+    font-size: 1.3rem;
     color: #fff;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.35rem;
     font-family: var(--font-display);
+    line-height: 1.3;
 }
 
-.garden-node .date {
-    font-size: 0.85rem;
+.card-date {
+    display: block;
+    font-size: 0.8rem;
     color: var(--accent-secondary);
     font-weight: 600;
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
 }
 
-.garden-node .excerpt {
+.card-excerpt {
     color: #a1a1aa;
+    font-size: 0.92rem;
     line-height: 1.6;
+    flex: 1;
 }
 
-.note-expanded {
-    overflow: hidden;
+.card-cta {
+    display: inline-block;
     margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.note-paragraph {
-    color: #d4d4d8;
-    line-height: 1.8;
-    font-size: 0.95rem;
-    margin-bottom: 1rem;
-}
-
-.note-paragraph:last-child {
-    margin-bottom: 0;
-}
-
-.read-toggle {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 1rem;
-    font-size: 0.8rem;
-    color: #7c3aed;
+    font-size: 0.78rem;
     font-weight: 600;
     letter-spacing: 0.5px;
     text-transform: uppercase;
+    color: var(--card-accent, #7c3aed);
+    transition: gap 0.25s ease;
 }
 
-.node-content.expanded {
-    border-color: rgba(124, 58, 237, 0.4);
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(124, 58, 237, 0.2);
+.growth-card:hover .card-cta {
+    letter-spacing: 1px;
 }
 
-.garden-node.left .read-toggle {
-    justify-content: flex-end;
+/* ---------- Note overlay / modal ---------- */
+
+.note-overlay-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    padding: 2rem;
+    overflow-y: auto;
 }
 
-.garden-node.left .note-paragraph {
-    text-align: left;
+.note-overlay {
+    position: relative;
+    width: 100%;
+    max-width: 700px;
+    max-height: 85vh;
+    overflow-y: auto;
+    background: rgba(18, 18, 24, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    box-shadow:
+        0 30px 80px rgba(0, 0, 0, 0.6),
+        0 0 40px -8px var(--card-accent, rgba(167, 139, 250, 0.25));
 }
+
+/* Scrollbar styling for overlay */
+.note-overlay::-webkit-scrollbar {
+    width: 6px;
+}
+
+.note-overlay::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.note-overlay::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
+
+.note-overlay::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Accent bar in overlay */
+.overlay-accent-bar {
+    height: 4px;
+    background: var(--card-accent);
+    border-radius: 16px 16px 0 0;
+}
+
+/* Close button */
+.overlay-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    color: #a1a1aa;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.overlay-close:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Overlay header */
+.overlay-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.25rem;
+    padding: 2rem 2rem 0;
+}
+
+.overlay-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 14px;
+    flex-shrink: 0;
+}
+
+.overlay-meta {
+    flex: 1;
+    min-width: 0;
+}
+
+.overlay-meta h2 {
+    font-size: 1.6rem;
+    color: #fff;
+    font-family: var(--font-display);
+    line-height: 1.3;
+    margin-bottom: 0.5rem;
+    padding-right: 2rem; /* avoid close button overlap */
+}
+
+.overlay-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.overlay-date {
+    font-size: 0.85rem;
+    color: var(--accent-secondary);
+    font-weight: 600;
+}
+
+/* Overlay article content */
+.overlay-content {
+    padding: 1.75rem 2rem 2.5rem;
+}
+
+.overlay-content p {
+    color: #d4d4d8;
+    line-height: 1.85;
+    font-size: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.overlay-content p:last-child {
+    margin-bottom: 0;
+}
+
+/* ---------- Responsive ---------- */
 
 @media (max-width: 768px) {
-    .vine-line {
-        left: 20px;
+    .garden-container {
+        padding: 3rem 1.25rem 4rem;
     }
 
-    .garden-node {
-        width: 100%;
-        padding-left: 60px;
-        padding-right: 0;
-        text-align: left;
+    .garden-header h1 {
+        font-size: 2.2rem;
     }
 
-    .garden-node.left,
-    .garden-node.right {
-        left: 0;
+    .garden-subtitle {
+        font-size: 1rem;
     }
 
-    .garden-node.left .vine-bud,
-    .garden-node.right .vine-bud {
-        left: 13px;
-        /* 20px - 7px */
-        right: auto;
+    .garden-grid {
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
     }
 
-    .garden-node.left .node-content {
-        align-items: flex-start;
+    .garden-grid .growth-card:nth-child(even) {
+        margin-top: 0;
     }
 
-    .garden-node.left .node-header {
-        flex-direction: row;
+    .note-overlay-backdrop {
+        padding: 1rem;
+        align-items: flex-end;
+    }
+
+    .note-overlay {
+        max-height: 90vh;
+        border-radius: 16px 16px 0 0;
+    }
+
+    .overlay-header {
+        padding: 1.5rem 1.25rem 0;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .overlay-meta h2 {
+        font-size: 1.3rem;
+    }
+
+    .overlay-content {
+        padding: 1.25rem 1.25rem 2rem;
+    }
+
+    .overlay-content p {
+        font-size: 0.95rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .garden-header h1 {
+        font-size: 1.8rem;
+    }
+
+    .card-title {
+        font-size: 1.1rem;
+    }
+
+    .card-body {
+        padding: 1.25rem;
     }
 }

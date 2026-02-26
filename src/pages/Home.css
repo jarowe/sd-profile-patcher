@@ -58,6 +58,30 @@
     grid-row: span 2;
     overflow: hidden;
     box-shadow: 0 0 60px rgba(124, 58, 237, 0.15);
+    position: relative;
+}
+
+.cell-map::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 80px;
+    background: linear-gradient(to bottom, rgba(15, 15, 18, 0.95) 0%, rgba(15, 15, 18, 0.5) 40%, transparent 100%);
+    z-index: 5;
+    pointer-events: none;
+    border-radius: 28px 28px 0 0;
+}
+
+.cell-map::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 28px;
+    box-shadow: inset 0 0 40px rgba(124, 58, 237, 0.1);
+    pointer-events: none;
+    z-index: 4;
 }
 
 .cell-instagram {
@@ -146,9 +170,10 @@
     grid-row: span 1;
 }
 
-.cell-game {
-    grid-column: span 2;
+.cell-game-vault {
+    grid-column: span 4;
     grid-row: span 1;
+    min-height: 200px;
 }
 
 /* Content Padding */
@@ -218,17 +243,58 @@
     bottom: 1rem;
     left: 1rem;
     right: 1rem;
-    background: rgba(0, 0, 0, 0.6);
-    padding: 0.5rem 1rem;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 0.35rem 0.5rem;
     border-radius: 20px;
-    backdrop-filter: blur(10px);
+    backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    justify-content: space-between;
+    gap: 0.3rem;
     color: #fff;
     z-index: 10;
+}
+
+.map-badge-center {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex: 1;
+    justify-content: center;
+    min-width: 0;
+}
+
+.map-badge-location {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.8rem;
+    color: #0ea5e9;
+    font-weight: 500;
+}
+
+.globe-nav-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 50%;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #fff;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    padding: 0;
+}
+
+.globe-nav-btn:hover {
+    background: rgba(124, 58, 237, 0.3);
+    border-color: rgba(124, 58, 237, 0.5);
+    transform: scale(1.1);
 }
 
 /* Music Cell */
@@ -576,7 +642,7 @@
     letter-spacing: 0.5px;
 }
 
-/* Hidden Character */
+/* Hidden Prism Character */
 .peek-character {
     position: fixed;
     z-index: 500;
@@ -584,12 +650,12 @@
 }
 
 .peek-character.peek-right {
-    right: 0;
+    right: -4px;
     top: 50%;
 }
 
 .peek-character.peek-left {
-    left: 0;
+    left: -4px;
     top: 40%;
 }
 
@@ -598,49 +664,20 @@
     top: 70px;
 }
 
-.peek-astronaut {
-    position: relative;
-    width: 36px;
-    height: 44px;
-    transition: transform 0.2s;
+.peek-prism {
+    filter: drop-shadow(0 0 8px rgba(124, 58, 237, 0.5)) drop-shadow(0 0 20px rgba(56, 189, 248, 0.3));
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    animation: prismFloat 3s ease-in-out infinite;
 }
 
-.peek-astronaut:hover {
-    transform: scale(1.3);
+.peek-prism:hover {
+    transform: scale(1.3) rotate(5deg);
+    filter: drop-shadow(0 0 12px rgba(124, 58, 237, 0.8)) drop-shadow(0 0 30px rgba(56, 189, 248, 0.5));
 }
 
-.astronaut-helmet {
-    position: absolute;
-    top: 0;
-    left: 4px;
-    width: 28px;
-    height: 26px;
-    background: #e2e8f0;
-    border-radius: 14px 14px 10px 10px;
-    border: 2px solid #94a3b8;
-}
-
-.astronaut-visor {
-    position: absolute;
-    top: 6px;
-    left: 10px;
-    width: 16px;
-    height: 12px;
-    background: linear-gradient(135deg, #7c3aed, #38bdf8);
-    border-radius: 8px 8px 6px 6px;
-    box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.3);
-}
-
-.astronaut-body {
-    position: absolute;
-    top: 26px;
-    left: 6px;
-    width: 24px;
-    height: 18px;
-    background: #e2e8f0;
-    border-radius: 4px 4px 8px 8px;
-    border: 2px solid #94a3b8;
-    border-top: none;
+@keyframes prismFloat {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-6px) rotate(3deg); }
 }
 
 /* Responsive */
@@ -699,7 +736,7 @@
         grid-row: span 1;
     }
 
-    .cell-game {
+    .cell-game-vault {
         grid-column: span 2;
         grid-row: span 1;
     }
@@ -722,7 +759,7 @@
     .cell-instagram,
     .cell-into,
     .cell-quotes,
-    .cell-game {
+    .cell-game-vault {
         grid-column: span 1;
         grid-row: span 1;
     }

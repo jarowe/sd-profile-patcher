@@ -11,7 +11,7 @@ export default function Now() {
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
             >
-                <Link to="/" className="back-link glass-panel">
+                <Link to="/" className="back-link">
                     <ArrowLeft size={18} /> Back to Hub
                 </Link>
                 <h1>What I'm doing <span>now</span></h1>

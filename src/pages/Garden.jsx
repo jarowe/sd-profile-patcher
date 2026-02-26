@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Leaf, Coffee, Code2, Zap, ChevronDown } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { ArrowLeft, Leaf, Coffee, Code2, Zap, X } from 'lucide-react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -83,35 +83,31 @@ const stageColors = {
     Evergreen: '#0ea5e9'
 };
 
+const stageEmojis = {
+    Seedling: '\u{1F331}',
+    Budding: '\u{1F33C}',
+    Evergreen: '\u{1F333}'
+};
+
 export default function Garden() {
     const container = useRef();
-    const [expandedId, setExpandedId] = useState(null);
+    const [activeNote, setActiveNote] = useState(null);
 
     useGSAP(() => {
         gsap.from('.garden-header', {
             y: -20, opacity: 0, duration: 0.8, ease: 'power3.out'
         });
 
-        gsap.from('.garden-node', {
+        gsap.from('.growth-card', {
             scrollTrigger: {
-                trigger: '.garden-timeline',
-                start: 'top 75%'
+                trigger: '.garden-grid',
+                start: 'top 80%'
             },
-            y: 50,
+            y: 60,
             opacity: 0,
-            duration: 0.8,
-            stagger: 0.2,
-            ease: 'back.out(1.2)'
-        });
-
-        gsap.from('.vine-line', {
-            scrollTrigger: {
-                trigger: '.garden-timeline',
-                start: 'top 75%'
-            },
-            height: 0,
-            duration: 1.5,
-            ease: 'power3.out'
+            duration: 0.7,
+            stagger: 0.15,
+            ease: 'back.out(1.4)'
         });
     }, { scope: container });
 
@@ -133,73 +129,133 @@ export default function Garden() {
         };
     }, []);
 
-    const toggleExpand = (id) => {
+    /* Lock body scroll when overlay is open */
+    useEffect(() => {
+        if (activeNote) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+        return () => { document.body.style.overflow = ''; };
+    }, [activeNote]);
+
+    const openNote = useCallback((note) => {
         playClickSound();
-        setExpandedId(prev => prev === id ? null : id);
-    };
+        setActiveNote(note);
+    }, []);
+
+    const closeNote = useCallback(() => {
+        playClickSound();
+        setActiveNote(null);
+    }, []);
+
+    /* Close overlay on Escape key */
+    useEffect(() => {
+        const handleKey = (e) => {
+            if (e.key === 'Escape' && activeNote) closeNote();
+        };
+        window.addEventListener('keydown', handleKey);
+        return () => window.removeEventListener('keydown', handleKey);
+    }, [activeNote, closeNote]);
 
     return (
         <div className="garden-container" ref={container}>
+            <div className="garden-particles" />
+
             <div className="garden-header">
                 <Link to="/" viewTransition className="back-link glass-panel">
                     <ArrowLeft size={18} /> Back to Hub
                 </Link>
                 <h1>The Brain Dump</h1>
-                <p>Half-baked ideas. Some are cooked. Most are still simmering. Click to read.</p>
+                <p className="garden-subtitle">
+                    Ideas at various stages of doneness. Click to dig in.
+                </p>
             </div>
 
-            <div className="garden-timeline">
-                <div className="vine-line"></div>
-                {notes.map((note, index) => (
-                    <div
-                        key={note.id}
-                        className={`garden-node ${index % 2 === 0 ? 'left' : 'right'}`}
-                    >
-                        <div className="vine-bud" style={{ backgroundColor: stageColors[note.stage] }}></div>
+            <div className="garden-grid">
+                {notes.map((note) => {
+                    const color = stageColors[note.stage];
+                    const emoji = stageEmojis[note.stage];
+                    return (
                         <div
-                            className={`node-content glass-panel clickable ${expandedId === note.id ? 'expanded' : ''}`}
-                            onClick={() => toggleExpand(note.id)}
+                            key={note.id}
+                            className="growth-card glass-panel clickable"
+                            style={{ '--card-accent': color }}
+                            onClick={() => openNote(note)}
+                            onMouseEnter={playHoverSound}
                         >
-                            <div className="node-header">
-                                <div className="node-icon">{note.icon}</div>
-                                <div className="tag" style={{ borderColor: stageColors[note.stage], color: stageColors[note.stage], padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', border: '1px solid' }}>
-                                    {note.stageLabel}
+                            <div className="card-accent-bar" />
+                            <div className="card-body">
+                                <div className="card-top-row">
+                                    <div className="card-icon">{note.icon}</div>
+                                    <span className="card-stage-badge" style={{ color }}>
+                                        <span className="stage-emoji">{emoji}</span>
+                                        {note.stageLabel}
+                                    </span>
                                 </div>
-                            </div>
-                            <h2>{note.title}</h2>
-                            <p className="date">{note.date}</p>
-                            <p className="excerpt">{note.excerpt}</p>
-
-                            <AnimatePresence>
-                                {expandedId === note.id && (
-                                    <motion.div
-                                        initial={{ height: 0, opacity: 0 }}
-                                        animate={{ height: 'auto', opacity: 1 }}
-                                        exit={{ height: 0, opacity: 0 }}
-                                        transition={{ duration: 0.4, ease: 'easeInOut' }}
-                                        className="note-expanded"
-                                    >
-                                        {note.content.split('\n\n').map((paragraph, pIdx) => (
-                                            <p key={pIdx} className="note-paragraph">{paragraph}</p>
-                                        ))}
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-
-                            <div className="read-toggle">
-                                <ChevronDown
-                                    size={16}
-                                    style={{
-                                        transform: expandedId === note.id ? 'rotate(180deg)' : 'rotate(0deg)',
-                                        transition: 'transform 0.3s'
-                                    }}
-                                />
-                                {expandedId === note.id ? 'Collapse' : 'Read more'}
+                                <h2 className="card-title">{note.title}</h2>
+                                <span className="card-date">{note.date}</span>
+                                <p className="card-excerpt">{note.excerpt}</p>
+                                <span className="card-cta">Read more &rarr;</span>
                             </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
+
+            {/* Full overlay / modal */}
+            <AnimatePresence>
+                {activeNote && (
+                    <motion.div
+                        className="note-overlay-backdrop"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.25 }}
+                        onClick={closeNote}
+                    >
+                        <motion.article
+                            className="note-overlay glass-panel"
+                            style={{ '--card-accent': stageColors[activeNote.stage] }}
+                            initial={{ y: 80, opacity: 0, scale: 0.97 }}
+                            animate={{ y: 0, opacity: 1, scale: 1 }}
+                            exit={{ y: 60, opacity: 0, scale: 0.97 }}
+                            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <button
+                                className="overlay-close"
+                                onClick={closeNote}
+                                aria-label="Close"
+                            >
+                                <X size={20} />
+                            </button>
+
+                            <div className="overlay-accent-bar" />
+
+                            <header className="overlay-header">
+                                <div className="overlay-icon">{activeNote.icon}</div>
+                                <div className="overlay-meta">
+                                    <h2>{activeNote.title}</h2>
+                                    <div className="overlay-meta-row">
+                                        <span className="card-stage-badge" style={{ color: stageColors[activeNote.stage] }}>
+                                            <span className="stage-emoji">{stageEmojis[activeNote.stage]}</span>
+                                            {activeNote.stageLabel}
+                                        </span>
+                                        <span className="overlay-date">{activeNote.date}</span>
+                                    </div>
+                                </div>
+                            </header>
+
+                            <div className="overlay-content">
+                                {activeNote.content.split('\n\n').map((paragraph, pIdx) => (
+                                    <p key={pIdx}>{paragraph}</p>
+                                ))}
+                            </div>
+                        </motion.article>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }
