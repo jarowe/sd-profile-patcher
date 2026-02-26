@@ -6,8 +6,7 @@ import { useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react'
 import { photos } from '../data/photos';
 import MusicCell from '../components/MusicCell';
 import confetti from 'canvas-confetti';
-import gsap from 'gsap';
-// useGSAP removed - using manual gsap.context for brand reveal only
+// GSAP removed entirely from Home - using pure CSS animations to prevent black screen bugs
 import { playHoverSound, playClickSound } from '../utils/sounds';
 import DailyCipher from '../components/DailyCipher';
 import SpeedPuzzle from '../components/SpeedPuzzle';
@@ -68,6 +67,7 @@ export default function Home() {
   const globeRef = useRef();
   const mapContainerRef = useRef();
   const [globeSize, setGlobeSize] = useState({ width: 0, height: 0 });
+  const [globeMounted, setGlobeMounted] = useState(false);
 
   useEffect(() => {
     const observer = new ResizeObserver((entries) => {
@@ -80,6 +80,12 @@ export default function Home() {
     });
     if (mapContainerRef.current) observer.observe(mapContainerRef.current);
     return () => observer.disconnect();
+  }, []);
+
+  // Callback ref: fires when Globe actually mounts (after lazy load resolves)
+  const handleGlobeRef = useCallback((el) => {
+    globeRef.current = el;
+    if (el) setGlobeMounted(true);
   }, []);
 
   const autoRotateTimer = useRef(null);
@@ -95,7 +101,7 @@ export default function Home() {
         setActiveExpedition(prev => {
           const next = (prev + 1) % expeditions.length;
           const loc = expeditions[next];
-          globeRef.current.pointOfView({ lat: loc.lat, lng: loc.lng, altitude: 0.55 }, 2500);
+          globeRef.current.pointOfView({ lat: loc.lat, lng: loc.lng, altitude: 0.4 }, 2500);
           setHoveredMarker(loc);
           // Clear marker tooltip after a moment
           setTimeout(() => {
@@ -108,72 +114,72 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (globeRef.current) {
-      const controls = globeRef.current.controls();
-      controls.autoRotate = true;
-      controls.autoRotateSpeed = 1.2;
-      controls.enableZoom = true;
-      controls.minDistance = 80;
-      controls.maxDistance = 400;
-      controls.enableDamping = true;
-      controls.dampingFactor = 0.05;
+    if (!globeMounted || !globeRef.current) return;
 
-      // Cinematic entrance: start zoomed far out, dramatically sweep down to first location
-      globeRef.current.pointOfView({ lat: 20, lng: 0, altitude: 3.5 });
-      setTimeout(() => {
-        if (globeRef.current) {
-          const first = expeditions[0];
-          // Dramatic zoom-in to first location over 4 seconds
-          globeRef.current.pointOfView({ lat: first.lat, lng: first.lng, altitude: 0.55 }, 4000);
-        }
-      }, 300);
+    const globe = globeRef.current;
+    const controls = globe.controls();
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 1.2;
+    controls.enableZoom = true;
+    controls.minDistance = 80;
+    controls.maxDistance = 400;
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
 
-      // Enhance Globe Material
-      const globeMaterial = globeRef.current.globeMaterial();
-      globeMaterial.color = new Color(0xffffff);
-      globeMaterial.emissive = new Color(0x1a1040);
-      globeMaterial.emissiveIntensity = 0.3;
-      globeMaterial.roughness = 0.3;
-      globeMaterial.metalness = 0.7;
+    // Cinematic entrance: start zoomed far out, dramatically sweep down to first location
+    globe.pointOfView({ lat: 20, lng: 0, altitude: 3.5 });
+    setTimeout(() => {
+      if (globeRef.current) {
+        const first = expeditions[0];
+        globeRef.current.pointOfView({ lat: first.lat, lng: first.lng, altitude: 0.4 }, 4000);
+      }
+    }, 300);
 
-      // Pause autoRotate on interaction, resume after 3s
-      const handleStart = () => {
-        isUserInteracting.current = true;
-        controls.autoRotate = false;
-        if (autoRotateTimer.current) clearTimeout(autoRotateTimer.current);
-        if (globeCycleTimer.current) clearInterval(globeCycleTimer.current);
-      };
-      const handleEnd = () => {
-        autoRotateTimer.current = setTimeout(() => {
-          isUserInteracting.current = false;
-          controls.autoRotateSpeed = 0;
-          controls.autoRotate = true;
-          const ramp = setInterval(() => {
-            if (controls.autoRotateSpeed < 1.2) {
-              controls.autoRotateSpeed += 0.03;
-            } else {
-              controls.autoRotateSpeed = 1.2;
-              clearInterval(ramp);
-            }
-          }, 50);
-          startGlobeCycle();
-        }, 4000);
-      };
+    // Enhance Globe Material
+    const globeMaterial = globe.globeMaterial();
+    globeMaterial.color = new Color(0xffffff);
+    globeMaterial.emissive = new Color(0x1a1040);
+    globeMaterial.emissiveIntensity = 0.3;
+    globeMaterial.roughness = 0.3;
+    globeMaterial.metalness = 0.7;
 
-      controls.addEventListener('start', handleStart);
-      controls.addEventListener('end', handleEnd);
+    // Pause autoRotate on interaction, resume after 4s
+    const handleStart = () => {
+      isUserInteracting.current = true;
+      controls.autoRotate = false;
+      if (autoRotateTimer.current) clearTimeout(autoRotateTimer.current);
+      if (globeCycleTimer.current) clearInterval(globeCycleTimer.current);
+    };
+    const handleEnd = () => {
+      autoRotateTimer.current = setTimeout(() => {
+        isUserInteracting.current = false;
+        controls.autoRotateSpeed = 0;
+        controls.autoRotate = true;
+        const ramp = setInterval(() => {
+          if (controls.autoRotateSpeed < 1.2) {
+            controls.autoRotateSpeed += 0.03;
+          } else {
+            controls.autoRotateSpeed = 1.2;
+            clearInterval(ramp);
+          }
+        }, 50);
+        startGlobeCycle();
+      }, 4000);
+    };
 
-      // Start auto-cycling after initial animation
-      setTimeout(() => startGlobeCycle(), 6000);
+    controls.addEventListener('start', handleStart);
+    controls.addEventListener('end', handleEnd);
 
-      return () => {
-        controls.removeEventListener('start', handleStart);
-        controls.removeEventListener('end', handleEnd);
-        if (autoRotateTimer.current) clearTimeout(autoRotateTimer.current);
-        if (globeCycleTimer.current) clearInterval(globeCycleTimer.current);
-      };
-    }
-  }, [globeSize.width, startGlobeCycle]);
+    // Start auto-cycling after initial animation
+    setTimeout(() => startGlobeCycle(), 6000);
+
+    return () => {
+      controls.removeEventListener('start', handleStart);
+      controls.removeEventListener('end', handleEnd);
+      if (autoRotateTimer.current) clearTimeout(autoRotateTimer.current);
+      if (globeCycleTimer.current) clearInterval(globeCycleTimer.current);
+    };
+  }, [globeMounted, startGlobeCycle]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -184,48 +190,16 @@ export default function Home() {
 
   const container = useRef();
   const [showBrand, setShowBrand] = useState(() => !sessionStorage.getItem('jarowe_visited'));
-  const brandCompleted = useRef(false);
 
-  // Brand reveal animation - ONLY on first ever visit
+  // Brand reveal - pure CSS animation handles visuals, this just dismisses the overlay
   useEffect(() => {
     if (!showBrand) return;
-    // First visit: play brand reveal then stagger cells in
-    const ctx = gsap.context(() => {
-      const tl = gsap.timeline({
-        onComplete: () => {
-          sessionStorage.setItem('jarowe_visited', 'true');
-          brandCompleted.current = true;
-          // Clear ALL gsap inline styles so cells are purely CSS-driven after animation
-          gsap.set('.bento-cell', { clearProps: 'all' });
-          setShowBrand(false);
-        }
-      });
-      tl.from('.brand-char', {
-        y: 50, opacity: 0, stagger: 0.1, duration: 0.8, ease: 'back.out(1.7)'
-      })
-        .to('.brand-char', {
-          opacity: 0, y: -20, duration: 0.5, stagger: 0.05, delay: 1
-        })
-        .from('.bento-cell', {
-          y: 50, opacity: 0, stagger: 0.1, duration: 0.8, ease: 'power2.out'
-        }, '-=0.2');
-    }, container);
-    return () => ctx.revert();
+    const timer = setTimeout(() => {
+      sessionStorage.setItem('jarowe_visited', 'true');
+      setShowBrand(false);
+    }, 3300);
+    return () => clearTimeout(timer);
   }, [showBrand]);
-
-  // Safety net: on every mount, ensure bento cells are visible (clears any stale GSAP inline styles)
-  useEffect(() => {
-    if (!showBrand) {
-      const cells = container.current?.querySelectorAll('.bento-cell');
-      if (cells) {
-        cells.forEach(cell => {
-          cell.style.opacity = '';
-          cell.style.transform = '';
-          cell.style.visibility = '';
-        });
-      }
-    }
-  }, []);
 
   // 3D cell tracking
   useEffect(() => {
@@ -307,7 +281,7 @@ export default function Home() {
     setActiveExpedition(newIdx);
     const loc = expeditions[newIdx];
     if (globeRef.current) {
-      globeRef.current.pointOfView({ lat: loc.lat, lng: loc.lng, altitude: 0.55 }, 1000);
+      globeRef.current.pointOfView({ lat: loc.lat, lng: loc.lng, altitude: 0.4 }, 1000);
     }
     setHoveredMarker(loc);
     playClickSound();
@@ -474,7 +448,7 @@ export default function Home() {
               <Suspense fallback={<div style={{ color: '#fff', padding: '2rem' }}>Loading globe...</div>}>
                 {globeSize.width > 0 && (
                   <Globe
-                    ref={globeRef}
+                    ref={handleGlobeRef}
                     width={globeSize.width}
                     height={globeSize.height}
                     globeImageUrl="//unpkg.com/three-globe/example/img/earth-dark.jpg"

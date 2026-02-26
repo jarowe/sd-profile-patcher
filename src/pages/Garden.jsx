@@ -99,7 +99,19 @@ You're now only 38, and already, you've painted a life more vivid and honest tha
 This past year alone\u2014you've led us from Greece to Maine, through Acadia's wild beauty, and across Europe once again\u2014Spain, Germany, Austria, Italy. A dream life that's somehow real. Because you made it so.
 
 It is the greatest honor of my life to be your husband. Happy Birthday to the woman who makes life the most beautiful adventure. I love you beyond what words can hold.`,
-        icon: <Heart size={24} color="#f472b6" />
+        icon: <Heart size={24} color="#f472b6" />,
+        gallery: [
+            `${BASE}images/Instagram/media/posts/202506/18117408043478584.jpg`,
+            `${BASE}images/Instagram/media/posts/202506/18071369545975540.jpg`,
+            `${BASE}images/Instagram/media/posts/202506/17978106839847821.jpg`,
+            `${BASE}images/Instagram/media/posts/202506/17907490422171899.jpg`,
+            `${BASE}images/Instagram/media/posts/202506/18056810669251441.jpg`,
+            `${BASE}images/Instagram/media/posts/202506/18082322089704316.jpg`,
+            `${BASE}images/Instagram/media/posts/202506/17961486461930716.jpg`,
+            `${BASE}images/Instagram/media/posts/202506/18080979883764421.jpg`,
+            `${BASE}images/Instagram/media/posts/202506/18052999454094216.jpg`,
+            `${BASE}images/Instagram/media/posts/202506/18070334965989005.jpg`,
+        ]
     },
     {
         id: 6,
@@ -122,7 +134,19 @@ You're creative, thoughtful, hilarious, and full of light. Whether you're baking
 My eyes fill when I think about all the moments that shaped you into the boy you are, and the man you'll one day become. You are a gift. So much light, and so much joy!
 
 It's an honor to be your dad. Truly. What a pleasure to say I'm your Father, Son. Happy golden birthday, Jole. I love you so, so much.`,
-        icon: <Heart size={24} color="#fbbf24" />
+        icon: <Heart size={24} color="#fbbf24" />,
+        gallery: [
+            `${BASE}images/Instagram/media/posts/202506/17914595157108652.jpg`,
+            `${BASE}images/Instagram/media/posts/202506/18047771570526757.jpg`,
+            `${BASE}images/Instagram/media/posts/202506/17855797470446616.jpg`,
+            `${BASE}images/Instagram/media/posts/202506/18512645647053946.jpg`,
+            `${BASE}images/Instagram/media/posts/202506/18079646629874354.jpg`,
+            `${BASE}images/Instagram/media/posts/202506/18032416868404999.jpg`,
+            `${BASE}images/Instagram/media/posts/202506/18307161658242748.jpg`,
+            `${BASE}images/Instagram/media/posts/202506/18508395667013897.jpg`,
+            `${BASE}images/Instagram/media/posts/202506/18009709811756330.jpg`,
+            `${BASE}images/Instagram/media/posts/202506/18228245308289810.jpg`,
+        ]
     },
     {
         id: 7,
@@ -141,7 +165,17 @@ I've been chasing that flow state my entire career. First in filmmaking, then in
 The secret I've learned: flow doesn't come from working harder. It comes from clearing the noise. Sometimes that means stepping away from the screen and walking through a new city with fresh eyes. Sometimes it means watching your kids discover something for the first time and remembering what curiosity felt like before deadlines existed.
 
 These buildings are growing on me. These murals sing. And somewhere between the morning espresso and the midnight commit, the best ideas always find their way through.`,
-        icon: <Paintbrush size={24} color="#a78bfa" />
+        icon: <Paintbrush size={24} color="#a78bfa" />,
+        gallery: [
+            `${BASE}images/Instagram/media/posts/202504/18099032260474455.jpg`,
+            `${BASE}images/Instagram/media/posts/202504/18043496630410520.jpg`,
+            `${BASE}images/Instagram/media/posts/202504/17928016757932757.jpg`,
+            `${BASE}images/Instagram/media/posts/202504/18119599621452905.jpg`,
+            `${BASE}images/Instagram/media/posts/202504/18041557661622729.jpg`,
+            `${BASE}images/Instagram/media/posts/202504/18057664345899652.jpg`,
+            `${BASE}images/Instagram/media/posts/202504/17902035795159850.jpg`,
+            `${BASE}images/Instagram/media/posts/202504/18458295763078376.jpg`,
+        ]
     },
     {
         id: 8,
@@ -160,7 +194,19 @@ Watching Jace protect his younger brothers. Watching Jax light up a room with hi
 Just before beginning what would have been a year-long home renovation journey, we paused\u2014and chose adventure instead. We packed our lives into suitcases and crossed an ocean. And in doing so, we didn't just see the world. We became part of it.
 
 The boys are growing up with a different kind of education. One that can't be measured by tests or grades. They're learning empathy, resilience, adaptability. They're learning that home isn't a place\u2014it's a feeling that's created in moments shared.`,
-        icon: <Heart size={24} color="#22c55e" />
+        icon: <Heart size={24} color="#22c55e" />,
+        gallery: [
+            `${BASE}images/Instagram/media/posts/202406/18035308411811495.jpg`,
+            `${BASE}images/Instagram/media/posts/202406/18228273304285645.jpg`,
+            `${BASE}images/Instagram/media/posts/202406/18012271727384289.jpg`,
+            `${BASE}images/Instagram/media/posts/202406/18060919540571241.jpg`,
+            `${BASE}images/Instagram/media/posts/202406/17868761385107011.jpg`,
+            `${BASE}images/Instagram/media/posts/202406/18079835032478250.jpg`,
+            `${BASE}images/Instagram/media/posts/202406/17924153279909680.jpg`,
+            `${BASE}images/Instagram/media/posts/202406/18344106379114900.jpg`,
+            `${BASE}images/Instagram/media/posts/202406/18059896519604323.jpg`,
+            `${BASE}images/Instagram/media/posts/202406/18337850548139087.jpg`,
+        ]
     },
     {
         id: 9,
@@ -179,7 +225,19 @@ Watching our boys dance with the waves and lay in the sand, we realized somethin
 Exploring ancient caves today and I found joy in the simple act of watching my son discover a fossil. His eyes went wide. His mouth dropped. And in that moment, I saw the world the way it's supposed to be seen\u2014with wonder.
 
 Tracing the paths of our childhood, my boys nearly mirror the curiosity my brothers and I once carried. The cycle continues. The adventure evolves. And every challenge presents a call to leap, expanding our horizons into bigger, brighter skies.`,
-        icon: <Globe2 size={24} color="#38bdf8" />
+        icon: <Globe2 size={24} color="#38bdf8" />,
+        gallery: [
+            `${BASE}images/Instagram/media/posts/202405/18028570129844786.jpg`,
+            `${BASE}images/Instagram/media/posts/202405/18029773807990488.jpg`,
+            `${BASE}images/Instagram/media/posts/202405/17951798984664627.jpg`,
+            `${BASE}images/Instagram/media/posts/202405/17867839035080687.jpg`,
+            `${BASE}images/Instagram/media/posts/202405/18101020048402394.jpg`,
+            `${BASE}images/Instagram/media/posts/202405/17981043038668072.jpg`,
+            `${BASE}images/Instagram/media/posts/202405/18028999012854429.jpg`,
+            `${BASE}images/Instagram/media/posts/202405/17976744140545057.jpg`,
+            `${BASE}images/Instagram/media/posts/202405/18030248443956620.jpg`,
+            `${BASE}images/Instagram/media/posts/202405/18017449808204624.jpg`,
+        ]
     },
     {
         id: 10,
@@ -199,7 +257,19 @@ You've faced challenges that could have made you bitter or discouraged, but inst
 You've helped me become the father I always hoped to be. Watching you grow up has been the greatest honor of my life. And now, as you step into your teenage years, you're not someone still trying to figure out who they are. You already know. And you're not afraid to be that person.
 
 Wherever your journey takes you, just know I'm always walking right behind you. Cheering you on. Learning from you. Loving you more than words can hold.`,
-        icon: <Heart size={24} color="#0ea5e9" />
+        icon: <Heart size={24} color="#0ea5e9" />,
+        gallery: [
+            `${BASE}images/Instagram/media/posts/202505/18049611632421210.jpg`,
+            `${BASE}images/Instagram/media/posts/202505/17863725780402542.jpg`,
+            `${BASE}images/Instagram/media/posts/202505/17980146791704711.jpg`,
+            `${BASE}images/Instagram/media/posts/202505/17944225151991319.jpg`,
+            `${BASE}images/Instagram/media/posts/202505/17909458218141036.jpg`,
+            `${BASE}images/Instagram/media/posts/202505/18169634275338168.jpg`,
+            `${BASE}images/Instagram/media/posts/202505/18068212789989135.jpg`,
+            `${BASE}images/Instagram/media/posts/202505/18051349199524470.jpg`,
+            `${BASE}images/Instagram/media/posts/202505/18043014722237621.jpg`,
+            `${BASE}images/Instagram/media/posts/202505/17860762629355902.jpg`,
+        ]
     },
 ];
 
@@ -394,6 +464,32 @@ export default function Garden() {
                                         </motion.div>
                                     </div>
                                 </header>
+
+                                {activeNote.gallery && activeNote.gallery.length > 0 && (
+                                    <motion.div
+                                        className="overlay-gallery"
+                                        initial={{ y: 20, opacity: 0 }}
+                                        animate={{ y: 0, opacity: 1 }}
+                                        transition={{ delay: 0.5 }}
+                                    >
+                                        <div className="gallery-scroll">
+                                            {activeNote.gallery.map((src, i) => (
+                                                <div key={i} className="gallery-item">
+                                                    <img
+                                                        src={src}
+                                                        alt={`${activeNote.title} photo ${i + 1}`}
+                                                        className="gallery-photo"
+                                                        loading="lazy"
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="gallery-hint">
+                                            <span className="gallery-count">{activeNote.gallery.length} photos</span>
+                                            <span className="gallery-swipe">scroll to explore &rarr;</span>
+                                        </div>
+                                    </motion.div>
+                                )}
 
                                 <motion.div
                                     className="overlay-content-massive"
