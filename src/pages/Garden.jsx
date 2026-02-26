@@ -215,42 +215,67 @@ export default function Garden() {
                         onClick={closeNote}
                     >
                         <motion.article
-                            className="note-overlay glass-panel"
+                            className="note-overlay full-screen-article"
                             style={{ '--card-accent': stageColors[activeNote.stage] }}
-                            initial={{ y: 80, opacity: 0, scale: 0.97 }}
-                            animate={{ y: 0, opacity: 1, scale: 1 }}
-                            exit={{ y: 60, opacity: 0, scale: 0.97 }}
-                            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                            initial={{ clipPath: 'circle(0% at 50% 50%)', opacity: 0 }}
+                            animate={{ clipPath: 'circle(150% at 50% 50%)', opacity: 1 }}
+                            exit={{ clipPath: 'circle(0% at 50% 50%)', opacity: 0 }}
+                            transition={{ duration: 0.8, ease: [0.76, 0, 0.24, 1] }}
                             onClick={(e) => e.stopPropagation()}
                         >
-                            <button
-                                className="overlay-close"
-                                onClick={closeNote}
-                                aria-label="Close"
-                            >
-                                <X size={20} />
-                            </button>
+                            <div className="overlay-accent-bar" style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100 }} />
 
-                            <div className="overlay-accent-bar" />
+                            <div className="note-overlay-inner">
+                                <button
+                                    className="overlay-close-massive"
+                                    onClick={closeNote}
+                                    aria-label="Close"
+                                >
+                                    <X size={32} />
+                                </button>
 
-                            <header className="overlay-header">
-                                <div className="overlay-icon">{activeNote.icon}</div>
-                                <div className="overlay-meta">
-                                    <h2>{activeNote.title}</h2>
-                                    <div className="overlay-meta-row">
-                                        <span className="card-stage-badge" style={{ color: stageColors[activeNote.stage] }}>
-                                            <span className="stage-emoji">{stageEmojis[activeNote.stage]}</span>
-                                            {activeNote.stageLabel}
-                                        </span>
-                                        <span className="overlay-date">{activeNote.date}</span>
+                                <header className="overlay-header-massive">
+                                    <motion.div
+                                        className="overlay-icon-massive"
+                                        initial={{ scale: 0, rotate: -45 }}
+                                        animate={{ scale: 1, rotate: 0 }}
+                                        transition={{ delay: 0.3, type: "spring" }}
+                                    >
+                                        {activeNote.icon}
+                                    </motion.div>
+                                    <div className="overlay-meta-massive">
+                                        <motion.h2
+                                            initial={{ y: 20, opacity: 0 }}
+                                            animate={{ y: 0, opacity: 1 }}
+                                            transition={{ delay: 0.4 }}
+                                        >
+                                            {activeNote.title}
+                                        </motion.h2>
+                                        <motion.div
+                                            className="overlay-meta-row"
+                                            initial={{ y: 20, opacity: 0 }}
+                                            animate={{ y: 0, opacity: 1 }}
+                                            transition={{ delay: 0.5 }}
+                                        >
+                                            <span className="card-stage-badge" style={{ color: stageColors[activeNote.stage] }}>
+                                                <span className="stage-emoji">{stageEmojis[activeNote.stage]}</span>
+                                                {activeNote.stageLabel}
+                                            </span>
+                                            <span className="overlay-date">{activeNote.date}</span>
+                                        </motion.div>
                                     </div>
-                                </div>
-                            </header>
+                                </header>
 
-                            <div className="overlay-content">
-                                {activeNote.content.split('\n\n').map((paragraph, pIdx) => (
-                                    <p key={pIdx}>{paragraph}</p>
-                                ))}
+                                <motion.div
+                                    className="overlay-content-massive"
+                                    initial={{ y: 30, opacity: 0 }}
+                                    animate={{ y: 0, opacity: 1 }}
+                                    transition={{ delay: 0.6 }}
+                                >
+                                    {activeNote.content.split('\n\n').map((paragraph, pIdx) => (
+                                        <p key={pIdx}>{paragraph}</p>
+                                    ))}
+                                </motion.div>
                             </div>
                         </motion.article>
                     </motion.div>

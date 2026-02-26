@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Lock, Unlock, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Lock, Unlock, Zap, X } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { motion, AnimatePresence } from 'framer-motion';
 import { playClickSound, playHoverSound } from '../utils/sounds';
 import './DailyCipher.css';
 
@@ -22,38 +23,49 @@ const WORDS = [
 const BASE = import.meta.env.BASE_URL;
 
 const vaultPhotos = [
-    { src: `${BASE}images/vault/velocicoaster.jpg`, name: 'VelociCoaster', park: 'Universal Orlando' },
-    { src: `${BASE}images/vault/hulk-coaster.jpg`, name: 'Incredible Hulk', park: 'Islands of Adventure' },
-    { src: `${BASE}images/vault/kraken-family.png`, name: 'Kraken', park: 'SeaWorld Orlando' },
-    { src: `${BASE}images/vault/penguin-trek.png`, name: 'Penguin Trek', park: 'SeaWorld Orlando' },
-    { src: `${BASE}images/vault/ice-breaker.png`, name: 'Ice Breaker', park: 'SeaWorld Orlando' },
-    { src: `${BASE}images/vault/mako-friends.jpg`, name: 'Mako', park: 'SeaWorld Orlando' },
-    { src: `${BASE}images/vault/manta-ride.jpg`, name: 'Manta', park: 'SeaWorld Orlando' },
-    { src: `${BASE}images/vault/mako-jace.jpg`, name: 'Mako II', park: 'SeaWorld Orlando' },
-    { src: `${BASE}images/vault/kraken-crew.jpg`, name: 'Kraken II', park: 'SeaWorld Orlando' },
-    { src: `${BASE}images/vault/mako-crew.jpg`, name: 'Mako III', park: 'SeaWorld Orlando' },
-    { src: `${BASE}images/vault/mako-team.jpg`, name: 'Mako IV', park: 'SeaWorld Orlando' },
+    { id: 0, src: `${BASE}images/vault/velocicoaster.jpg`, name: 'VelociCoaster', rar: 'Legendary' },
+    { id: 1, src: `${BASE}images/vault/hulk-coaster.jpg`, name: 'Incredible Hulk', rar: 'Epic' },
+    { id: 2, src: `${BASE}images/vault/kraken-family.png`, name: 'Kraken', rar: 'Rare' },
+    { id: 3, src: `${BASE}images/vault/penguin-trek.png`, name: 'Penguin Trek', rar: 'Beta' },
+    { id: 4, src: `${BASE}images/vault/ice-breaker.png`, name: 'Ice Breaker', rar: 'Rare' },
+    { id: 5, src: `${BASE}images/vault/mako-friends.jpg`, name: 'Mako', rar: 'Epic' },
+    { id: 6, src: `${BASE}images/vault/manta-ride.jpg`, name: 'Manta', rar: 'Epic' },
+    { id: 7, src: `${BASE}images/vault/mako-jace.jpg`, name: 'Mako II', rar: 'Rare' },
+    { id: 8, src: `${BASE}images/vault/kraken-crew.jpg`, name: 'Kraken Squad', rar: 'Rare' },
+    { id: 9, src: `${BASE}images/vault/mako-crew.jpg`, name: 'Mako Night Out', rar: 'Beta' },
+    { id: 10, src: `${BASE}images/vault/mako-team.jpg`, name: 'Squadron', rar: 'Legendary' },
 ];
 
-const getDailyWord = () => {
+const getDailyData = () => {
     const today = new Date();
     const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
-    return WORDS[seed % WORDS.length];
+    return {
+        word: WORDS[seed % WORDS.length],
+        cardIndex: seed % vaultPhotos.length
+    };
 };
 
 export default function DailyCipher({ showVault = false }) {
     const [guesses, setGuesses] = useState([]);
     const [currentGuess, setCurrentGuess] = useState('');
-    const [gameState, setGameState] = useState('playing');
+    const [gameState, setGameState] = useState('playing'); // playing, won, lost
     const [dailyWord, setDailyWord] = useState('');
+    const [dailyCardId, setDailyCardId] = useState(0);
     const [shake, setShake] = useState(false);
-    const [vaultOpening, setVaultOpening] = useState(false);
-    const [vaultOpen, setVaultOpen] = useState(false);
-    const [photoIndex, setPhotoIndex] = useState(0);
+
+    const [unlockedCards, setUnlockedCards] = useState([]);
+    const [showRewardSpash, setShowRewardSplash] = useState(false);
+    const [selectedCard, setSelectedCard] = useState(null);
 
     useEffect(() => {
-        const word = getDailyWord();
-        setDailyWord(word);
+        const data = getDailyData();
+        setDailyWord(data.word);
+        setDailyCardId(data.cardIndex);
+
+        const storedStats = localStorage.getItem('jarowe_collection');
+        if (storedStats) {
+            setUnlockedCards(JSON.parse(storedStats));
+        }
 
         const storedState = localStorage.getItem('dailyCipher');
         if (storedState) {
@@ -61,9 +73,7 @@ export default function DailyCipher({ showVault = false }) {
             const todayStr = new Date().toDateString();
             if (parsed.date === todayStr) {
                 setGuesses(parsed.guesses || []);
-                const savedState = parsed.gameState || 'playing';
-                setGameState(savedState);
-                if (savedState === 'won') setVaultOpen(true);
+                setGameState(parsed.gameState || 'playing');
             }
         }
     }, []);
@@ -78,9 +88,43 @@ export default function DailyCipher({ showVault = false }) {
         }
     }, [guesses, gameState, dailyWord]);
 
+    const handleWin = () => {
+        setGameState('won');
+        playClickSound();
+
+        let newUnlocked = [...unlockedCards];
+        let cardToUnlock = dailyCardId;
+
+        // If they already have today's card, give them the next locked one
+        if (newUnlocked.includes(cardToUnlock)) {
+            for (let i = 0; i < vaultPhotos.length; i++) {
+                if (!newUnlocked.includes(i)) {
+                    cardToUnlock = i;
+                    break;
+                }
+            }
+        }
+
+        if (!newUnlocked.includes(cardToUnlock)) {
+            newUnlocked.push(cardToUnlock);
+            setUnlockedCards(newUnlocked);
+            localStorage.setItem('jarowe_collection', JSON.stringify(newUnlocked));
+
+            setTimeout(() => {
+                setShowRewardSplash(cardToUnlock);
+                confetti({
+                    particleCount: 200,
+                    spread: 120,
+                    origin: { y: 0.6 },
+                    colors: ['#7c3aed', '#38bdf8', '#f472b6', '#fbbf24', '#22c55e']
+                });
+            }, 1000);
+        }
+    };
+
     useEffect(() => {
         const handleKeyDown = (e) => {
-            if (gameState !== 'playing') return;
+            if (gameState !== 'playing' || showRewardSpash !== false || selectedCard !== null) return;
 
             if (e.key === 'Enter') {
                 if (currentGuess.length !== WORD_LENGTH) {
@@ -92,20 +136,7 @@ export default function DailyCipher({ showVault = false }) {
                 setGuesses(newGuesses);
 
                 if (currentGuess === dailyWord) {
-                    setGameState('won');
-                    playClickSound();
-                    // Vault opening sequence
-                    setVaultOpening(true);
-                    setTimeout(() => {
-                        setVaultOpen(true);
-                        setVaultOpening(false);
-                        confetti({
-                            particleCount: 150,
-                            spread: 100,
-                            origin: { y: 0.5, x: 0.75 },
-                            colors: ['#7c3aed', '#38bdf8', '#f472b6', '#fbbf24', '#22c55e']
-                        });
-                    }, 1500);
+                    handleWin();
                 } else if (newGuesses.length >= MAX_GUESSES) {
                     setGameState('lost');
                 }
@@ -119,19 +150,7 @@ export default function DailyCipher({ showVault = false }) {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [currentGuess, gameState, guesses, dailyWord]);
-
-    // Count how many letters are correctly placed across all guesses
-    const correctPositions = useMemo(() => {
-        if (!dailyWord) return new Set();
-        const positions = new Set();
-        guesses.forEach(guess => {
-            for (let i = 0; i < WORD_LENGTH; i++) {
-                if (guess[i] === dailyWord[i]) positions.add(i);
-            }
-        });
-        return positions;
-    }, [guesses, dailyWord]);
+    }, [currentGuess, gameState, guesses, dailyWord, showRewardSpash, selectedCard, unlockedCards, dailyCardId]);
 
     const getCharClasses = (char, index, guessWord) => {
         if (!dailyWord) return '';
@@ -146,10 +165,18 @@ export default function DailyCipher({ showVault = false }) {
 
     return (
         <div className={`cipher-vault-wrapper ${showVault ? 'with-vault' : ''}`}>
-            {/* CIPHER SIDE */}
-            <div className="cipher-game-container">
-                <div className="cipher-header">DAILY CIPHER</div>
-                <div className="cipher-subtitle">Crack the code. Unlock the vault.</div>
+
+            {/* LEFT: CIPHER TERMINAL */}
+            <div className="cipher-terminal">
+                <div className="terminal-header">
+                    <div className="terminal-title">
+                        <Zap size={16} className="text-accent" />
+                        <span>NETWORK DECRYPT</span>
+                    </div>
+                    <div className="terminal-status">
+                        {gameState === 'playing' ? 'AWAITING INPUT...' : gameState === 'won' ? 'ACCESS GRANTED' : 'LOCKDOWN INITIATED'}
+                    </div>
+                </div>
 
                 <div className="cipher-grid">
                     {Array.from({ length: MAX_GUESSES }).map((_, rowIndex) => {
@@ -169,7 +196,7 @@ export default function DailyCipher({ showVault = false }) {
 
                                     return (
                                         <div key={colIndex} className={classNames} style={{ animationDelay: isSubmitted ? `${colIndex * 0.1}s` : undefined }}>
-                                            {char}
+                                            <span className="cell-char">{char}</span>
                                         </div>
                                     );
                                 })}
@@ -178,76 +205,111 @@ export default function DailyCipher({ showVault = false }) {
                     })}
                 </div>
 
-                {gameState === 'won' && !showVault && (
-                    <div className="cipher-message success">ACCESS GRANTED!</div>
-                )}
+                <div className="terminal-footer">
+                    <span>KEY: [{dailyWord.length} CHARS]</span>
+                    <span>ATTEMPTS: {guesses.length}/{MAX_GUESSES}</span>
+                </div>
+
                 {gameState === 'lost' && (
-                    <div className="cipher-message error">
-                        LOCKDOWN.<br />The word was {dailyWord}. Try tomorrow.
+                    <div className="terminal-overlay lost">
+                        <Lock size={32} />
+                        <h3>FATAL ERROR</h3>
+                        <p>KEY WAS: {dailyWord}</p>
                     </div>
                 )}
             </div>
 
-            {/* VAULT SIDE */}
+            {/* RIGHT: CARD COLLECTION */}
             {showVault && (
-                <div className="vault-visual">
-                    {/* Lock indicators */}
-                    <div className="vault-locks">
-                        {Array.from({ length: WORD_LENGTH }).map((_, i) => {
-                            const isUnlocked = correctPositions.has(i);
+                <div className="collection-visual">
+                    <div className="collection-header">
+                        <h3>THE ARCHIVE</h3>
+                        <span className="collection-count">{unlockedCards.length} / {vaultPhotos.length} DISCOVERED</span>
+                    </div>
+
+                    <div className="cards-grid">
+                        {vaultPhotos.map((item, idx) => {
+                            const isUnlocked = unlockedCards.includes(idx);
+
                             return (
-                                <div key={i} className={`vault-lock ${isUnlocked ? 'unlocked' : ''}`}>
-                                    {isUnlocked ? <Unlock size={16} /> : <Lock size={16} />}
-                                </div>
+                                <motion.div
+                                    key={idx}
+                                    className={`collection-card ${isUnlocked ? 'unlocked' : 'locked'}`}
+                                    whileHover={isUnlocked ? { scale: 1.05, y: -5 } : {}}
+                                    onClick={() => {
+                                        if (isUnlocked) {
+                                            setSelectedCard(item);
+                                            playClickSound();
+                                        }
+                                    }}
+                                >
+                                    {isUnlocked ? (
+                                        <>
+                                            <img src={item.src} alt={item.name} className="card-image" />
+                                            <div className="card-foil"></div>
+                                            <div className="card-info">
+                                                <div className="card-name">{item.name}</div>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="card-locked-state">
+                                            <Lock size={20} className="locked-icon" />
+                                            <div className="locked-glitch"></div>
+                                        </div>
+                                    )}
+                                </motion.div>
                             );
                         })}
                     </div>
-
-                    {/* Vault door / content */}
-                    {!vaultOpen ? (
-                        <div className={`vault-door ${vaultOpening ? 'opening' : ''}`}>
-                            <div className="vault-door-face">
-                                <div className="vault-dial">
-                                    <div className="dial-ring"></div>
-                                    <div className="dial-center">{correctPositions.size}/{WORD_LENGTH}</div>
-                                </div>
-                                <div className="vault-door-label">
-                                    {gameState === 'lost' ? 'SEALED' : `${WORD_LENGTH - correctPositions.size} LOCKS REMAIN`}
-                                </div>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="vault-revealed">
-                            <div className="vault-photo-card">
-                                <img
-                                    src={vaultPhotos[photoIndex].src}
-                                    alt={vaultPhotos[photoIndex].name}
-                                    className="vault-photo"
-                                />
-                                <div className="vault-photo-info">
-                                    <span className="vault-photo-name">{vaultPhotos[photoIndex].name}</span>
-                                    <span className="vault-photo-park">{vaultPhotos[photoIndex].park}</span>
-                                </div>
-                            </div>
-                            <div className="vault-photo-nav">
-                                <button
-                                    className="vault-nav-btn"
-                                    onClick={() => { setPhotoIndex(p => (p - 1 + vaultPhotos.length) % vaultPhotos.length); playClickSound(); }}
-                                >
-                                    <ChevronLeft size={14} />
-                                </button>
-                                <span className="vault-photo-count">{photoIndex + 1} / {vaultPhotos.length}</span>
-                                <button
-                                    className="vault-nav-btn"
-                                    onClick={() => { setPhotoIndex(p => (p + 1) % vaultPhotos.length); playClickSound(); }}
-                                >
-                                    <ChevronRight size={14} />
-                                </button>
-                            </div>
-                        </div>
-                    )}
                 </div>
             )}
+
+            {/* REWARD OR FULL SCREEN CARD SPLASH */}
+            <AnimatePresence>
+                {(showRewardSpash !== false || selectedCard !== null) && (
+                    <motion.div
+                        className="card-splash-backdrop"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => {
+                            if (showRewardSpash !== false) setShowRewardSplash(false);
+                            if (selectedCard !== null) setSelectedCard(null);
+                            playClickSound();
+                        }}
+                    >
+                        <motion.div
+                            className="card-splash-container"
+                            initial={{ scale: 0.8, y: 50, rotateY: 90 }}
+                            animate={{ scale: 1, y: 0, rotateY: 0 }}
+                            exit={{ scale: 0.8, opacity: 0 }}
+                            transition={{ type: 'spring', damping: 20, stiffness: 100 }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <button className="splash-close" onClick={() => { setShowRewardSplash(false); setSelectedCard(null); playClickSound(); }}>
+                                <X size={24} />
+                            </button>
+
+                            {showRewardSpash !== false && (
+                                <div className="reward-title">NEW RELIC ACQUIRED!</div>
+                            )}
+
+                            <div className="hero-card">
+                                <img
+                                    src={vaultPhotos[showRewardSpash !== false ? showRewardSpash : selectedCard.id].src}
+                                    alt="Hero Card"
+                                />
+                                <div className="hero-card-foil"></div>
+                                <div className="hero-card-shine"></div>
+                                <div className="hero-card-content">
+                                    <div className="hero-card-rarity">{vaultPhotos[showRewardSpash !== false ? showRewardSpash : selectedCard.id].rar}</div>
+                                    <div className="hero-card-title">{vaultPhotos[showRewardSpash !== false ? showRewardSpash : selectedCard.id].name}</div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

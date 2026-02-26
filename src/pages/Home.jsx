@@ -11,6 +11,7 @@ import { useGSAP } from '@gsap/react';
 import { playHoverSound, playClickSound } from '../utils/sounds';
 import DailyCipher from '../components/DailyCipher';
 import './Home.css';
+import { Color } from 'three';
 const Globe = lazy(() => import('react-globe.gl'));
 
 const quotes = [
@@ -86,13 +87,24 @@ export default function Home() {
     if (globeRef.current) {
       const controls = globeRef.current.controls();
       controls.autoRotate = true;
-      controls.autoRotateSpeed = 0.8;
+      controls.autoRotateSpeed = 2.5; // Increased rotation speed
       controls.enableZoom = true;
-      controls.minDistance = 150;
+      controls.minDistance = 120;
       controls.maxDistance = 350;
       controls.enableDamping = true;
-      controls.dampingFactor = 0.1;
+      controls.dampingFactor = 0.05;
       globeRef.current.pointOfView({ lat: 35, lng: -40, altitude: 1.3 });
+
+      // Enhance Globe Material for iridescent reflections
+      const globeMaterial = globeRef.current.globeMaterial();
+      globeMaterial.color = new Color(0xffffff);
+      globeMaterial.emissive = new Color(0x111122);
+      globeMaterial.emissiveIntensity = 0.2;
+      globeMaterial.roughness = 0.4;
+      globeMaterial.metalness = 0.6;
+      // Add fake iridescence using clearcoat if available
+      globeMaterial.clearcoat = 1.0;
+      globeMaterial.clearcoatRoughness = 0.1;
 
       // Pause autoRotate on interaction, resume after 3s
       const handleStart = () => {
@@ -103,12 +115,12 @@ export default function Home() {
         autoRotateTimer.current = setTimeout(() => {
           controls.autoRotateSpeed = 0;
           controls.autoRotate = true;
-          // Smooth ramp back to normal speed
+          // Smooth ramp back to faster normal speed
           const ramp = setInterval(() => {
-            if (controls.autoRotateSpeed < 0.8) {
+            if (controls.autoRotateSpeed < 2.5) {
               controls.autoRotateSpeed += 0.05;
             } else {
-              controls.autoRotateSpeed = 0.8;
+              controls.autoRotateSpeed = 2.5;
               clearInterval(ramp);
             }
           }, 50);
@@ -184,8 +196,8 @@ export default function Home() {
 
     const handleMouseLeave = (e) => {
       const cell = e.currentTarget;
-      cell.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
-      cell.style.transition = 'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+      cell.style.transform = '';
+      cell.style.transition = '';
     };
 
     const handleMouseEnter = (e) => {
@@ -480,7 +492,7 @@ export default function Home() {
 
           {/* WORKSHOP CELL */}
           <div className="bento-cell cell-project clickable" onClick={() => navigate('/workshop', { viewTransition: true })}>
-            <div className="project-image" style={{ backgroundImage: `url(${BASE}images/jaredIMG_4650-3smVbD.jpg)`, filter: 'brightness(0.5) contrast(1.2)' }}></div>
+            <div className="project-image" style={{ backgroundImage: `url(${BASE}images/tools-builds-bg.png)`, filter: 'brightness(0.7) contrast(1.1)' }}></div>
             <div className="featured-badge">Tools & Builds</div>
             <div className="bento-content" style={{ zIndex: 1 }}>
               <h3 className="project-title" style={{ fontSize: '1.8rem', marginBottom: '0.2rem' }}>The Workshop</h3>
@@ -550,9 +562,23 @@ export default function Home() {
                 />
               </AnimatePresence>
             </div>
-            <div className="insta-overlay">
-              <div className="insta-text">Life in Photos</div>
-              <Instagram size={20} color="#fff" />
+            <div className="insta-overlay" style={{ flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'flex-end', padding: '1.5rem', background: 'linear-gradient(to top, rgba(0,0,0,0.9), transparent)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: '4px' }}>
+                <div className="insta-text">Life in Photos</div>
+                <Instagram size={20} color="#fff" />
+              </div>
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={photoIndex}
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  transition={{ duration: 0.5 }}
+                  style={{ fontSize: '0.85rem', color: '#ccc', letterSpacing: '0.5px' }}
+                >
+                  {photos[photoIndex].caption}
+                </motion.div>
+              </AnimatePresence>
             </div>
           </div>
 

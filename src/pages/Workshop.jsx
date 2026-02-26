@@ -84,9 +84,9 @@ export default function Workshop() {
 
         const handleMouseLeave = (e) => {
             const cell = e.currentTarget;
-            cell.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
-            cell.style.transition = 'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-            cell.style.zIndex = 1;
+            cell.style.transform = '';
+            cell.style.transition = '';
+            cell.style.zIndex = '';
         };
 
         const handleMouseEnter = (e) => {
