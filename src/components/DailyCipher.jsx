@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Lock, Unlock, Zap, X } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -56,6 +56,47 @@ export default function DailyCipher({ showVault = false }) {
     const [unlockedCards, setUnlockedCards] = useState([]);
     const [showRewardSpash, setShowRewardSplash] = useState(false);
     const [selectedCard, setSelectedCard] = useState(null);
+
+    // 3D card tilt for hero card in splash view
+    const heroCardRef = useRef(null);
+    const handleHeroMouseMove = useCallback((e) => {
+        const card = heroCardRef.current;
+        if (!card) return;
+        const rect = card.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+        const rotateX = ((y - centerY) / centerY) * -15;
+        const rotateY = ((x - centerX) / centerX) * 15;
+        // Holographic shine position
+        const shineX = (x / rect.width) * 100;
+        const shineY = (y / rect.height) * 100;
+        card.style.transform = `perspective(800px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.05, 1.05, 1.05)`;
+        const shine = card.querySelector('.hero-card-shine');
+        if (shine) {
+            shine.style.background = `radial-gradient(circle at ${shineX}% ${shineY}%, rgba(255,255,255,0.4) 0%, transparent 60%)`;
+            shine.style.opacity = '1';
+        }
+        const foil = card.querySelector('.hero-card-foil');
+        if (foil) {
+            foil.style.backgroundPosition = `${shineX}% ${shineY}%`;
+        }
+    }, []);
+    const handleHeroMouseLeave = useCallback(() => {
+        const card = heroCardRef.current;
+        if (!card) return;
+        card.style.transition = 'transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+        void card.offsetHeight;
+        card.style.transform = '';
+        const shine = card.querySelector('.hero-card-shine');
+        if (shine) shine.style.opacity = '0';
+    }, []);
+    const handleHeroMouseEnter = useCallback(() => {
+        const card = heroCardRef.current;
+        if (!card) return;
+        card.style.transition = 'none';
+    }, []);
 
     useEffect(() => {
         const data = getDailyData();
@@ -294,7 +335,13 @@ export default function DailyCipher({ showVault = false }) {
                                 <div className="reward-title">NEW RELIC ACQUIRED!</div>
                             )}
 
-                            <div className="hero-card">
+                            <div
+                                className="hero-card"
+                                ref={heroCardRef}
+                                onMouseMove={handleHeroMouseMove}
+                                onMouseLeave={handleHeroMouseLeave}
+                                onMouseEnter={handleHeroMouseEnter}
+                            >
                                 <img
                                     src={vaultPhotos[showRewardSpash !== false ? showRewardSpash : selectedCard.id].src}
                                     alt="Hero Card"

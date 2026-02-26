@@ -10,6 +10,7 @@ import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { playHoverSound, playClickSound } from '../utils/sounds';
 import DailyCipher from '../components/DailyCipher';
+import SpeedPuzzle from '../components/SpeedPuzzle';
 import './Home.css';
 import { Color } from 'three';
 const Globe = lazy(() => import('react-globe.gl'));
@@ -94,7 +95,7 @@ export default function Home() {
         setActiveExpedition(prev => {
           const next = (prev + 1) % expeditions.length;
           const loc = expeditions[next];
-          globeRef.current.pointOfView({ lat: loc.lat, lng: loc.lng, altitude: 1.1 }, 2500);
+          globeRef.current.pointOfView({ lat: loc.lat, lng: loc.lng, altitude: 0.9 }, 2500);
           setHoveredMarker(loc);
           // Clear marker tooltip after a moment
           setTimeout(() => {
@@ -117,11 +118,12 @@ export default function Home() {
       controls.enableDamping = true;
       controls.dampingFactor = 0.05;
 
-      // Impressive entrance: start zoomed out, slowly sweep in
-      globeRef.current.pointOfView({ lat: 10, lng: 20, altitude: 2.5 });
+      // Impressive entrance: start zoomed out, sweep to first destination
+      globeRef.current.pointOfView({ lat: 10, lng: 20, altitude: 2.2 });
       setTimeout(() => {
         if (globeRef.current) {
-          globeRef.current.pointOfView({ lat: 35, lng: -40, altitude: 1.1 }, 3000);
+          const first = expeditions[0];
+          globeRef.current.pointOfView({ lat: first.lat, lng: first.lng, altitude: 0.9 }, 3000);
         }
       }, 500);
 
@@ -202,9 +204,9 @@ export default function Home() {
           y: 50, opacity: 0, stagger: 0.1, duration: 0.8, ease: 'power2.out'
         }, "-=0.2");
     } else if (!brandCompleted.current) {
-      // Only run entrance animation on direct visits (no brand reveal)
+      // Safe entrance: use translateY only (never set opacity to 0 — causes black screen if animation fails)
       gsap.from('.bento-cell', {
-        y: 30, opacity: 0, stagger: 0.05, duration: 0.6, ease: 'power2.out'
+        y: 20, stagger: 0.04, duration: 0.5, ease: 'power2.out'
       });
     }
   }, { scope: container, dependencies: [showBrand] });
@@ -230,10 +232,12 @@ export default function Home() {
 
     const handleMouseLeave = (e) => {
       const cell = e.currentTarget;
-      // Explicitly set transition inline so browser knows to animate
+      // Step 1: restore transition
       cell.style.transition = 'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-      // Animate back to neutral (using explicit values, not empty string)
-      cell.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
+      // Step 2: force reflow so browser registers the transition BEFORE the transform change
+      void cell.offsetHeight;
+      // Step 3: now animate back to neutral
+      cell.style.transform = '';
     };
 
     const handleMouseEnter = (e) => {
@@ -287,7 +291,7 @@ export default function Home() {
     setActiveExpedition(newIdx);
     const loc = expeditions[newIdx];
     if (globeRef.current) {
-      globeRef.current.pointOfView({ lat: loc.lat, lng: loc.lng, altitude: 1.3 }, 1000);
+      globeRef.current.pointOfView({ lat: loc.lat, lng: loc.lng, altitude: 0.9 }, 1000);
     }
     setHoveredMarker(loc);
     playClickSound();
@@ -349,11 +353,24 @@ export default function Home() {
   // Hidden character peek-a-boo
   const [peekVisible, setPeekVisible] = useState(false);
   const [peekPosition, setPeekPosition] = useState({ cell: 0, side: 'right' });
-  const peekCaught = useRef(false);
+  const [prismBops, setPrismBops] = useState(0);
+  const [prismBubble, setPrismBubble] = useState(null);
+  const [showSpeedGame, setShowSpeedGame] = useState(false);
+
+  const prismPhrases = [
+    "Hey! You found me!",
+    "Boop! Again!",
+    "One more... I dare you!",
+    "WHOA! Secret time!",
+    "Can't catch me!",
+    "I see everything...",
+    "Did you try the cipher?",
+    "Go explore the universe!",
+  ];
 
   useEffect(() => {
     const scheduleNext = () => {
-      const delay = 15000 + Math.random() * 30000; // 15-45 seconds
+      const delay = 12000 + Math.random() * 20000;
       return setTimeout(() => {
         const sides = ['right', 'left', 'top'];
         setPeekPosition({
@@ -361,7 +378,7 @@ export default function Home() {
           side: sides[Math.floor(Math.random() * sides.length)]
         });
         setPeekVisible(true);
-        setTimeout(() => setPeekVisible(false), 3500);
+        setTimeout(() => setPeekVisible(false), 4000);
         timerId = scheduleNext();
       }, delay);
     };
@@ -371,18 +388,25 @@ export default function Home() {
   }, []);
 
   const handleCatchCharacter = useCallback(() => {
-    if (!peekCaught.current) {
-      peekCaught.current = true;
-    }
     setPeekVisible(false);
     playClickSound();
+    const newBops = prismBops + 1;
+    setPrismBops(newBops);
+    setPrismBubble(prismPhrases[(newBops - 1) % prismPhrases.length]);
+    setTimeout(() => setPrismBubble(null), 2500);
+
     confetti({
-      particleCount: 80,
-      spread: 90,
+      particleCount: 40 + newBops * 20,
+      spread: 60 + newBops * 10,
       origin: { y: 0.5 },
-      colors: ['#22c55e', '#fbbf24', '#38bdf8'],
+      colors: ['#22c55e', '#fbbf24', '#38bdf8', '#7c3aed', '#f472b6'],
     });
-  }, []);
+
+    // Every 3 bops, trigger the speed puzzle game
+    if (newBops % 3 === 0) {
+      setTimeout(() => setShowSpeedGame(true), 1500);
+    }
+  }, [prismBops]);
 
   return (
     <div className="home-wrapper" ref={container}>
@@ -695,6 +719,24 @@ export default function Home() {
               onClick={handleCatchCharacter}
               style={{ cursor: 'pointer' }}
             >
+              {/* Bop counter badge */}
+              {prismBops > 0 && (
+                <div className="prism-bop-counter">{prismBops}</div>
+              )}
+              {/* Talk bubble */}
+              <AnimatePresence>
+                {prismBubble && (
+                  <motion.div
+                    className="prism-bubble"
+                    initial={{ opacity: 0, scale: 0, y: 10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.5 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+                  >
+                    {prismBubble}
+                  </motion.div>
+                )}
+              </AnimatePresence>
               <svg className="peek-prism" width="48" height="56" viewBox="0 0 48 56" fill="none">
                 <defs>
                   <linearGradient id="prism-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -720,21 +762,16 @@ export default function Home() {
                     </feMerge>
                   </filter>
                 </defs>
-                {/* Main prism body */}
                 <polygon points="24,4 44,44 4,44" fill="url(#prism-gradient)" filter="url(#prism-glow)" opacity="0.9" />
-                {/* Glass shine overlay */}
                 <polygon points="24,4 44,44 4,44" fill="url(#prism-shine)" />
-                {/* Inner refraction lines */}
                 <line x1="24" y1="12" x2="14" y2="38" stroke="rgba(255,255,255,0.3)" strokeWidth="0.5" />
                 <line x1="24" y1="12" x2="34" y2="38" stroke="rgba(255,255,255,0.2)" strokeWidth="0.5" />
-                {/* Eye */}
                 <circle cx="24" cy="28" r="5" fill="rgba(0,0,0,0.3)" />
                 <circle cx="24" cy="28" r="3" fill="rgba(255,255,255,0.9)">
                   <animate attributeName="r" values="3;3.5;3" dur="2s" repeatCount="indefinite" />
                 </circle>
                 <circle cx="24" cy="28" r="1.5" fill="#050510" />
                 <circle cx="25.5" cy="26.5" r="0.8" fill="rgba(255,255,255,0.8)" />
-                {/* Rainbow refraction beam */}
                 <g opacity="0.6">
                   <line x1="38" y1="36" x2="46" y2="48" stroke="#ef4444" strokeWidth="1.5" />
                   <line x1="39" y1="37" x2="47" y2="50" stroke="#f59e0b" strokeWidth="1.5" />
@@ -744,6 +781,13 @@ export default function Home() {
                 </g>
               </svg>
             </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* SPEED PUZZLE GAME */}
+        <AnimatePresence>
+          {showSpeedGame && (
+            <SpeedPuzzle onClose={() => setShowSpeedGame(false)} />
           )}
         </AnimatePresence>
       </section>

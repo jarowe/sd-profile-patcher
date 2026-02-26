@@ -84,8 +84,12 @@ export default function Workshop() {
 
         const handleMouseLeave = (e) => {
             const cell = e.currentTarget;
+            // Step 1: restore transition
             cell.style.transition = 'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-            cell.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
+            // Step 2: force reflow so browser registers transition BEFORE transform change
+            void cell.offsetHeight;
+            // Step 3: animate back to neutral
+            cell.style.transform = '';
             cell.style.zIndex = '';
         };
 

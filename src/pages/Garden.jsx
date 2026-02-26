@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Leaf, Coffee, Code2, Zap, X } from 'lucide-react';
+import { ArrowLeft, Leaf, Coffee, Code2, Zap, X, Heart, Mountain, Paintbrush, Globe2 } from 'lucide-react';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import gsap from 'gsap';
@@ -9,6 +9,8 @@ import { playClickSound, playHoverSound } from '../utils/sounds';
 import './Garden.css';
 
 gsap.registerPlugin(ScrollTrigger);
+
+const BASE = import.meta.env.BASE_URL;
 
 const notes = [
     {
@@ -74,7 +76,131 @@ What if your personal site had a daily puzzle? What if the music changed based o
 
 That's what this site is becoming. The bento grid is the hub. The globe is a toy. The cipher is a challenge. The character peeking out is a surprise. Every click should lead somewhere unexpected. Make them stay longer than 7 seconds.`,
         icon: <Zap size={24} color="#fbbf24" />
-    }
+    },
+    // --- JOURNAL ENTRIES from Instagram ---
+    {
+        id: 5,
+        title: "A Letter to Maria",
+        stage: 'Evergreen',
+        stageLabel: 'From the heart',
+        date: 'June 2025',
+        excerpt: "You didn't just chase your dream\u2014you embodied it. And in doing so, you've become a quiet revolution.",
+        photo: `${BASE}images/Instagram/media/posts/202506/18117408043478584.jpg`,
+        content: `One of the most meaningful moments of my life was when I told you my dreams of becoming a filmmaker, and you smiled\u2014that soft, soulful smile\u2014and said that your dream was to be a mother and to travel the world.
+
+I didn't fully understand why it moved me so deeply then. But I do now. It's because, in that moment, you were showing me a dream that was pure. And deep down, all I wanted was to be with that woman.
+
+A woman whose dream was to love her children with everything she had and to explore the world together in wonderment. And now\u2026 just let that sink in.
+
+You've become that woman\u2014and so much more. You've not only become the woman you dreamed of\u2014you've surpassed her in every way. You've created a life that most people spend a lifetime hoping for. But you didn't stumble into it. You built it.
+
+You're now only 38, and already, you've painted a life more vivid and honest than most dare to dream. Not through luck or chance\u2014but by choosing it, nurturing it, becoming it. You didn't just chase your dream\u2014you embodied it. And in doing so, you've become a quiet revolution.
+
+This past year alone\u2014you've led us from Greece to Maine, through Acadia's wild beauty, and across Europe once again\u2014Spain, Germany, Austria, Italy. A dream life that's somehow real. Because you made it so.
+
+It is the greatest honor of my life to be your husband. Happy Birthday to the woman who makes life the most beautiful adventure. I love you beyond what words can hold.`,
+        icon: <Heart size={24} color="#f472b6" />
+    },
+    {
+        id: 6,
+        title: "Happy Golden Birthday, Jole",
+        stage: 'Evergreen',
+        stageLabel: 'From the heart',
+        date: 'June 2025',
+        excerpt: "From the very beginning, you've made me smile easier than anyone. It's an honor to be your dad.",
+        photo: `${BASE}images/Instagram/media/posts/202506/17914595157108652.jpg`,
+        content: `From the very beginning, you've made me smile easier than anyone. You were such a funny baby\u2026bright, quick, curious, and somehow, it felt like you were already here, fully formed, just figuring out how to walk and talk as fast as you could.
+
+And you did. You've always moved fast. Thought fast. Eaten fast. And loved with your whole heart.
+
+You've spent more time on my shoulders than anywhere else, because that's just where you fit right from the very start. And even now, when I close my eyes, I can still feel the weight of you there, your little chubby hands holding on, both of us just being together.
+
+You have a heart full of joy, kindness, and this deep, emotional strength that not many people your age carry. You care so deeply about the people you love, and you protect them with everything you've got.
+
+You're creative, thoughtful, hilarious, and full of light. Whether you're baking your gluten free double tree oat cookies or drawing with that wildly vivid imagination of yours, you put your whole heart into it.
+
+My eyes fill when I think about all the moments that shaped you into the boy you are, and the man you'll one day become. You are a gift. So much light, and so much joy!
+
+It's an honor to be your dad. Truly. What a pleasure to say I'm your Father, Son. Happy golden birthday, Jole. I love you so, so much.`,
+        icon: <Heart size={24} color="#fbbf24" />
+    },
+    {
+        id: 7,
+        title: "In Between the Hustle, There's Flow",
+        stage: 'Budding',
+        stageLabel: 'Reflections',
+        date: 'April 2025',
+        excerpt: "Capturing the rhythm between creative work and finding moments of quiet in unexpected places.",
+        photo: `${BASE}images/Instagram/media/posts/202505/18036208973644195.jpg`,
+        content: `In between the hustle\u2026there's flow.
+
+There are moments in the creative process where everything just aligns. The code compiles on the first try. The design clicks. The words pour out faster than you can type them. Those moments are rare, but they're what keep us going.
+
+I've been chasing that flow state my entire career. First in filmmaking, then in product development, now in building creative tools. The medium changes but the feeling doesn't.
+
+The secret I've learned: flow doesn't come from working harder. It comes from clearing the noise. Sometimes that means stepping away from the screen and walking through a new city with fresh eyes. Sometimes it means watching your kids discover something for the first time and remembering what curiosity felt like before deadlines existed.
+
+These buildings are growing on me. These murals sing. And somewhere between the morning espresso and the midnight commit, the best ideas always find their way through.`,
+        icon: <Paintbrush size={24} color="#a78bfa" />
+    },
+    {
+        id: 8,
+        title: "Brotherhood & The Weight of Words",
+        stage: 'Evergreen',
+        stageLabel: 'From the heart',
+        date: 'June 2024',
+        excerpt: "Brother\u2014it's the most meaningful word I know. Having two brothers who shaped who I am today.",
+        photo: `${BASE}images/Instagram/media/posts/202505/17909458218141036.jpg`,
+        content: `Brother\u2014it's the most meaningful word I know. Having two brothers who shaped who I am today, and now watching my three boys forge those same bonds\u2026 it's everything.
+
+I used to think being a good father meant having all the answers. Being strong. Never showing weakness. But I've learned that the best thing I can give my boys is honesty. Showing them that it's okay to feel deeply, to cry, to be vulnerable.
+
+Watching Jace protect his younger brothers. Watching Jax light up a room with his energy. Watching Jole care for everyone around him with that enormous heart. These are the moments that matter more than any product launch or career milestone.
+
+Just before beginning what would have been a year-long home renovation journey, we paused\u2014and chose adventure instead. We packed our lives into suitcases and crossed an ocean. And in doing so, we didn't just see the world. We became part of it.
+
+The boys are growing up with a different kind of education. One that can't be measured by tests or grades. They're learning empathy, resilience, adaptability. They're learning that home isn't a place\u2014it's a feeling that's created in moments shared.`,
+        icon: <Heart size={24} color="#22c55e" />
+    },
+    {
+        id: 9,
+        title: "Water As Clear As Thoughts",
+        stage: 'Budding',
+        stageLabel: 'Reflections',
+        date: 'May 2024',
+        excerpt: "With water as clear as the thoughts these times inspire, I'm finding joy in the simple act of being present.",
+        photo: `${BASE}images/Instagram/media/posts/202404/17878593333062972.jpg`,
+        content: `With water as clear as the thoughts these times inspire, I'm finding joy in the simple act of being present.
+
+Off the coast of Syros, aboard a beautiful yacht with nothing but the Aegean stretching in every direction, something shifted in me. The constant noise of notifications, deadlines, and to-do lists faded into the rhythm of the waves.
+
+Watching our boys dance with the waves and lay in the sand, we realized something profound: their childhood isn't something that happens between our work hours. It IS the main event. Everything else is the intermission.
+
+Exploring ancient caves today and I found joy in the simple act of watching my son discover a fossil. His eyes went wide. His mouth dropped. And in that moment, I saw the world the way it's supposed to be seen\u2014with wonder.
+
+Tracing the paths of our childhood, my boys nearly mirror the curiosity my brothers and I once carried. The cycle continues. The adventure evolves. And every challenge presents a call to leap, expanding our horizons into bigger, brighter skies.`,
+        icon: <Globe2 size={24} color="#38bdf8" />
+    },
+    {
+        id: 10,
+        title: "A Letter to Jace",
+        stage: 'Evergreen',
+        stageLabel: 'From the heart',
+        date: 'March 2024',
+        excerpt: "Your passion for reading, your sense of justice, your quiet confidence\u2014I see it all.",
+        content: `To my oldest, Jace, I see you. Your passion for reading, your sense of justice, your quiet confidence that often goes unnoticed by the world but never by me.
+
+You've changed my life in more ways than I can ever explain. From the moment you were born, there was something different about you. Your eyes, your spirit, the way you looked at the world as if you already knew something most people don't.
+
+You're the kind of person who makes the world better just by being in it. You lift people up without even trying. You bring calm. You bring laughter. You bring heart.
+
+You've faced challenges that could have made you bitter or discouraged, but instead, you became stronger. You became wiser. You became more compassionate. You've shown me how to choose joy, even when it's gluten free. You've shown your brothers what kindness looks like.
+
+You've helped me become the father I always hoped to be. Watching you grow up has been the greatest honor of my life. And now, as you step into your teenage years, you're not someone still trying to figure out who they are. You already know. And you're not afraid to be that person.
+
+Wherever your journey takes you, just know I'm always walking right behind you. Cheering you on. Learning from you. Loving you more than words can hold.`,
+        icon: <Heart size={24} color="#0ea5e9" />
+    },
 ];
 
 const stageColors = {
@@ -179,11 +305,14 @@ export default function Garden() {
                     return (
                         <div
                             key={note.id}
-                            className="growth-card glass-panel clickable"
+                            className={`growth-card glass-panel clickable ${note.photo ? 'has-photo' : ''}`}
                             style={{ '--card-accent': color }}
                             onClick={() => openNote(note)}
                             onMouseEnter={playHoverSound}
                         >
+                            {note.photo && (
+                                <div className="card-photo" style={{ backgroundImage: `url(${note.photo})` }} />
+                            )}
                             <div className="card-accent-bar" />
                             <div className="card-body">
                                 <div className="card-top-row">

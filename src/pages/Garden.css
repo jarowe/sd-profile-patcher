@@ -265,6 +265,36 @@
     letter-spacing: 1px;
 }
 
+/* Photo card variant */
+.growth-card.has-photo {
+    min-height: 280px;
+}
+
+.card-photo {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    opacity: 0.25;
+    transition: opacity 0.4s ease;
+    z-index: 0;
+}
+
+.growth-card.has-photo:hover .card-photo {
+    opacity: 0.35;
+}
+
+.growth-card.has-photo .card-accent-bar {
+    position: relative;
+    z-index: 1;
+}
+
+.growth-card.has-photo .card-body {
+    position: relative;
+    z-index: 1;
+    background: linear-gradient(to top, rgba(15, 15, 20, 0.95) 60%, transparent 100%);
+}
+
 /* ---------- Note overlay / modal ---------- */
 
 .note-overlay-backdrop {
