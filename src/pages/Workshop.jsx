@@ -84,8 +84,8 @@ export default function Workshop() {
 
         const handleMouseLeave = (e) => {
             const cell = e.currentTarget;
-            cell.style.transform = '';
-            cell.style.transition = '';
+            cell.style.transition = 'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+            cell.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
             cell.style.zIndex = '';
         };
 
@@ -116,7 +116,7 @@ export default function Workshop() {
     return (
         <div className="workshop-container" ref={container}>
             <div className="workshop-header">
-                <Link to="/" viewTransition className="back-link">
+                <Link to="/" className="back-link">
                     <ArrowLeft size={18} /> Back to Hub
                 </Link>
                 <h1><Wrench size={32} /> The Workshop</h1>

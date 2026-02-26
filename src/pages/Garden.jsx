@@ -163,7 +163,7 @@ export default function Garden() {
             <div className="garden-particles" />
 
             <div className="garden-header">
-                <Link to="/" viewTransition className="back-link glass-panel">
+                <Link to="/" className="back-link">
                     <ArrowLeft size={18} /> Back to Hub
                 </Link>
                 <h1>The Brain Dump</h1>

@@ -97,7 +97,7 @@ export default function Vault() {
         <div className="vault-container" ref={container}>
             <div className="vault-scanline"></div>
 
-            <Link to="/" viewTransition className="back-link vault-back">
+            <Link to="/" className="back-link vault-back">
                 <ArrowLeft size={18} /> EXIT VAULT
             </Link>
 

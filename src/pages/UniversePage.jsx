@@ -186,7 +186,7 @@ function InteractiveNode({ id, label, color, link, speed, orbitRadius, tilt, onD
                                         if (element) element.scrollIntoView({ behavior: 'smooth' });
                                     }, 500);
                                 } else {
-                                    navigate(link, { viewTransition: true });
+                                    navigate(link);
                                 }
                             }
                         });
@@ -245,7 +245,7 @@ export default function UniversePage() {
                 animate={{ opacity: 1 }}
                 transition={{ duration: 1, delay: 0.5 }}
             >
-                <Link to="/" viewTransition className="back-link" onClick={() => playClickSound()}>
+                <Link to="/" className="back-link" onClick={() => playClickSound()}>
                     <ArrowLeft size={18} /> BACK TO HUB
                 </Link>
                 <div className="universe-title">

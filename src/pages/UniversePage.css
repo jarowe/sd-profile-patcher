@@ -19,7 +19,7 @@
     top: 0;
     left: 0;
     width: 100%;
-    padding: 2rem;
+    padding: 1.5rem 2rem;
     z-index: 10;
     display: flex;
     justify-content: space-between;
@@ -29,6 +29,9 @@
 
 .universe-ui .back-link {
     pointer-events: auto;
+    background: rgba(0, 0, 0, 0.4);
+    border-color: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(8px);
 }
 
 .universe-title {

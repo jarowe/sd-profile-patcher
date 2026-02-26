@@ -83,60 +83,94 @@ export default function Home() {
 
   const autoRotateTimer = useRef(null);
 
+  // Auto-cycle through locations when globe is idle
+  const globeCycleTimer = useRef(null);
+  const isUserInteracting = useRef(false);
+
+  const startGlobeCycle = useCallback(() => {
+    if (globeCycleTimer.current) clearInterval(globeCycleTimer.current);
+    globeCycleTimer.current = setInterval(() => {
+      if (!isUserInteracting.current && globeRef.current) {
+        setActiveExpedition(prev => {
+          const next = (prev + 1) % expeditions.length;
+          const loc = expeditions[next];
+          globeRef.current.pointOfView({ lat: loc.lat, lng: loc.lng, altitude: 1.1 }, 2500);
+          setHoveredMarker(loc);
+          // Clear marker tooltip after a moment
+          setTimeout(() => {
+            if (!isUserInteracting.current) setHoveredMarker(null);
+          }, 3500);
+          return next;
+        });
+      }
+    }, 8000);
+  }, []);
+
   useEffect(() => {
     if (globeRef.current) {
       const controls = globeRef.current.controls();
       controls.autoRotate = true;
-      controls.autoRotateSpeed = 2.5; // Increased rotation speed
+      controls.autoRotateSpeed = 1.2;
       controls.enableZoom = true;
-      controls.minDistance = 120;
-      controls.maxDistance = 350;
+      controls.minDistance = 100;
+      controls.maxDistance = 300;
       controls.enableDamping = true;
       controls.dampingFactor = 0.05;
-      globeRef.current.pointOfView({ lat: 35, lng: -40, altitude: 1.3 });
 
-      // Enhance Globe Material for iridescent reflections
+      // Impressive entrance: start zoomed out, slowly sweep in
+      globeRef.current.pointOfView({ lat: 10, lng: 20, altitude: 2.5 });
+      setTimeout(() => {
+        if (globeRef.current) {
+          globeRef.current.pointOfView({ lat: 35, lng: -40, altitude: 1.1 }, 3000);
+        }
+      }, 500);
+
+      // Enhance Globe Material
       const globeMaterial = globeRef.current.globeMaterial();
       globeMaterial.color = new Color(0xffffff);
-      globeMaterial.emissive = new Color(0x111122);
-      globeMaterial.emissiveIntensity = 0.2;
-      globeMaterial.roughness = 0.4;
-      globeMaterial.metalness = 0.6;
-      // Add fake iridescence using clearcoat if available
-      globeMaterial.clearcoat = 1.0;
-      globeMaterial.clearcoatRoughness = 0.1;
+      globeMaterial.emissive = new Color(0x1a1040);
+      globeMaterial.emissiveIntensity = 0.3;
+      globeMaterial.roughness = 0.3;
+      globeMaterial.metalness = 0.7;
 
       // Pause autoRotate on interaction, resume after 3s
       const handleStart = () => {
+        isUserInteracting.current = true;
         controls.autoRotate = false;
         if (autoRotateTimer.current) clearTimeout(autoRotateTimer.current);
+        if (globeCycleTimer.current) clearInterval(globeCycleTimer.current);
       };
       const handleEnd = () => {
         autoRotateTimer.current = setTimeout(() => {
+          isUserInteracting.current = false;
           controls.autoRotateSpeed = 0;
           controls.autoRotate = true;
-          // Smooth ramp back to faster normal speed
           const ramp = setInterval(() => {
-            if (controls.autoRotateSpeed < 2.5) {
-              controls.autoRotateSpeed += 0.05;
+            if (controls.autoRotateSpeed < 1.2) {
+              controls.autoRotateSpeed += 0.03;
             } else {
-              controls.autoRotateSpeed = 2.5;
+              controls.autoRotateSpeed = 1.2;
               clearInterval(ramp);
             }
           }, 50);
-        }, 3000);
+          startGlobeCycle();
+        }, 4000);
       };
 
       controls.addEventListener('start', handleStart);
       controls.addEventListener('end', handleEnd);
 
+      // Start auto-cycling after initial animation
+      setTimeout(() => startGlobeCycle(), 6000);
+
       return () => {
         controls.removeEventListener('start', handleStart);
         controls.removeEventListener('end', handleEnd);
         if (autoRotateTimer.current) clearTimeout(autoRotateTimer.current);
+        if (globeCycleTimer.current) clearInterval(globeCycleTimer.current);
       };
     }
-  }, [globeSize.width]);
+  }, [globeSize.width, startGlobeCycle]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -196,8 +230,10 @@ export default function Home() {
 
     const handleMouseLeave = (e) => {
       const cell = e.currentTarget;
-      cell.style.transform = '';
-      cell.style.transition = '';
+      // Explicitly set transition inline so browser knows to animate
+      cell.style.transition = 'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+      // Animate back to neutral (using explicit values, not empty string)
+      cell.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
     };
 
     const handleMouseEnter = (e) => {
@@ -236,7 +272,7 @@ export default function Home() {
         keySequence = keySequence.slice(-5);
       }
       if (keySequence.toLowerCase() === 'vault') {
-        navigate('/vault', { viewTransition: true });
+        navigate('/vault');
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -491,7 +527,7 @@ export default function Home() {
           </div>
 
           {/* WORKSHOP CELL */}
-          <div className="bento-cell cell-project clickable" onClick={() => navigate('/workshop', { viewTransition: true })}>
+          <div className="bento-cell cell-project clickable" onClick={() => navigate('/workshop')}>
             <div className="project-image" style={{ backgroundImage: `url(${BASE}images/tools-builds-bg.png)`, filter: 'brightness(0.7) contrast(1.1)' }}></div>
             <div className="featured-badge">Tools & Builds</div>
             <div className="bento-content" style={{ zIndex: 1 }}>
@@ -503,7 +539,7 @@ export default function Home() {
           {/* NOW PAGE CELL */}
           <div
             className="bento-cell cell-now clickable tilt-enabled"
-            onClick={() => navigate('/now', { viewTransition: true })}
+            onClick={() => navigate('/now')}
             onMouseEnter={handleCurrentlyHover}
             onMouseLeave={handleCurrentlyLeave}
           >
@@ -583,7 +619,7 @@ export default function Home() {
           </div>
 
           {/* DIGITAL GARDEN CELL */}
-          <div className="bento-cell cell-garden clickable" onClick={() => navigate('/garden', { viewTransition: true })}>
+          <div className="bento-cell cell-garden clickable" onClick={() => navigate('/garden')}>
             <div className="bento-content" style={{ justifyContent: 'center' }}>
               <div className="garden-header"><BookOpen size={20} /> Brain Dump</div>
               <p style={{ color: '#aaa', fontSize: '0.95rem' }}>
@@ -593,7 +629,7 @@ export default function Home() {
           </div>
 
           {/* ENTER THE UNIVERSE CELL */}
-          <div className="bento-cell cell-universe clickable" onClick={() => navigate('/universe', { viewTransition: true })}>
+          <div className="bento-cell cell-universe clickable" onClick={() => navigate('/universe')}>
             <div className="bento-content">
               <div className="universe-content">
                 <div>
@@ -608,7 +644,7 @@ export default function Home() {
           </div>
 
           {/* INTO RIGHT NOW CELL */}
-          <div className="bento-cell cell-into clickable" onClick={() => navigate('/favorites', { viewTransition: true })}>
+          <div className="bento-cell cell-into clickable" onClick={() => navigate('/favorites')}>
             <div className="bento-content" style={{ background: 'linear-gradient(135deg, rgba(20, 20, 25, 0.8), rgba(15, 15, 20, 0.4))' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f472b6', fontWeight: 'bold', marginBottom: '10px' }}>
                 <Sparkles size={18} /> Into Right Now

@@ -114,7 +114,7 @@ export default function Favorites() {
     return (
         <div className="fav-container" ref={container}>
             <div className="fav-header">
-                <Link to="/" viewTransition className="back-link">
+                <Link to="/" className="back-link">
                     <ArrowLeft size={18} /> Back to Hub
                 </Link>
                 <h1><Sparkles size={28} /> Into Right Now</h1>
