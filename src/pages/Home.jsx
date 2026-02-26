@@ -222,7 +222,7 @@ export default function Home() {
         // --- A. Cinematic Lighting Setup ---
         // Clean out default lights to own the scene fully
         scene.children.filter(c => c.type === 'DirectionalLight' || c.type === 'AmbientLight').forEach(l => scene.remove(l));
-        const ambient = new THREE.AmbientLight(0xffffff, 0.2); // Low base
+        const ambient = new THREE.AmbientLight(0xffffff, 0.5); // Brighter base to show texture
         const rimColor = new THREE.DirectionalLight(0x7c3aed, 2.5); // Deep purple rim
         rimColor.position.set(-200, 100, -200);
         const sunLight = new THREE.DirectionalLight(0xffffff, 1.5);
@@ -240,15 +240,16 @@ export default function Home() {
             map: mapReady,
             bumpMap: bumpReady,
             bumpScale: 1.2,
-            roughnessMap: waterReady, // Magic reflections on oceans
-            roughness: 0.1, // very glossy
-            metalness: 0.8,
-            color: new THREE.Color(0x334466),
-            emissive: new THREE.Color(0x0a1628), // Deepest dark blue shadows
-            iridescence: 1.0, 
+            roughnessMap: waterReady,
+            roughness: 0.45,
+            metalness: 0.15,
+            color: new THREE.Color(0xffffff), // White = show texture as-is, no tint
+            emissive: new THREE.Color(0x0a1a3a),
+            emissiveIntensity: 0.6,
+            iridescence: 0.6,
             iridescenceIOR: 1.3,
-            clearcoat: 1.0,
-            clearcoatRoughness: 0.1,
+            clearcoat: 0.8,
+            clearcoatRoughness: 0.15,
           });
           // Apply material by finding the globe mesh in the scene
           // (globe.globeMaterial() is not a function in this react-globe.gl version)
@@ -324,8 +325,6 @@ export default function Home() {
               const vec3 color1 = vec3(0.0, 0.9, 0.6);
               const vec3 color2 = vec3(0.5, 0.1, 0.9);
               const vec3 color3 = vec3(0.1, 0.5, 1.0);
-              // intense hit color
-              const vec3 hitColor = vec3(1.0, 0.8, 0.0); 
 
               vec4 permute(vec4 x){return mod(((x*34.0)+1.0)*x, 289.0);}
               vec4 taylorInvSqrt(vec4 r){return 1.79284291400159 - 0.85373472095314 * r;}
@@ -359,15 +358,22 @@ export default function Home() {
               void main() {
                 vec3 viewDir = normalize(cameraPosition - vPosition);
                 float fresnel = clamp(1.0 - dot(viewDir, vNormal), 0.0, 1.0);
-                fresnel = pow(fresnel, max(0.5, 2.5 - prismPulse * 1.5)); // Expand fresnel on hit
-                float speed = time * (0.2 + prismPulse);
+                // High power = edge-only glow, doesn't cover globe face
+                fresnel = pow(fresnel, max(2.0, 4.0 - prismPulse * 2.0));
+                float speed = time * (0.2 + prismPulse * 0.15);
                 float n = snoise(vPosition * 0.015 + vec3(0.0, speed, speed * 0.5));
                 float mask = smoothstep(0.1, 0.9, n * 0.5 + 0.5);
                 vec3 col = mix(color1, color2, mask);
                 col = mix(col, color3, audioPulse * fresnel);
-                col = mix(col, hitColor, prismPulse); // Turn golden on hit
-                float alpha = fresnel * (0.8 + n * 0.4 + audioPulse + prismPulse * 2.0);
-                gl_FragColor = vec4(col * (1.5 + audioPulse + prismPulse*2.0), alpha * 0.8);
+                // Prismatic rainbow cycle on hit instead of solid gold
+                vec3 hitColor = vec3(
+                  0.5 + 0.5 * sin(time * 2.5),
+                  0.5 + 0.5 * sin(time * 2.5 + 2.094),
+                  0.5 + 0.5 * sin(time * 2.5 + 4.189)
+                );
+                col = mix(col, hitColor, prismPulse * 0.6);
+                float alpha = fresnel * (0.3 + n * 0.15 + audioPulse * 0.3 + prismPulse * 0.5);
+                gl_FragColor = vec4(col * (0.7 + audioPulse*0.3 + prismPulse*0.5), alpha * 0.25);
               }
             `,
             transparent: true,
@@ -438,30 +444,37 @@ export default function Home() {
                 vColor = customColor; vType = pType;
                 vec3 pos = position;
                 if (pType > 0.5) {
-                  float speed = time * (0.8 + prismPulse * 5.0);
-                  pos.x += sin(speed*0.5+pos.y*0.05)*(1.5+audioPulse*20.0);
-                  pos.y += cos(speed*0.3+pos.x*0.05)*(1.5+audioPulse*20.0);
-                  pos.z += sin(speed*0.4+pos.z*0.05)*(1.5+audioPulse*20.0);
-                  // Explosion burst on prism click
-                  pos += burstOffset * prismPulse;
+                  float speed = time * (0.8 + prismPulse * 0.5);
+                  // Gentle orbital drift, not wild thrashing
+                  pos.x += sin(speed*0.5+pos.y*0.05)*(1.5+audioPulse*4.0);
+                  pos.y += cos(speed*0.3+pos.x*0.05)*(1.5+audioPulse*4.0);
+                  pos.z += sin(speed*0.4+pos.z*0.05)*(1.5+audioPulse*4.0);
+                  // No outward explosion - just gentle breathing
+                  pos += burstOffset * prismPulse * 0.08;
                 }
                 vec4 mv = modelViewMatrix * vec4(pos,1.0);
                 gl_Position = projectionMatrix * mv;
-                // Tinier dust by default, blows up massively on audio and click
-                float baseSize = (pType>0.5) ? aScale*(0.5 + audioPulse*10.0 + prismPulse*15.0) : aScale*(1.5+audioPulse*2.0);
+                // Subtle glow-up: dust brightens gently, doesn't balloon
+                float baseSize = (pType>0.5) ? aScale*(0.5 + audioPulse*2.0 + prismPulse*1.5) : aScale*(1.5+audioPulse*2.0);
                 gl_PointSize = baseSize * pixelRatio * (300.0 / -mv.z);
               }
             `,
             fragmentShader: `
-              varying vec3 vColor; varying float vType; uniform float audioPulse; uniform float prismPulse;
+              varying vec3 vColor; varying float vType; uniform float audioPulse; uniform float prismPulse; uniform float time;
               void main() {
                 vec2 xy = gl_PointCoord.xy - vec2(0.5);
                 float ll = length(xy);
                 if(ll>0.5) discard;
-                float glow = (vType>0.5) ? smoothstep(0.5,0.0,ll) : smoothstep(0.5,0.4,ll); // Sharper magical core for dust
-                float alpha = glow * (0.5 + audioPulse*0.5 + prismPulse*1.0);
-                vec3 flash = mix(vColor, vec3(1.0), prismPulse); // turns white on flash
-                gl_FragColor = vec4(flash*(1.0 + audioPulse*2.0 + prismPulse*3.0), alpha);
+                float glow = (vType>0.5) ? smoothstep(0.5,0.0,ll) : smoothstep(0.5,0.4,ll);
+                float alpha = glow * (0.4 + audioPulse*0.3 + prismPulse*0.3);
+                // Gentle prismatic color shift - ethereal shimmer not white flash
+                vec3 prismatic = vec3(
+                  0.5 + 0.5 * sin(time * 3.0),
+                  0.5 + 0.5 * sin(time * 3.0 + 2.094),
+                  0.5 + 0.5 * sin(time * 3.0 + 4.189)
+                );
+                vec3 shimmer = mix(vColor, prismatic, prismPulse * 0.5);
+                gl_FragColor = vec4(shimmer*(1.0 + audioPulse*0.8 + prismPulse*0.5), alpha);
               }
             `,
             transparent: true, blending: THREE.AdditiveBlending, depthWrite: false
@@ -542,7 +555,7 @@ export default function Home() {
 
               // Decay Prism Pulse organically
               if (globe.customUniforms.prismPulse.value > 0) {
-                 globe.customUniforms.prismPulse.value = Math.max(0, globe.customUniforms.prismPulse.value - dt * 0.8);
+                 globe.customUniforms.prismPulse.value = Math.max(0, globe.customUniforms.prismPulse.value - dt * 0.35);
               }
 
               if (window.globalAnalyser) {
@@ -554,7 +567,7 @@ export default function Home() {
 
               // Animate Satellites & Planes
               if (globe.satellitesGroup) {
-                const globalPrismMultiplier = 1.0 + (globe.customUniforms.prismPulse.value * 20.0); // Extreme hyperspeed on bop
+                const globalPrismMultiplier = 1.0 + (globe.customUniforms.prismPulse.value * 5.0); // Graceful acceleration on bop
                 globe.satellitesGroup.children.forEach(m => {
                   m.userData.lat += m.userData.speedLat * dt * globalPrismMultiplier;
                   m.userData.lng += m.userData.speedLng * dt * globalPrismMultiplier;
@@ -840,10 +853,14 @@ export default function Home() {
     setTimeout(() => setPrismBubble(null), 2500);
 
     confetti({
-      particleCount: 40 + newBops * 20,
-      spread: 60 + newBops * 10,
+      particleCount: 20 + newBops * 5,
+      spread: 120,
       origin: { y: 0.5 },
       colors: ['#22c55e', '#fbbf24', '#38bdf8', '#7c3aed', '#f472b6'],
+      gravity: 0.4,
+      scalar: 0.7,
+      drift: 0.5,
+      ticks: 150,
     });
 
     // Every 3 bops, trigger the speed puzzle game
@@ -916,11 +933,12 @@ export default function Home() {
                     ref={handleGlobeRef}
                     width={globeSize.width}
                     height={globeSize.height}
-                    
-                    
+                    globeImageUrl="//unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
+                    bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
                     backgroundColor="rgba(0,0,0,0)"
-                    
-                    
+                    atmosphereColor="#7c3aed"
+                    atmosphereAltitude={0.45}
+
                     arcsData={arcsData}
                     arcColor="color"
                     arcDashLength={0.4}

@@ -17,7 +17,6 @@ export const photos = [
     { src: `${BASE}images/Instagram/media/posts/202404/17898580916989133.jpg`, alt: 'Rooftop views', caption: 'Hot cocoa and cool breezes' },
     { src: `${BASE}images/Instagram/media/posts/202404/17878593333062972.jpg`, alt: 'Beach day', caption: 'Glistening in the Aegean' },
     { src: `${BASE}images/Instagram/media/posts/202405/17847667560217703.jpg`, alt: 'Cave exploring', caption: 'Joy in simple moments' },
-    { src: `${BASE}images/Instagram/media/posts/202505/17980146791704711.jpg`, alt: 'Happy birthday', caption: 'A perfect reflection' },
     { src: `${BASE}images/Instagram/media/posts/202505/17909458218141036.jpg`, alt: 'Brother bond', caption: "The most meaningful word I know" },
     { src: `${BASE}images/rooftop-social.jpg`, alt: 'Rooftop conversations', caption: 'Making connections everywhere' },
     { src: `${BASE}images/Instagram/media/posts/202404/17850421683190177.jpg`, alt: 'Waffles morning', caption: 'Homemade waffles to evening gelato' },
