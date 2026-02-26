@@ -14,7 +14,6 @@ export const photos = [
     { src: `${BASE}images/Instagram/media/posts/202505/18036208973644195.jpg`, alt: 'An immortal gaze', caption: 'Art meets soul' },
     { src: `${BASE}images/Instagram/media/posts/202505/17863725780402542.jpg`, alt: 'City vibes', caption: 'These buildings are growing on me' },
     { src: `${BASE}images/Instagram/media/posts/202404/17847062664203019.jpg`, alt: 'Greek adventure', caption: 'Golden hour family' },
-    { src: `${BASE}images/Instagram/media/posts/202404/17898580916989133.jpg`, alt: 'Rooftop views', caption: 'Hot cocoa and cool breezes' },
     { src: `${BASE}images/Instagram/media/posts/202404/17878593333062972.jpg`, alt: 'Beach day', caption: 'Glistening in the Aegean' },
     { src: `${BASE}images/Instagram/media/posts/202405/17847667560217703.jpg`, alt: 'Cave exploring', caption: 'Joy in simple moments' },
     { src: `${BASE}images/Instagram/media/posts/202505/17909458218141036.jpg`, alt: 'Brother bond', caption: "The most meaningful word I know" },

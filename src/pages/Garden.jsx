@@ -261,7 +261,6 @@ Wherever your journey takes you, just know I'm always walking right behind you. 
         gallery: [
             `${BASE}images/Instagram/media/posts/202505/18049611632421210.jpg`,
             `${BASE}images/Instagram/media/posts/202505/17863725780402542.jpg`,
-            `${BASE}images/Instagram/media/posts/202505/17980146791704711.jpg`,
             `${BASE}images/Instagram/media/posts/202505/17944225151991319.jpg`,
             `${BASE}images/Instagram/media/posts/202505/17909458218141036.jpg`,
             `${BASE}images/Instagram/media/posts/202505/18169634275338168.jpg`,
