@@ -243,7 +243,7 @@ export default function Home() {
         if (!globe.oceanMaterialSet) {
           const texLoader = new THREE.TextureLoader();
           const earthTex = texLoader.load('//unpkg.com/three-globe/example/img/earth-blue-marble.jpg');
-          const nightTex = texLoader.load('//cdn.jsdelivr.net/gh/mrdoob/three.js/examples/textures/planets/earth_lights_2048.png');
+          const nightTex = texLoader.load('//cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/textures/planets/earth_night_4096.jpg');
           const waterTex = texLoader.load('//unpkg.com/three-globe/example/img/earth-water.png');
           const sunDirVec = new THREE.Vector3(1.0, 0.5, 1.0).normalize();
 
