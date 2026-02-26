@@ -7,7 +7,7 @@ import { photos } from '../data/photos';
 import MusicCell from '../components/MusicCell';
 import confetti from 'canvas-confetti';
 import gsap from 'gsap';
-import { useGSAP } from '@gsap/react';
+// useGSAP removed - using manual gsap.context for brand reveal only
 import { playHoverSound, playClickSound } from '../utils/sounds';
 import DailyCipher from '../components/DailyCipher';
 import SpeedPuzzle from '../components/SpeedPuzzle';
@@ -95,7 +95,7 @@ export default function Home() {
         setActiveExpedition(prev => {
           const next = (prev + 1) % expeditions.length;
           const loc = expeditions[next];
-          globeRef.current.pointOfView({ lat: loc.lat, lng: loc.lng, altitude: 0.9 }, 2500);
+          globeRef.current.pointOfView({ lat: loc.lat, lng: loc.lng, altitude: 0.55 }, 2500);
           setHoveredMarker(loc);
           // Clear marker tooltip after a moment
           setTimeout(() => {
@@ -113,19 +113,20 @@ export default function Home() {
       controls.autoRotate = true;
       controls.autoRotateSpeed = 1.2;
       controls.enableZoom = true;
-      controls.minDistance = 100;
-      controls.maxDistance = 300;
+      controls.minDistance = 80;
+      controls.maxDistance = 400;
       controls.enableDamping = true;
       controls.dampingFactor = 0.05;
 
-      // Impressive entrance: start zoomed out, sweep to first destination
-      globeRef.current.pointOfView({ lat: 10, lng: 20, altitude: 2.2 });
+      // Cinematic entrance: start zoomed far out, dramatically sweep down to first location
+      globeRef.current.pointOfView({ lat: 20, lng: 0, altitude: 3.5 });
       setTimeout(() => {
         if (globeRef.current) {
           const first = expeditions[0];
-          globeRef.current.pointOfView({ lat: first.lat, lng: first.lng, altitude: 0.9 }, 3000);
+          // Dramatic zoom-in to first location over 4 seconds
+          globeRef.current.pointOfView({ lat: first.lat, lng: first.lng, altitude: 0.55 }, 4000);
         }
-      }, 500);
+      }, 300);
 
       // Enhance Globe Material
       const globeMaterial = globeRef.current.globeMaterial();
@@ -185,12 +186,17 @@ export default function Home() {
   const [showBrand, setShowBrand] = useState(() => !sessionStorage.getItem('jarowe_visited'));
   const brandCompleted = useRef(false);
 
-  useGSAP(() => {
-    if (showBrand) {
+  // Brand reveal animation - ONLY on first ever visit
+  useEffect(() => {
+    if (!showBrand) return;
+    // First visit: play brand reveal then stagger cells in
+    const ctx = gsap.context(() => {
       const tl = gsap.timeline({
         onComplete: () => {
           sessionStorage.setItem('jarowe_visited', 'true');
           brandCompleted.current = true;
+          // Clear ALL gsap inline styles so cells are purely CSS-driven after animation
+          gsap.set('.bento-cell', { clearProps: 'all' });
           setShowBrand(false);
         }
       });
@@ -202,14 +208,24 @@ export default function Home() {
         })
         .from('.bento-cell', {
           y: 50, opacity: 0, stagger: 0.1, duration: 0.8, ease: 'power2.out'
-        }, "-=0.2");
-    } else if (!brandCompleted.current) {
-      // Safe entrance: use translateY only (never set opacity to 0 — causes black screen if animation fails)
-      gsap.from('.bento-cell', {
-        y: 20, stagger: 0.04, duration: 0.5, ease: 'power2.out'
-      });
+        }, '-=0.2');
+    }, container);
+    return () => ctx.revert();
+  }, [showBrand]);
+
+  // Safety net: on every mount, ensure bento cells are visible (clears any stale GSAP inline styles)
+  useEffect(() => {
+    if (!showBrand) {
+      const cells = container.current?.querySelectorAll('.bento-cell');
+      if (cells) {
+        cells.forEach(cell => {
+          cell.style.opacity = '';
+          cell.style.transform = '';
+          cell.style.visibility = '';
+        });
+      }
     }
-  }, { scope: container, dependencies: [showBrand] });
+  }, []);
 
   // 3D cell tracking
   useEffect(() => {
@@ -291,7 +307,7 @@ export default function Home() {
     setActiveExpedition(newIdx);
     const loc = expeditions[newIdx];
     if (globeRef.current) {
-      globeRef.current.pointOfView({ lat: loc.lat, lng: loc.lng, altitude: 0.9 }, 1000);
+      globeRef.current.pointOfView({ lat: loc.lat, lng: loc.lng, altitude: 0.55 }, 1000);
     }
     setHoveredMarker(loc);
     playClickSound();
