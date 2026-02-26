@@ -361,11 +361,7 @@ export default function Home() {
 
                 // --- PACKED TEXTURE: roughness + cloud shadows ---
                 vec3 packed = texture2D(packedTex, vUv).rgb;
-                // Green channel = roughness (high = rough/matte, low = shiny)
-                // Modulate land specular: rough areas get less shine
-                float roughness = packed.g;
-                float landShine = (1.0 - roughness) * pow(max(dot(normalize(vNormal + vec3(0.0)), normalize(sunDir + viewDir)), 0.0), 40.0);
-                finalColor += vec3(0.8, 0.85, 0.9) * landShine * 0.15 * (1.0 - isWater) * dayStrength;
+                // Green channel = roughness (reserved for future use)
 
                 // Blue channel = cloud density - cast soft shadows on surface
                 float cloudDensity = smoothstep(0.2, 0.7, packed.b);
@@ -377,12 +373,12 @@ export default function Home() {
                 finalColor += sunsetColor * terminatorBand * rawFresnel * 0.6;
 
                 // --- Atmospheric rim haze ---
-                float rimHaze = pow(rawFresnel, 2.5);
+                float rimHaze = pow(rawFresnel, 4.5);
                 vec3 dayHaze = vec3(0.2, 0.4, 1.0);
                 vec3 nightHaze = vec3(0.04, 0.02, 0.12);
                 vec3 hazeColor = mix(nightHaze, dayHaze, dayStrength);
                 hazeColor = mix(hazeColor, vec3(1.0, 0.4, 0.1), terminatorBand);
-                finalColor += hazeColor * rimHaze * 0.25;
+                finalColor += hazeColor * rimHaze * 0.1;
 
                 gl_FragColor = vec4(finalColor, 1.0);
               }
@@ -393,6 +389,7 @@ export default function Home() {
           scene.traverse((child) => {
             if (child.isMesh && child.material && child.material.type === 'MeshPhongMaterial' && child.geometry?.parameters?.radius > 90) {
               child.material = oceanMat;
+              globe._globeMesh = child; // Store for raycaster occlusion
             }
           });
           globe.oceanMaterialSet = true;
@@ -588,7 +585,7 @@ export default function Home() {
                 float introBoost = introIntensity * (0.6 + n3 * 0.4);
                 float alpha = max(fresnel * curtain, introBoost) * (0.7 + audioPulse * 0.5 + prismPulse * 0.4);
 
-                float brightness = 1.2 + introIntensity * 0.6 + audioPulse * 0.5 + prismPulse * 0.3;
+                float brightness = 1.6 + introIntensity * 0.8 + audioPulse * 0.6 + prismPulse * 0.4;
                 float alphaOut = alpha * (0.55 + introIntensity * 0.3);
                 gl_FragColor = vec4(col * brightness, alphaOut);
               }
@@ -636,7 +633,7 @@ export default function Home() {
               varying vec3 vWorldNormal;
               void main() {
                 vec3 viewDir = normalize(-vPosition);
-                float fresnel = pow(1.0 - dot(viewDir, vNormal), 3.5);
+                float fresnel = pow(1.0 - dot(viewDir, vNormal), 5.5);
 
                 float sunFacing = dot(vWorldNormal, sunDir) * 0.5 + 0.5;
                 vec3 dayAtmos = vec3(0.3, 0.55, 1.0);
@@ -647,8 +644,8 @@ export default function Home() {
                 vec3 atmosColor = mix(nightAtmos, dayAtmos, smoothstep(0.25, 0.7, sunFacing));
                 atmosColor += terminatorGlow * terminatorLine * 2.0;
 
-                float alpha = fresnel * (0.55 + introIntensity * 0.3);
-                gl_FragColor = vec4(atmosColor * (1.4 + introIntensity * 0.4), alpha);
+                float alpha = fresnel * (0.3 + introIntensity * 0.2);
+                gl_FragColor = vec4(atmosColor * (1.0 + introIntensity * 0.3), alpha);
               }
             `,
             transparent: true,
@@ -686,7 +683,7 @@ export default function Home() {
               varying vec3 vPosition;
               void main() {
                 vec3 viewDir = normalize(-vPosition);
-                float fresnel = pow(dot(viewDir, vNormal), 2.0);
+                float fresnel = pow(dot(viewDir, vNormal), 3.5);
 
                 float sunFacing = dot(vWorldNormal, sunDir) * 0.5 + 0.5;
                 vec3 dayGlow = vec3(0.25, 0.5, 1.0);
@@ -697,8 +694,8 @@ export default function Home() {
                 vec3 color = mix(nightGlow, dayGlow, smoothstep(0.2, 0.65, sunFacing));
                 color += twilightGlow * terminator * 2.5;
 
-                float alpha = fresnel * (0.35 + introIntensity * 0.15);
-                gl_FragColor = vec4(color * 1.2, alpha);
+                float alpha = fresnel * (0.18 + introIntensity * 0.1);
+                gl_FragColor = vec4(color * 0.9, alpha);
               }
             `,
             transparent: true,
@@ -776,38 +773,74 @@ export default function Home() {
 
           const flarePos = sunDir.clone().multiplyScalar(350);
 
-          // Layer 1: Main sun glow
+          // Layer 1: Main sun glow (bigger for cinematic impact)
           const mainMat = new THREE.SpriteMaterial({
             map: mainTex, transparent: true,
             blending: THREE.AdditiveBlending,
-            depthWrite: false, depthTest: false, opacity: 0.7
+            depthWrite: false, depthTest: false, opacity: 0.8
           });
           const mainFlare = new THREE.Sprite(mainMat);
           mainFlare.position.copy(flarePos);
-          mainFlare.scale.set(60, 60, 1);
+          mainFlare.scale.set(80, 80, 1);
           scene.add(mainFlare);
 
           // Layer 2: Starburst rays
           const rayMat = new THREE.SpriteMaterial({
             map: rayTex, transparent: true,
             blending: THREE.AdditiveBlending,
-            depthWrite: false, depthTest: false, opacity: 0.5
+            depthWrite: false, depthTest: false, opacity: 0.55
           });
           const rays = new THREE.Sprite(rayMat);
           rays.position.copy(flarePos);
-          rays.scale.set(120, 120, 1);
+          rays.scale.set(160, 160, 1);
           scene.add(rays);
 
           // Layer 3: Wide halo
           const haloMat = new THREE.SpriteMaterial({
             map: haloTex, transparent: true,
             blending: THREE.AdditiveBlending,
-            depthWrite: false, depthTest: false, opacity: 0.25
+            depthWrite: false, depthTest: false, opacity: 0.3
           });
           const halo = new THREE.Sprite(haloMat);
           halo.position.copy(flarePos);
-          halo.scale.set(250, 250, 1);
+          halo.scale.set(320, 320, 1);
           scene.add(halo);
+
+          // Layer 4: JJ Abrams anamorphic horizontal streak
+          const anamorphicTex = (() => {
+            const c = document.createElement('canvas');
+            c.width = 512; c.height = 64;
+            const ctx = c.getContext('2d');
+            const g = ctx.createLinearGradient(0, 32, 512, 32);
+            g.addColorStop(0, 'rgba(100,150,255,0)');
+            g.addColorStop(0.15, 'rgba(150,180,255,0.03)');
+            g.addColorStop(0.35, 'rgba(200,220,255,0.12)');
+            g.addColorStop(0.5, 'rgba(255,250,240,0.4)');
+            g.addColorStop(0.65, 'rgba(200,220,255,0.12)');
+            g.addColorStop(0.85, 'rgba(150,180,255,0.03)');
+            g.addColorStop(1, 'rgba(100,150,255,0)');
+            ctx.fillStyle = g;
+            ctx.fillRect(0, 0, 512, 64);
+            // Vertical fade for thin streak
+            const vg = ctx.createLinearGradient(0, 0, 0, 64);
+            vg.addColorStop(0, 'rgba(255,255,255,0)');
+            vg.addColorStop(0.3, 'rgba(255,255,255,1)');
+            vg.addColorStop(0.7, 'rgba(255,255,255,1)');
+            vg.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.globalCompositeOperation = 'destination-in';
+            ctx.fillStyle = vg;
+            ctx.fillRect(0, 0, 512, 64);
+            return new THREE.CanvasTexture(c);
+          })();
+          const anamorphicMat = new THREE.SpriteMaterial({
+            map: anamorphicTex, transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false, depthTest: false, opacity: 0.45
+          });
+          const anamorphic = new THREE.Sprite(anamorphicMat);
+          anamorphic.position.copy(flarePos);
+          anamorphic.scale.set(500, 25, 1);
+          scene.add(anamorphic);
 
           // Lens artifacts along sun-to-center line
           const hexTex = (() => {
@@ -848,7 +881,7 @@ export default function Home() {
             artifacts.push(s);
           });
 
-          globe.lensFlare = { main: mainFlare, rays, halo, artifacts };
+          globe.lensFlare = { main: mainFlare, rays, halo, anamorphic, artifacts };
         }
 
         // --- E. Tri-Layer Particles (TINY twinkling magic + deep stars + reaction bursts) ---
@@ -953,11 +986,11 @@ export default function Home() {
 
                   // Mouse ripple: particles near mouse get pushed outward like water
                   float mouseDist = distance(pos, mousePos);
-                  float rippleRadius = 20.0;
+                  float rippleRadius = 8.0;
                   if (mouseDist < rippleRadius && length(mousePos) > 1.0) {
                     vec3 pushDir = normalize(pos - mousePos);
                     float rippleStr = (1.0 - mouseDist / rippleRadius);
-                    rippleStr = rippleStr * rippleStr * 8.0;
+                    rippleStr = rippleStr * rippleStr * 3.0;
                     // Ripple wave - particles oscillate as the ripple passes through
                     float wave = sin(mouseDist * 0.5 - time * 4.0) * 0.5 + 0.5;
                     pos += pushDir * rippleStr * wave;
@@ -984,7 +1017,7 @@ export default function Home() {
                 float alpha = glow * (0.6 + audioPulse*0.4 + prismPulse*0.3);
 
                 // Mouse proximity glow - particles near cursor glow brighter
-                float mouseGlow = (vMouseDist < 20.0) ? (1.0 - vMouseDist / 20.0) * 0.5 : 0.0;
+                float mouseGlow = (vMouseDist < 8.0) ? (1.0 - vMouseDist / 8.0) * 0.5 : 0.0;
 
                 // Gentle prismatic color shift
                 vec3 prismatic = vec3(
@@ -1108,7 +1141,7 @@ export default function Home() {
                 if (globe._flareRaycaster && camera) {
                   const dir = flareWorldPos.clone().sub(camera.position).normalize();
                   globe._flareRaycaster.set(camera.position, dir);
-                  const hits = globe._flareRaycaster.intersectObjects(scene.children, false);
+                  const hits = globe._globeMesh ? globe._flareRaycaster.intersectObjects([globe._globeMesh], false) : [];
                   const sunDist = camera.position.distanceTo(flareWorldPos);
                   occlusionTarget = (hits.length > 0 && hits[0].distance < sunDist) ? 1.0 : 0.0;
                   // Smooth transition
@@ -1117,18 +1150,23 @@ export default function Home() {
                 const flareVis = 1.0 - (globe._flareOcclusion || 0);
 
                 if (lf.rays) {
-                  lf.rays.material.rotation = elTs * 0.05;
-                  lf.rays.material.opacity = (0.4 + Math.sin(elTs * 0.8) * 0.12) * flareVis;
+                  lf.rays.material.rotation = elTs * 0.04;
+                  lf.rays.material.opacity = (0.45 + Math.sin(elTs * 0.8) * 0.15) * flareVis;
                 }
                 if (lf.main) {
-                  const breathe = 1.0 + Math.sin(elTs * 1.2) * 0.1;
-                  lf.main.scale.set(70 * breathe, 70 * breathe, 1);
-                  lf.main.material.opacity = 0.8 * flareVis;
+                  const breathe = 1.0 + Math.sin(elTs * 1.2) * 0.12;
+                  lf.main.scale.set(90 * breathe, 90 * breathe, 1);
+                  lf.main.material.opacity = 0.85 * flareVis;
                 }
                 if (lf.halo) {
-                  const hBreath = 1.0 + Math.sin(elTs * 0.5) * 0.06;
-                  lf.halo.scale.set(280 * hBreath, 280 * hBreath, 1);
-                  lf.halo.material.opacity = 0.3 * flareVis;
+                  const hBreath = 1.0 + Math.sin(elTs * 0.5) * 0.08;
+                  lf.halo.scale.set(350 * hBreath, 350 * hBreath, 1);
+                  lf.halo.material.opacity = 0.35 * flareVis;
+                }
+                if (lf.anamorphic) {
+                  const streakBreath = 1.0 + Math.sin(elTs * 0.6) * 0.08;
+                  lf.anamorphic.scale.set(500 * streakBreath, 25, 1);
+                  lf.anamorphic.material.opacity = 0.4 * flareVis;
                 }
                 if (lf.artifacts) {
                   lf.artifacts.forEach(a => {
