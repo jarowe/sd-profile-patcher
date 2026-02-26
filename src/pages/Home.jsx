@@ -185,272 +185,361 @@ export default function Home() {
     const globe = globeRef.current;
     if (!globe) return;
 
-    // Material is passed as a prop (globeMaterial={...}) - no method call needed here
-
     try {
-    // ------------------------------------------------------------------
-    // CONTROLS SETUP
-    // ------------------------------------------------------------------
-    const controls = globe.controls();
-    controls.autoRotate = false;
-    controls.enableZoom = false; // Disable until cinematic enter finishes
-    controls.minDistance = 120;
-    controls.maxDistance = 500;
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.005;
-    controls.rotateSpeed = 0.6;
+      // ------------------------------------------------------------------
+      // CONTROLS SETUP - Restored magic interaction!
+      // ------------------------------------------------------------------
+      const controls = globe.controls();
+      controls.autoRotate = true; // Enables smooth planetary spin
+      controls.autoRotateSpeed = 1.0;
+      controls.enableZoom = false; // Disabled during cinematic
+      controls.minDistance = 110;
+      controls.maxDistance = 600;
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05; // Perfect weight for dragging
+      controls.rotateSpeed = 0.8;
 
-    const handleStart = () => {
-      isUserInteracting.current = true;
-      if (globeCycleTimer.current) clearInterval(globeCycleTimer.current);
-    };
-    const handleEnd = () => {
-      isUserInteracting.current = false;
-      setTimeout(() => startGlobeCycle(), 10000);
-    };
-    controls.addEventListener('start', handleStart);
-    controls.addEventListener('end', handleEnd);
-
-    // ------------------------------------------------------------------
-    // 3. CINEMATIC ENTRANCE
-    // ------------------------------------------------------------------
-    if (!hasAnimatedIn.current) {
-      hasAnimatedIn.current = true;
-      const first = expeditions[0];
-      globe.pointOfView({ lat: 20, lng: 0, altitude: 3.5 }, 0);
-
-      setTimeout(() => {
-        if (globeRef.current) {
-          globeRef.current.pointOfView({ lat: first.lat, lng: first.lng, altitude: 1.5 }, 5000);
-
-          setTimeout(() => {
-            const c = globeRef.current.controls();
-            if (c) c.enableZoom = true;
-            startGlobeCycle();
-          }, 5500);
-        }
-      }, 300);
-    }
-
-    // ------------------------------------------------------------------
-    // 4. AUDIO & SHADERS
-    // ------------------------------------------------------------------
-    try {
-      if (!window.globalAnalyser) {
-        window.globalAnalyser = Howler.ctx.createAnalyser();
-        window.globalAnalyser.fftSize = 128;
-        Howler.masterGain.connect(window.globalAnalyser);
-        window.globalAnalyser.connect(Howler.ctx.destination);
-      }
-    } catch (e) { }
-
-    let audioDataArray = new Uint8Array(64);
-
-    if (!globe.auroraUniforms) {
-      globe.auroraUniforms = {
-        time: { value: 0 },
-        audioPulse: { value: 0 }
+      const handleStart = () => {
+        isUserInteracting.current = true;
+        if (globeCycleTimer.current) clearInterval(globeCycleTimer.current);
       };
-    }
+      const handleEnd = () => {
+        isUserInteracting.current = false;
+        setTimeout(() => startGlobeCycle(), 10000);
+      };
+      controls.addEventListener('start', handleStart);
+      controls.addEventListener('end', handleEnd);
 
-    if (!globe.auroraShell) {
-      const VShader = `
-        varying vec3 vNormal;
-        varying vec3 vPosition;
-        void main() {
-          vNormal = normalize(normalMatrix * normal);
-          vPosition = (modelViewMatrix * vec4(position, 1.0)).xyz;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      // ------------------------------------------------------------------
+      // AUDIO & ANALYSER
+      // ------------------------------------------------------------------
+      try {
+        if (!window.globalAnalyser) {
+          window.globalAnalyser = Howler.ctx.createAnalyser();
+          window.globalAnalyser.fftSize = 128;
+          Howler.masterGain.connect(window.globalAnalyser);
+          window.globalAnalyser.connect(Howler.ctx.destination);
         }
-      `;
-      const FShader = `
-        uniform float time;
-        uniform float audioPulse;
-        varying vec3 vNormal;
-        varying vec3 vPosition;
-        
-        const vec3 color1 = vec3(0.0, 0.9, 0.6);
-        const vec3 color2 = vec3(0.5, 0.1, 0.9);
-        
-        vec4 permute(vec4 x){return mod(((x*34.0)+1.0)*x, 289.0);}
-        vec4 taylorInvSqrt(vec4 r){return 1.79284291400159 - 0.85373472095314 * r;}
-        float snoise(vec3 v){ 
-          const vec2  C = vec2(1.0/6.0, 1.0/3.0) ;
-          const vec4  D = vec4(0.0, 0.5, 1.0, 2.0);
-          vec3 i  = floor(v + dot(v, C.yyy) );
-          vec3 x0 = v - i + dot(i, C.xxx) ;
-          vec3 g = step(x0.yzx, x0.xyz);
-          vec3 l = 1.0 - g;
-          vec3 i1 = min( g.xyz, l.zxy );
-          vec3 i2 = max( g.xyz, l.zxy );
-          vec3 x1 = x0 - i1 + C.xxx;
-          vec3 x2 = x0 - i2 + C.yyy;
-          vec3 x3 = x0 - D.yyy;
-          i = mod(i, 289.0 ); 
-          vec4 p = permute( permute( permute( 
-                     i.z + vec4(0.0, i1.z, i2.z, 1.0 ))
-                   + i.y + vec4(0.0, i1.y, i2.y, 1.0 )) 
-                   + i.x + vec4(0.0, i1.x, i2.x, 1.0 ));
-          float n_ = 0.142857142857; 
-          vec3  ns = n_ * D.wyz - D.xzx;
-          vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
-          vec4 x_ = floor(j * ns.z);
-          vec4 y_ = floor(j - 7.0 * x_ );
-          vec4 x = x_ *ns.x + ns.yyyy;
-          vec4 y = y_ *ns.x + ns.yyyy;
-          vec4 h = 1.0 - abs(x) - abs(y);
-          vec4 b0 = vec4( x.xy, y.xy );
-          vec4 b1 = vec4( x.zw, y.zw );
-          vec4 s0 = floor(b0)*2.0 + 1.0;
-          vec4 s1 = floor(b1)*2.0 + 1.0;
-          vec4 sh = -step(h, vec4(0.0));
-          vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy ;
-          vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww ;
-          vec3 p0 = vec3(a0.xy,h.x);
-          vec3 p1 = vec3(a0.zw,h.y);
-          vec3 p2 = vec3(a1.xy,h.z);
-          vec3 p3 = vec3(a1.zw,h.w);
-          vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
-          p0 *= norm.x;
-          p1 *= norm.y;
-          p2 *= norm.z;
-          p3 *= norm.w;
-          vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
-          m = m * m;
-          return 42.0 * dot( m*m, vec4( dot(p0,x0), dot(p1,x1), 
-                                        dot(p2,x2), dot(p3,x3) ) );
-        }
-        
-        void main() {
-          float intensity = pow(0.6 - dot(vNormal, vec3(0, 0, 1.0)), 2.5);
-          float noiseVal = snoise(vPosition * 0.02 + vec3(0.0, time * 0.5, time * 0.2));
-          float auroraMask = smoothstep(0.2, 0.8, noiseVal * 0.5 + 0.5) * intensity;
-          vec3 finalColor = mix(color1, color2, noiseVal * 0.5 + 0.5);
-          
-          finalColor += finalColor * audioPulse * 1.5;
-          float finalAlpha = (auroraMask * 0.4) + (intensity * 0.1 * audioPulse);
-          
-          gl_FragColor = vec4(finalColor, finalAlpha * 0.6);
-        }
-      `;
-      const auroraMat = new THREE.ShaderMaterial({
-        vertexShader: VShader,
-        fragmentShader: FShader,
-        uniforms: globe.auroraUniforms,
-        transparent: true,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        side: THREE.BackSide
-      });
-      const radius = 101.5;
-      const auroraMesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 64, 64), auroraMat);
-      globe.scene().add(auroraMesh);
-      globe.auroraShell = auroraMesh;
-    }
+      } catch (e) { }
+      let audioDataArray = new Uint8Array(64);
 
-    if (!globe.particleSystem) {
-      const radius = 101.5;
-      const partCount = 4000;
-      const posArray = new Float32Array(partCount * 3);
-      const scaleArray = new Float32Array(partCount);
-      const colorArray = new Float32Array(partCount * 3);
-      const color1 = new THREE.Color(0x7c3aed);
-      const color2 = new THREE.Color(0x38bdf8);
-      const color3 = new THREE.Color(0xf472b6);
-
-      for (let i = 0; i < partCount; i++) {
-        const r = radius * 1.5 + Math.random() * radius * 4.0;
-        const theta = 2 * Math.PI * Math.random();
-        const phi = Math.acos(2 * Math.random() - 1);
-        posArray[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-        posArray[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-        posArray[i * 3 + 2] = r * Math.cos(phi);
-        scaleArray[i] = Math.random();
-        const mixC = Math.random();
-        const partColor = mixC > 0.66 ? color1 : (mixC > 0.33 ? color2 : color3);
-        partColor.toArray(colorArray, i * 3);
-      }
-
-      const partGeo = new THREE.BufferGeometry();
-      partGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-      partGeo.setAttribute('aScale', new THREE.BufferAttribute(scaleArray, 1));
-      partGeo.setAttribute('customColor', new THREE.BufferAttribute(colorArray, 3));
-
-      const partMat = new THREE.ShaderMaterial({
-        uniforms: {
+      // ------------------------------------------------------------------
+      // SHADERS & EFFECTS
+      // ------------------------------------------------------------------
+      const scene = globe.scene();
+      
+      if (!globe.customUniforms) {
+        globe.customUniforms = {
           time: { value: 0 },
           audioPulse: { value: 0 },
-          pixelRatio: { value: window.devicePixelRatio || 1 }
-        },
-        vertexShader: `
+          warpIntensity: { value: 1.0 }
+        };
+      }
+
+      // 1. Extreme Warp / Lens Flare (Cinematic Entrance)
+      if (!globe.warpShell) {
+        const warpMat = new THREE.ShaderMaterial({
+          uniforms: globe.customUniforms,
+          vertexShader: `
+            varying vec2 vUv;
+            void main() {
+              vUv = uv;
+              gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+          `,
+          fragmentShader: `
+            uniform float time;
+            uniform float warpIntensity;
+            varying vec2 vUv;
+            void main() {
+              float dist = distance(vUv, vec2(0.5));
+              float ring = sin(dist * 60.0 - time * 15.0) * warpIntensity;
+              vec3 color = vec3(ring * 0.3 + 0.5, ring * 0.1, ring * 0.8 + 0.2);
+              float alpha = smoothstep(0.5, 0.0, dist) * warpIntensity * abs(ring);
+              gl_FragColor = vec4(color, alpha * 0.7);
+            }
+          `,
+          transparent: true,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          side: THREE.FrontSide
+        });
+        const warpMesh = new THREE.Mesh(new THREE.SphereGeometry(105, 64, 64), warpMat);
+        scene.add(warpMesh);
+        globe.warpShell = warpMesh;
+      }
+
+      // 2. Beautiful Aurora Atmosphere Envelope
+      if (!globe.auroraShell) {
+        const VShader = `
+          varying vec3 vNormal;
+          varying vec3 vPosition;
+          void main() {
+            vNormal = normalize(normalMatrix * normal);
+            vPosition = (modelViewMatrix * vec4(position, 1.0)).xyz;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `;
+        const FShader = `
           uniform float time;
           uniform float audioPulse;
-          uniform float pixelRatio;
-          attribute float aScale;
-          attribute vec3 customColor;
-          varying vec3 vColor;
-          void main() {
-              vColor = customColor;
-              vec3 pos = position;
-              pos.x += sin(time * 0.5 + pos.y * 0.05) * (10.0 + audioPulse * 30.0);
-              pos.y += cos(time * 0.3 + pos.x * 0.05) * (10.0 + audioPulse * 30.0);
-              pos.z += sin(time * 0.4 + pos.z * 0.05) * (10.0 + audioPulse * 30.0);
-              vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
-              gl_Position = projectionMatrix * mvPosition;
-              float size = aScale * (3.0 + audioPulse * 15.0);
-              gl_PointSize = size * pixelRatio * (300.0 / -mvPosition.z);
+          varying vec3 vNormal;
+          varying vec3 vPosition;
+          
+          const vec3 color1 = vec3(0.0, 0.9, 0.6);
+          const vec3 color2 = vec3(0.5, 0.1, 0.9);
+          const vec3 color3 = vec3(0.1, 0.5, 1.0);
+          
+          // --- Noise Functions ---
+          vec4 permute(vec4 x){return mod(((x*34.0)+1.0)*x, 289.0);}
+          vec4 taylorInvSqrt(vec4 r){return 1.79284291400159 - 0.85373472095314 * r;}
+          float snoise(vec3 v){ 
+            const vec2  C = vec2(1.0/6.0, 1.0/3.0);
+            const vec4  D = vec4(0.0, 0.5, 1.0, 2.0);
+            vec3 i  = floor(v + dot(v, C.yyy) );
+            vec3 x0 = v - i + dot(i, C.xxx) ;
+            vec3 g = step(x0.yzx, x0.xyz);
+            vec3 l = 1.0 - g;
+            vec3 i1 = min( g.xyz, l.zxy );
+            vec3 i2 = max( g.xyz, l.zxy );
+            vec3 x1 = x0 - i1 + C.xxx;
+            vec3 x2 = x0 - i2 + C.yyy;
+            vec3 x3 = x0 - D.yyy;
+            i = mod(i, 289.0 ); 
+            vec4 p = permute( permute( permute( 
+                       i.z + vec4(0.0, i1.z, i2.z, 1.0 ))
+                     + i.y + vec4(0.0, i1.y, i2.y, 1.0 )) 
+                     + i.x + vec4(0.0, i1.x, i2.x, 1.0 ));
+            float n_ = 0.142857142857; 
+            vec3  ns = n_ * D.wyz - D.xzx;
+            vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+            vec4 x_ = floor(j * ns.z);
+            vec4 y_ = floor(j - 7.0 * x_ );
+            vec4 x = x_ *ns.x + ns.yyyy;
+            vec4 y = y_ *ns.x + ns.yyyy;
+            vec4 h = 1.0 - abs(x) - abs(y);
+            vec4 b0 = vec4( x.xy, y.xy );
+            vec4 b1 = vec4( x.zw, y.zw );
+            vec4 s0 = floor(b0)*2.0 + 1.0;
+            vec4 s1 = floor(b1)*2.0 + 1.0;
+            vec4 sh = -step(h, vec4(0.0));
+            vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy ;
+            vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww ;
+            vec3 p0 = vec3(a0.xy,h.x);
+            vec3 p1 = vec3(a0.zw,h.y);
+            vec3 p2 = vec3(a1.xy,h.z);
+            vec3 p3 = vec3(a1.zw,h.w);
+            vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
+            p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
+            vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+            m = m * m;
+            return 42.0 * dot( m*m, vec4( dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3) ) );
           }
-        `,
-        fragmentShader: `
-          varying vec3 vColor;
-          uniform float audioPulse;
+          // -----------------------
+          
           void main() {
-              vec2 xy = gl_PointCoord.xy - vec2(0.5);
-              float ll = length(xy);
-              if(ll > 0.5) discard;
-              float glow = smoothstep(0.5, 0.1, ll);
-              float alpha = glow * (0.3 + audioPulse * 0.7);
-              gl_FragColor = vec4(vColor * (1.0 + audioPulse * 1.5), alpha);
+            // Intense edge glow
+            vec3 viewDirection = normalize(cameraPosition - vPosition);
+            float fresnel = dot(viewDirection, vNormal);
+            fresnel = clamp(1.0 - fresnel, 0.0, 1.0);
+            fresnel = pow(fresnel, 2.5); // Sharp edge envelope
+            
+            float noiseVal = snoise(vPosition * 0.015 + vec3(0.0, time * 0.2, time * 0.1));
+            float mask = smoothstep(0.1, 0.9, noiseVal * 0.5 + 0.5);
+            
+            vec3 finalColor = mix(color1, color2, mask);
+            finalColor = mix(finalColor, color3, audioPulse * fresnel);
+            
+            float alpha = fresnel * (0.8 + noiseVal * 0.4 + audioPulse * 1.0);
+            gl_FragColor = vec4(finalColor * (1.5 + audioPulse), alpha * 0.8);
           }
-        `,
-        transparent: true,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false
-      });
+        `;
+        
+        const auroraMat = new THREE.ShaderMaterial({
+          uniforms: globe.customUniforms,
+          vertexShader: VShader,
+          fragmentShader: FShader,
+          transparent: true,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          side: THREE.FrontSide
+        });
+        const auroraMesh = new THREE.Mesh(new THREE.SphereGeometry(103.5, 64, 64), auroraMat);
+        scene.add(auroraMesh);
+        globe.auroraShell = auroraMesh;
+      }
 
-      const pSystem = new THREE.Points(partGeo, partMat);
-      globe.scene().add(pSystem);
-      globe.particleUniforms = partMat.uniforms;
-    }
-
-    if (!globe.animateTick) {
-      globe.animateTick = true;
-      const clock = new THREE.Clock();
-
-      controls.autoRotate = true;
-      controls.autoRotateSpeed = 4.0;
-      setTimeout(() => { controls.autoRotate = false; }, 800);
-
-      const animateOverrides = () => {
-        if (globeRef.current && globe.auroraShell) {
-          const elTs = clock.getElapsedTime();
-          globe.auroraUniforms.time.value = elTs;
-          if (globe.particleUniforms) globe.particleUniforms.time.value = elTs;
-
-          if (window.globalAnalyser) {
-            window.globalAnalyser.getByteFrequencyData(audioDataArray);
-            let sum = 0;
-            for (let i = 0; i < 32; i++) sum += audioDataArray[i];
-            const avg = sum / 32;
-            const pulse = avg / 255.0;
-            globe.auroraUniforms.audioPulse.value = pulse;
-            if (globe.particleUniforms) globe.particleUniforms.audioPulse.value = pulse;
+      // 3. Dual Layer Particles (Stars + Magic Dust)
+      if (!globe.particleSystem) {
+        const bgStarCount = 8000;
+        const dustCount = 4000;
+        const totalCount = bgStarCount + dustCount;
+        
+        const posArray = new Float32Array(totalCount * 3);
+        const scaleArray = new Float32Array(totalCount);
+        const colorArray = new Float32Array(totalCount * 3);
+        const typeArray = new Float32Array(totalCount); // 0.0 = star, 1.0 = dust
+        
+        for (let i = 0; i < totalCount; i++) {
+          let r, isDust;
+          if (i < bgStarCount) {
+             r = 400 + Math.random() * 800;
+             isDust = 0.0;
+          } else {
+             r = 103 + Math.random() * 50;
+             isDust = 1.0;
+          }
+          
+          const theta = 2 * Math.PI * Math.random();
+          const phi = Math.acos(2 * Math.random() - 1);
+          
+          posArray[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+          posArray[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+          posArray[i * 3 + 2] = r * Math.cos(phi);
+          
+          scaleArray[i] = Math.random();
+          typeArray[i] = isDust;
+          
+          if (isDust) {
+            const mixC = Math.random();
+            const partColor = mixC > 0.66 ? new THREE.Color(0x7c3aed) : (mixC > 0.33 ? new THREE.Color(0x38bdf8) : new THREE.Color(0xf472b6));
+            partColor.toArray(colorArray, i * 3);
+          } else {
+            const starColor = Math.random() > 0.8 ? new THREE.Color(0xaae3ff) : new THREE.Color(0xffffff);
+            starColor.toArray(colorArray, i * 3);
           }
         }
-        requestAnimationFrame(animateOverrides);
-      };
-      animateOverrides();
-    }
+        
+        const partGeo = new THREE.BufferGeometry();
+        partGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        partGeo.setAttribute('aScale', new THREE.BufferAttribute(scaleArray, 1));
+        partGeo.setAttribute('customColor', new THREE.BufferAttribute(colorArray, 3));
+        partGeo.setAttribute('pType', new THREE.BufferAttribute(typeArray, 1));
+
+        const partMat = new THREE.ShaderMaterial({
+          uniforms: {
+            time: globe.customUniforms.time,
+            audioPulse: globe.customUniforms.audioPulse,
+            pixelRatio: { value: window.devicePixelRatio || 1 }
+          },
+          vertexShader: `
+            uniform float time;
+            uniform float audioPulse;
+            uniform float pixelRatio;
+            attribute float aScale;
+            attribute vec3 customColor;
+            attribute float pType; // 0=star, 1=dust
+            varying vec3 vColor;
+            varying float vType;
+            
+            void main() {
+                vColor = customColor;
+                vType = pType;
+                vec3 pos = position;
+                
+                // Only dust actively dances around, stars slowly rotate statically based on camera
+                if (pType > 0.5) {
+                    pos.x += sin(time * 0.5 + pos.y * 0.05) * (5.0 + audioPulse * 20.0);
+                    pos.y += cos(time * 0.3 + pos.x * 0.05) * (5.0 + audioPulse * 20.0);
+                    pos.z += sin(time * 0.4 + pos.z * 0.05) * (5.0 + audioPulse * 20.0);
+                }
+                
+                vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+                gl_Position = projectionMatrix * mvPosition;
+                
+                float size = (pType > 0.5) ? aScale * (3.0 + audioPulse * 15.0) : aScale * (1.5 + audioPulse * 2.0);
+                gl_PointSize = size * pixelRatio * (300.0 / -mvPosition.z);
+            }
+          `,
+          fragmentShader: `
+            varying vec3 vColor;
+            varying float vType;
+            uniform float audioPulse;
+            void main() {
+                vec2 xy = gl_PointCoord.xy - vec2(0.5);
+                float ll = length(xy);
+                if(ll > 0.5) discard;
+                
+                // Stars twinkle, dust glows warmly
+                float glow = (vType > 0.5) ? smoothstep(0.5, 0.1, ll) : smoothstep(0.5, 0.4, ll);
+                float alpha = glow * (0.4 + audioPulse * 0.6);
+                vec3 finalColor = vColor * (1.0 + audioPulse * ((vType > 0.5) ? 1.5 : 0.5));
+                
+                gl_FragColor = vec4(finalColor, alpha);
+            }
+          `,
+          transparent: true,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false
+        });
+
+        const pSystem = new THREE.Points(partGeo, partMat);
+        scene.add(pSystem);
+        globe.particleSystem = pSystem;
+      }
+
+      // ------------------------------------------------------------------
+      // EXTREME CINEMATIC ENTRANCE
+      // ------------------------------------------------------------------
+      if (!hasAnimatedIn.current) {
+        hasAnimatedIn.current = true;
+        const first = expeditions[0];
+        
+        // Start massively zoomed out, spun wildly, looking down
+        globe.pointOfView({ lat: -70, lng: 280, altitude: 8.0 }, 0);
+        
+        setTimeout(() => {
+          if (globeRef.current) {
+            // Extreme ease-in to the first destination
+            globeRef.current.pointOfView({ lat: first.lat, lng: first.lng, altitude: 1.5 }, 6000);
+            
+            const clockStart = Date.now();
+            const fadeWarp = () => {
+              const el = Date.now() - clockStart;
+              const p = Math.min(el / 6000.0, 1.0);
+              const intensity = Math.pow(1.0 - p, 4.0); // sharp decelerating decay
+              
+              if (globe.customUniforms) {
+                globe.customUniforms.warpIntensity.value = intensity;
+              }
+              
+              if (p < 1.0) requestAnimationFrame(fadeWarp);
+              else {
+                if(globe.warpShell) scene.remove(globe.warpShell);
+                globe.warpShell = null;
+              }
+            };
+            fadeWarp();
+
+            setTimeout(() => {
+              const c = globeRef.current.controls();
+              if (c) c.enableZoom = true;
+              startGlobeCycle();
+            }, 6500);
+          }
+        }, 150);
+      }
+
+      const clock = new THREE.Clock();
+      if (!globe.animateTick) {
+        globe.animateTick = true;
+        const animateOverrides = () => {
+          if (globeRef.current && globe.customUniforms) {
+            const elTs = clock.getElapsedTime();
+            globe.customUniforms.time.value = elTs;
+
+            if (window.globalAnalyser) {
+              window.globalAnalyser.getByteFrequencyData(audioDataArray);
+              let sum = 0;
+              for (let i = 0; i < 32; i++) sum += audioDataArray[i];
+              const pulse = (sum / 32) / 255.0;
+              globe.customUniforms.audioPulse.value = pulse;
+            }
+          }
+          requestAnimationFrame(animateOverrides);
+        };
+        animateOverrides();
+      }
 
     } catch (e) {
       console.warn('Globe ready init error:', e);
