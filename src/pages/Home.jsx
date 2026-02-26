@@ -162,6 +162,7 @@ export default function Home() {
       if (!globe) return;
 
       try {
+        
         // ------------------------------------------------------------------
         // CONTROLS - weighted momentum spin
         // ------------------------------------------------------------------
@@ -214,19 +215,61 @@ export default function Home() {
         } catch (e) { }
 
         // ------------------------------------------------------------------
-        // SHADERS & EFFECTS (injected into Three.js scene)
+        // EXTREME MAGICAL SHADERS & EFFECTS
         // ------------------------------------------------------------------
         const scene = globe.scene();
+        
+        // --- A. Cinematic Lighting Setup ---
+        // Clean out default lights to own the scene fully
+        scene.children.filter(c => c.type === 'DirectionalLight' || c.type === 'AmbientLight').forEach(l => scene.remove(l));
+        const ambient = new THREE.AmbientLight(0xffffff, 0.2); // Low base
+        const rimColor = new THREE.DirectionalLight(0x7c3aed, 2.5); // Deep purple rim
+        rimColor.position.set(-200, 100, -200);
+        const sunLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        sunLight.position.set(200, 100, 200);
+        scene.add(ambient, rimColor, sunLight);
+
+        // --- B. Ultra-Premium Oceanic Material ---
+        if (!globe.oceanMaterialSet) {
+          const texLoader = new THREE.TextureLoader();
+          const mapReady = texLoader.load('//unpkg.com/three-globe/example/img/earth-blue-marble.jpg');
+          const bumpReady = texLoader.load('//unpkg.com/three-globe/example/img/earth-topology.png');
+          const waterReady = texLoader.load('//unpkg.com/three-globe/example/img/earth-water.png');
+
+          const shinyMat = new THREE.MeshPhysicalMaterial({
+            map: mapReady,
+            bumpMap: bumpReady,
+            bumpScale: 1.2,
+            roughnessMap: waterReady, // Magic reflections on oceans
+            roughness: 0.1, // very glossy
+            metalness: 0.8,
+            color: new THREE.Color(0x334466),
+            emissive: new THREE.Color(0x0a1628), // Deepest dark blue shadows
+            iridescence: 1.0, 
+            iridescenceIOR: 1.3,
+            clearcoat: 1.0,
+            clearcoatRoughness: 0.1,
+          });
+          // Apply material by finding the globe mesh in the scene
+          // (globe.globeMaterial() is not a function in this react-globe.gl version)
+          scene.traverse((child) => {
+            if (child.isMesh && child.material && child.material.type === 'MeshPhongMaterial' && child.geometry?.parameters?.radius > 90) {
+              child.material = shinyMat;
+            }
+          });
+          globe.oceanMaterialSet = true;
+        }
 
         if (!globe.customUniforms) {
           globe.customUniforms = {
             time: { value: 0 },
             audioPulse: { value: 0 },
-            warpIntensity: { value: 1.0 }
+            warpIntensity: { value: 1.0 },
+            prismPulse: { value: 0.0 } // Reaction state for Prism bops!
           };
         }
 
-        // 1. Warp shell (cinematic entrance effect)
+        // --- C. Warp shell (cinematic entrance) ---
         if (!globe.warpShell) {
           const warpMat = new THREE.ShaderMaterial({
             uniforms: globe.customUniforms,
@@ -259,7 +302,7 @@ export default function Home() {
           globe.warpShell = warpMesh;
         }
 
-        // 2. Aurora fresnel envelope
+        // --- D. Aurora Fresnel (audio & prism pulse reactive) ---
         if (!globe.auroraShell) {
           const auroraMat = new THREE.ShaderMaterial({
             uniforms: globe.customUniforms,
@@ -275,11 +318,15 @@ export default function Home() {
             fragmentShader: `
               uniform float time;
               uniform float audioPulse;
+              uniform float prismPulse;
               varying vec3 vNormal;
               varying vec3 vPosition;
               const vec3 color1 = vec3(0.0, 0.9, 0.6);
               const vec3 color2 = vec3(0.5, 0.1, 0.9);
               const vec3 color3 = vec3(0.1, 0.5, 1.0);
+              // intense hit color
+              const vec3 hitColor = vec3(1.0, 0.8, 0.0); 
+
               vec4 permute(vec4 x){return mod(((x*34.0)+1.0)*x, 289.0);}
               vec4 taylorInvSqrt(vec4 r){return 1.79284291400159 - 0.85373472095314 * r;}
               float snoise(vec3 v){
@@ -295,45 +342,32 @@ export default function Home() {
                 vec3 x2 = x0 - i2 + C.yyy;
                 vec3 x3 = x0 - D.yyy;
                 i = mod(i, 289.0);
-                vec4 p = permute(permute(permute(
-                  i.z + vec4(0.0, i1.z, i2.z, 1.0))
-                  + i.y + vec4(0.0, i1.y, i2.y, 1.0))
-                  + i.x + vec4(0.0, i1.x, i2.x, 1.0));
-                float n_ = 0.142857142857;
-                vec3 ns = n_ * D.wyz - D.xzx;
+                vec4 p = permute(permute(permute(i.z + vec4(0.0, i1.z, i2.z, 1.0)) + i.y + vec4(0.0, i1.y, i2.y, 1.0)) + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+                float n_ = 0.142857142857; vec3 ns = n_ * D.wyz - D.xzx;
                 vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
-                vec4 x_ = floor(j * ns.z);
-                vec4 y_ = floor(j - 7.0 * x_);
-                vec4 x = x_ * ns.x + ns.yyyy;
-                vec4 y = y_ * ns.x + ns.yyyy;
-                vec4 h = 1.0 - abs(x) - abs(y);
-                vec4 b0 = vec4(x.xy, y.xy);
-                vec4 b1 = vec4(x.zw, y.zw);
-                vec4 s0 = floor(b0)*2.0 + 1.0;
-                vec4 s1 = floor(b1)*2.0 + 1.0;
-                vec4 sh = -step(h, vec4(0.0));
-                vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy;
-                vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww;
-                vec3 p0 = vec3(a0.xy,h.x);
-                vec3 p1 = vec3(a0.zw,h.y);
-                vec3 p2 = vec3(a1.xy,h.z);
-                vec3 p3 = vec3(a1.zw,h.w);
+                vec4 x_ = floor(j * ns.z); vec4 y_ = floor(j - 7.0 * x_);
+                vec4 x = x_ * ns.x + ns.yyyy; vec4 y = y_ * ns.x + ns.yyyy;
+                vec4 h = 1.0 - abs(x) - abs(y); vec4 b0 = vec4(x.xy, y.xy); vec4 b1 = vec4(x.zw, y.zw);
+                vec4 s0 = floor(b0)*2.0 + 1.0; vec4 s1 = floor(b1)*2.0 + 1.0; vec4 sh = -step(h, vec4(0.0));
+                vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy; vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww;
+                vec3 p0 = vec3(a0.xy,h.x); vec3 p1 = vec3(a0.zw,h.y); vec3 p2 = vec3(a1.xy,h.z); vec3 p3 = vec3(a1.zw,h.w);
                 vec4 norm = taylorInvSqrt(vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3)));
                 p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
                 vec4 m = max(0.6 - vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)), 0.0);
-                m = m * m;
-                return 42.0 * dot(m*m, vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));
+                m = m * m; return 42.0 * dot(m*m, vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));
               }
               void main() {
                 vec3 viewDir = normalize(cameraPosition - vPosition);
                 float fresnel = clamp(1.0 - dot(viewDir, vNormal), 0.0, 1.0);
-                fresnel = pow(fresnel, 2.5);
-                float n = snoise(vPosition * 0.015 + vec3(0.0, time * 0.2, time * 0.1));
+                fresnel = pow(fresnel, max(0.5, 2.5 - prismPulse * 1.5)); // Expand fresnel on hit
+                float speed = time * (0.2 + prismPulse);
+                float n = snoise(vPosition * 0.015 + vec3(0.0, speed, speed * 0.5));
                 float mask = smoothstep(0.1, 0.9, n * 0.5 + 0.5);
                 vec3 col = mix(color1, color2, mask);
                 col = mix(col, color3, audioPulse * fresnel);
-                float alpha = fresnel * (0.8 + n * 0.4 + audioPulse);
-                gl_FragColor = vec4(col * (1.5 + audioPulse), alpha * 0.8);
+                col = mix(col, hitColor, prismPulse); // Turn golden on hit
+                float alpha = fresnel * (0.8 + n * 0.4 + audioPulse + prismPulse * 2.0);
+                gl_FragColor = vec4(col * (1.5 + audioPulse + prismPulse*2.0), alpha * 0.8);
               }
             `,
             transparent: true,
@@ -346,19 +380,21 @@ export default function Home() {
           globe.auroraShell = auroraMesh;
         }
 
-        // 3. Dual particles: 8000 deep stars + 4000 magic dust
+        // --- E. Tri-Layer Particles (TINY twinkling magic + deep stars + reaction bursts) ---
         if (!globe.particleSystem) {
           const bgStarCount = 8000;
-          const dustCount = 4000;
+          const dustCount = 8000; // doubled tiny dust
           const totalCount = bgStarCount + dustCount;
           const posArr = new Float32Array(totalCount * 3);
           const scaleArr = new Float32Array(totalCount);
           const colorArr = new Float32Array(totalCount * 3);
           const typeArr = new Float32Array(totalCount);
+          const burstOffsetArr = new Float32Array(totalCount * 3); // for crazy hit bursts
 
           for (let i = 0; i < totalCount; i++) {
             const isDust = i >= bgStarCount;
-            const r = isDust ? (103 + Math.random() * 50) : (400 + Math.random() * 800);
+            // Magically hugging the atmosphere
+            const r = isDust ? (101.5 + Math.random() * 8) : (400 + Math.random() * 800);
             const theta = 2 * Math.PI * Math.random();
             const phi = Math.acos(2 * Math.random() - 1);
             posArr[i*3] = r * Math.sin(phi) * Math.cos(theta);
@@ -366,6 +402,12 @@ export default function Home() {
             posArr[i*3+2] = r * Math.cos(phi);
             scaleArr[i] = Math.random();
             typeArr[i] = isDust ? 1.0 : 0.0;
+
+            // Random burst offsets (outwards)
+            burstOffsetArr[i*3] = posArr[i*3] * (Math.random() * 0.2);
+            burstOffsetArr[i*3+1] = posArr[i*3+1] * (Math.random() * 0.2);
+            burstOffsetArr[i*3+2] = posArr[i*3+2] * (Math.random() * 0.2);
+
             if (isDust) {
               const m = Math.random();
               (m > 0.66 ? new THREE.Color(0x7c3aed) : m > 0.33 ? new THREE.Color(0x38bdf8) : new THREE.Color(0xf472b6)).toArray(colorArr, i*3);
@@ -379,36 +421,47 @@ export default function Home() {
           geo.setAttribute('aScale', new THREE.BufferAttribute(scaleArr, 1));
           geo.setAttribute('customColor', new THREE.BufferAttribute(colorArr, 3));
           geo.setAttribute('pType', new THREE.BufferAttribute(typeArr, 1));
+          geo.setAttribute('burstOffset', new THREE.BufferAttribute(burstOffsetArr, 3));
 
           const pMat = new THREE.ShaderMaterial({
-            uniforms: { time: globe.customUniforms.time, audioPulse: globe.customUniforms.audioPulse, pixelRatio: { value: window.devicePixelRatio || 1 } },
+            uniforms: { 
+              time: globe.customUniforms.time, 
+              audioPulse: globe.customUniforms.audioPulse, 
+              prismPulse: globe.customUniforms.prismPulse,
+              pixelRatio: { value: window.devicePixelRatio || 1 } 
+            },
             vertexShader: `
-              uniform float time; uniform float audioPulse; uniform float pixelRatio;
-              attribute float aScale; attribute vec3 customColor; attribute float pType;
+              uniform float time; uniform float audioPulse; uniform float prismPulse; uniform float pixelRatio;
+              attribute float aScale; attribute vec3 customColor; attribute float pType; attribute vec3 burstOffset;
               varying vec3 vColor; varying float vType;
               void main() {
                 vColor = customColor; vType = pType;
                 vec3 pos = position;
                 if (pType > 0.5) {
-                  pos.x += sin(time*0.5+pos.y*0.05)*(5.0+audioPulse*20.0);
-                  pos.y += cos(time*0.3+pos.x*0.05)*(5.0+audioPulse*20.0);
-                  pos.z += sin(time*0.4+pos.z*0.05)*(5.0+audioPulse*20.0);
+                  float speed = time * (0.8 + prismPulse * 5.0);
+                  pos.x += sin(speed*0.5+pos.y*0.05)*(1.5+audioPulse*20.0);
+                  pos.y += cos(speed*0.3+pos.x*0.05)*(1.5+audioPulse*20.0);
+                  pos.z += sin(speed*0.4+pos.z*0.05)*(1.5+audioPulse*20.0);
+                  // Explosion burst on prism click
+                  pos += burstOffset * prismPulse;
                 }
                 vec4 mv = modelViewMatrix * vec4(pos,1.0);
                 gl_Position = projectionMatrix * mv;
-                float sz = (pType>0.5) ? aScale*(3.0+audioPulse*15.0) : aScale*(1.5+audioPulse*2.0);
-                gl_PointSize = sz * pixelRatio * (300.0 / -mv.z);
+                // Tinier dust by default, blows up massively on audio and click
+                float baseSize = (pType>0.5) ? aScale*(0.5 + audioPulse*10.0 + prismPulse*15.0) : aScale*(1.5+audioPulse*2.0);
+                gl_PointSize = baseSize * pixelRatio * (300.0 / -mv.z);
               }
             `,
             fragmentShader: `
-              varying vec3 vColor; varying float vType; uniform float audioPulse;
+              varying vec3 vColor; varying float vType; uniform float audioPulse; uniform float prismPulse;
               void main() {
                 vec2 xy = gl_PointCoord.xy - vec2(0.5);
                 float ll = length(xy);
                 if(ll>0.5) discard;
-                float glow = (vType>0.5) ? smoothstep(0.5,0.1,ll) : smoothstep(0.5,0.4,ll);
-                float alpha = glow * (0.4 + audioPulse*0.6);
-                gl_FragColor = vec4(vColor*(1.0+audioPulse*((vType>0.5)?1.5:0.5)), alpha);
+                float glow = (vType>0.5) ? smoothstep(0.5,0.0,ll) : smoothstep(0.5,0.4,ll); // Sharper magical core for dust
+                float alpha = glow * (0.5 + audioPulse*0.5 + prismPulse*1.0);
+                vec3 flash = mix(vColor, vec3(1.0), prismPulse); // turns white on flash
+                gl_FragColor = vec4(flash*(1.0 + audioPulse*2.0 + prismPulse*3.0), alpha);
               }
             `,
             transparent: true, blending: THREE.AdditiveBlending, depthWrite: false
@@ -416,6 +469,33 @@ export default function Home() {
           const pts = new THREE.Points(geo, pMat);
           scene.add(pts);
           globe.particleSystem = pts;
+        }
+
+        // --- F. Tiny Orbiting Satellites / Vehicles ---
+        if (!globe.satellitesGroup) {
+          globe.satellitesGroup = new THREE.Group();
+          scene.add(globe.satellitesGroup);
+
+          const satColors = [0xffffff, 0x38bdf8, 0xfbbf24, 0xf472b6];
+          for(let i=0; i<30; i++) {
+            const isHighObj = Math.random() > 0.5; // High alt satellite or low alt plane
+            const geo = isHighObj ? new THREE.BoxGeometry(0.5, 0.2, 0.5) : new THREE.CylinderGeometry(0.2, 0.2, 0.6, 4);
+            const mat = new THREE.MeshBasicMaterial({ 
+              color: satColors[i % satColors.length], 
+              wireframe: isHighObj // High alt satellites have sci-fi wireframe
+            });
+            const m = new THREE.Mesh(geo, mat);
+            
+            const r = isHighObj ? (115 + Math.random() * 20) : (101.5 + Math.random() * 3);
+            m.userData = {
+              r: r,
+              lat: (Math.random() - 0.5) * Math.PI, // -PI/2 to PI/2
+              lng: (Math.random() - 0.5) * Math.PI * 2,
+              speedLat: (Math.random() - 0.5) * 0.05,
+              speedLng: (Math.random() - 0.5) * 0.08 + 0.02
+            };
+            globe.satellitesGroup.add(m);
+          }
         }
 
         // ------------------------------------------------------------------
@@ -450,25 +530,53 @@ export default function Home() {
           }, 150);
         }
 
-        // Animation loop for shaders
+        // --- G. Animation loop for shaders & motion ---
         const clock = new THREE.Clock();
         if (!globe.animateTick) {
           globe.animateTick = true;
           const tick = () => {
             if (globeRef.current && globe.customUniforms) {
-              globe.customUniforms.time.value = clock.getElapsedTime();
+              const dt = clock.getDelta();
+              const elTs = clock.getElapsedTime();
+              globe.customUniforms.time.value = elTs;
+
+              // Decay Prism Pulse organically
+              if (globe.customUniforms.prismPulse.value > 0) {
+                 globe.customUniforms.prismPulse.value = Math.max(0, globe.customUniforms.prismPulse.value - dt * 0.8);
+              }
+
               if (window.globalAnalyser) {
                 window.globalAnalyser.getByteFrequencyData(audioDataArray);
                 let sum = 0;
                 for (let k = 0; k < 32; k++) sum += audioDataArray[k];
                 globe.customUniforms.audioPulse.value = (sum / 32) / 255.0;
               }
+
+              // Animate Satellites & Planes
+              if (globe.satellitesGroup) {
+                const globalPrismMultiplier = 1.0 + (globe.customUniforms.prismPulse.value * 20.0); // Extreme hyperspeed on bop
+                globe.satellitesGroup.children.forEach(m => {
+                  m.userData.lat += m.userData.speedLat * dt * globalPrismMultiplier;
+                  m.userData.lng += m.userData.speedLng * dt * globalPrismMultiplier;
+                  
+                  // convert back to x, y, z
+                  const r = m.userData.r;
+                  const phi = Math.PI / 2 - m.userData.lat;
+                  const theta = m.userData.lng;
+                  
+                  m.position.x = r * Math.sin(phi) * Math.cos(theta);
+                  m.position.y = r * Math.cos(phi);
+                  m.position.z = r * Math.sin(phi) * Math.sin(theta);
+                  m.lookAt(0,0,0); // Orient towards planet, optional
+                });
+              }
             }
             requestAnimationFrame(tick);
           };
           tick();
         }
-      } catch (e) {
+
+    } catch (e) {
         console.warn('Globe init error:', e);
       }
     }, 500);
@@ -724,6 +832,9 @@ export default function Home() {
     setPeekVisible(false);
     playClickSound();
     const newBops = prismBops + 1;
+    if (globeRef.current && globeRef.current.customUniforms) {
+      globeRef.current.customUniforms.prismPulse.value = 1.0; // TRIGGER EXTREME GLOBE REACTION
+    }
     setPrismBops(newBops);
     setPrismBubble(prismPhrases[(newBops - 1) % prismPhrases.length]);
     setTimeout(() => setPrismBubble(null), 2500);
@@ -805,11 +916,11 @@ export default function Home() {
                     ref={handleGlobeRef}
                     width={globeSize.width}
                     height={globeSize.height}
-                    globeImageUrl="//unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
-                    bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
+                    
+                    
                     backgroundColor="rgba(0,0,0,0)"
-                    atmosphereColor="#7c3aed"
-                    atmosphereAltitude={0.45}
+                    
+                    
                     arcsData={arcsData}
                     arcColor="color"
                     arcDashLength={0.4}
