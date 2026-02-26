@@ -243,11 +243,13 @@ export default function Home() {
         if (!globe.oceanMaterialSet) {
           const texLoader = new THREE.TextureLoader();
           const earthTex = texLoader.load('//unpkg.com/three-globe/example/img/earth-blue-marble.jpg');
+          const cloudsTex = texLoader.load('//cdn.jsdelivr.net/gh/mrdoob/three.js/examples/textures/planets/earth_clouds_1024.png');
           const waterTex = texLoader.load('//unpkg.com/three-globe/example/img/earth-water.png');
 
           const oceanMat = new THREE.ShaderMaterial({
             uniforms: {
               earthMap: { value: earthTex },
+              cloudsMap: { value: cloudsTex },
               waterMask: { value: waterTex },
               time: globe.customUniforms.time,
               audioPulse: globe.customUniforms.audioPulse,
@@ -267,6 +269,7 @@ export default function Home() {
             `,
             fragmentShader: `
               uniform sampler2D earthMap;
+              uniform sampler2D cloudsMap;
               uniform sampler2D waterMask;
               uniform float time;
               uniform float audioPulse;
@@ -312,7 +315,9 @@ export default function Home() {
                 float dayLight = 0.12 + NdotL * 0.88;
 
                 // --- LAND: matte diffuse only ---
-                vec3 landColor = texCol.rgb * dayLight;
+                float rawFresnel = clamp(1.0 - dot(viewDir, vNormal), 0.0, 1.0);
+                float landFresnel = pow(rawFresnel, 3.0);
+                vec3 landColor = texCol.rgb * dayLight + texCol.rgb * landFresnel * 0.15;
 
                 // --- WATER: animated waves, strong specular, sun glare ---
                 vec2 waveUv = vUv * 50.0;
@@ -347,6 +352,45 @@ export default function Home() {
                   + vec3(0.3, 0.5, 0.8) * waves * audioPulse * 0.25;
 
                 vec3 finalColor = mix(landColor, waterColor, isWater);
+                
+                // --- HIGH FIDELITY CLOUDS ---
+                vec2 cloUv = vUv + vec2(time * -0.003, 0.0);
+                float cloudVal = texture2D(cloudsMap, cloUv).r;
+                
+                // Add sub-detail noise to the clouds
+                float cNoise = fbm(cloUv * 30.0 + time * 0.05);
+                float cloudMask = mix(cloudVal, cloudVal * (0.5 + cNoise * 0.5), 0.5);
+                
+                float cloudAlpha = smoothstep(0.05, 0.5, cloudMask);
+                
+                // Self-shadowing on clouds (thicker clouds are darker at the core relative to sun)
+                float sunAngle = dot(vNormal, sunDir);
+                float cloudIllum = smoothstep(-0.2, 0.8, sunAngle); // Clouds catch light early on the terminator
+                
+                vec3 baseCloud = vec3(0.95, 0.98, 1.0);
+                vec3 shadowCloud = vec3(0.25, 0.3, 0.4); // Darker cloud shadow
+                vec3 cloudColor = mix(shadowCloud, baseCloud, cloudIllum) * dayLight;
+                
+                // Sunset edge scattering (warm orange/pink light on the terminator line)
+                float terminatorLine = smoothstep(0.0, 0.3, sunAngle) * smoothstep(0.6, 0.3, sunAngle);
+                vec3 sunsetScatter = vec3(1.0, 0.4, 0.1) * terminatorLine * 1.5;
+                
+                // Rim lighting for clouds
+                float cloudFresnel = pow(1.0 - max(dot(viewDir, vNormal), 0.0), 3.0);
+                
+                vec3 finalCloudColor = cloudColor + (sunsetScatter * cloudVal) + (vec3(1.0, 0.95, 0.9) * cloudFresnel * 0.4 * cloudIllum);
+
+                // Add drop shadow from clouds onto the earth
+                float shadowOffset = 0.005;
+                float cloudShadowVal = texture2D(cloudsMap, cloUv - vec2(sunDir.x, sunDir.y) * shadowOffset).r;
+                float shadowAlpha = smoothstep(0.1, 0.8, cloudShadowVal) * 0.6 * dayLight;
+                finalColor = mix(finalColor, finalColor * 0.2, shadowAlpha); // Darken ground
+                
+                // Thicker clouds
+                cloudAlpha = pow(cloudAlpha, 0.8);
+
+                // Paint clouds
+                finalColor = mix(finalColor, finalCloudColor, cloudAlpha * 0.9);
 
                 // Night-side city glow on land
                 float nightGlow = max(0.0, 1.0 - NdotL * 3.0);
