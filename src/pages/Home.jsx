@@ -385,7 +385,7 @@ export default function Home() {
         // --- B2. Volumetric Cloud Layer (separate mesh for realism) ---
         if (!globe.cloudMesh) {
           const cLoader = new THREE.TextureLoader();
-          const cloudsTex = cLoader.load('//cdn.jsdelivr.net/gh/mrdoob/three.js/examples/textures/planets/earth_clouds_1024.png');
+          const cloudsTex = cLoader.load('//cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/textures/planets/earth_clouds_1024.png');
 
           const cloudMat = new THREE.ShaderMaterial({
             uniforms: {
@@ -445,7 +445,8 @@ export default function Home() {
             `,
             transparent: true,
             depthWrite: false,
-            side: THREE.DoubleSide
+            depthTest: false,
+            side: THREE.FrontSide
           });
 
           const cloudMesh = new THREE.Mesh(
@@ -536,20 +537,20 @@ export default function Home() {
                 col = mix(col, auroraGold, introIntensity * smoothstep(0.4, 0.8, n3 * 0.5 + 0.5) * 0.4);
                 col = mix(col, col * 1.5, audioPulse * rawFresnel);
 
-                // Prismatic rainbow on prism bop
+                // Prismatic rainbow on prism bop (subtle, not blinding)
                 vec3 hitColor = vec3(
                   0.5 + 0.5 * sin(time * 2.5),
                   0.5 + 0.5 * sin(time * 2.5 + 2.094),
                   0.5 + 0.5 * sin(time * 2.5 + 4.189)
                 );
-                col = mix(col, hitColor, prismPulse * 0.6);
+                col = mix(col, hitColor, prismPulse * 0.35);
 
                 // During intro: full coverage curtain. After: flowing edge bands
                 float curtain = smoothstep(-0.2, 0.6, n1) * smoothstep(-0.3, 0.5, n2);
-                float introBoost = introIntensity * (0.6 + n3 * 0.4); // swirling full-globe coverage
-                float alpha = max(fresnel * curtain, introBoost) * (0.7 + audioPulse * 0.5 + prismPulse * 0.8);
+                float introBoost = introIntensity * (0.6 + n3 * 0.4);
+                float alpha = max(fresnel * curtain, introBoost) * (0.7 + audioPulse * 0.5 + prismPulse * 0.4);
 
-                float brightness = 1.2 + introIntensity * 0.6 + audioPulse * 0.5 + prismPulse * 0.6;
+                float brightness = 1.2 + introIntensity * 0.6 + audioPulse * 0.5 + prismPulse * 0.3;
                 float alphaOut = alpha * (0.55 + introIntensity * 0.3);
                 gl_FragColor = vec4(col * brightness, alphaOut);
               }
@@ -852,52 +853,108 @@ export default function Home() {
           geo.setAttribute('pType', new THREE.BufferAttribute(typeArr, 1));
           geo.setAttribute('burstOffset', new THREE.BufferAttribute(burstOffsetArr, 3));
 
+          // Mouse tracking for particle ripples
+          const mouseWorld = new THREE.Vector3(0, 0, 0);
+          const mouseUniforms = { value: mouseWorld };
+          globe._particleMousePos = mouseWorld;
+          const globeEl = mapContainerRef.current;
+          if (globeEl) {
+            const onMouseMove = (e) => {
+              const rect = globeEl.getBoundingClientRect();
+              const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+              const ny = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+              // Project mouse into 3D space near the globe surface
+              const cam = globe.camera();
+              if (cam) {
+                const ray = new THREE.Vector3(nx, ny, 0.5).unproject(cam);
+                const dir = ray.sub(cam.position).normalize();
+                // Intersect with sphere of radius ~105 (dust cloud region)
+                const a = dir.dot(dir);
+                const b = 2 * cam.position.dot(dir);
+                const c = cam.position.dot(cam.position) - 105 * 105;
+                const disc = b * b - 4 * a * c;
+                if (disc > 0) {
+                  const t = (-b - Math.sqrt(disc)) / (2 * a);
+                  if (t > 0) {
+                    mouseWorld.copy(cam.position).add(dir.multiplyScalar(t));
+                  }
+                }
+              }
+            };
+            globeEl.addEventListener('mousemove', onMouseMove);
+            globe._particleMouseCleanup = () => globeEl.removeEventListener('mousemove', onMouseMove);
+          }
+
           const pMat = new THREE.ShaderMaterial({
-            uniforms: { 
-              time: globe.customUniforms.time, 
-              audioPulse: globe.customUniforms.audioPulse, 
+            uniforms: {
+              time: globe.customUniforms.time,
+              audioPulse: globe.customUniforms.audioPulse,
               prismPulse: globe.customUniforms.prismPulse,
-              pixelRatio: { value: window.devicePixelRatio || 1 } 
+              pixelRatio: { value: window.devicePixelRatio || 1 },
+              mousePos: mouseUniforms
             },
             vertexShader: `
               uniform float time; uniform float audioPulse; uniform float prismPulse; uniform float pixelRatio;
+              uniform vec3 mousePos;
               attribute float aScale; attribute vec3 customColor; attribute float pType; attribute vec3 burstOffset;
-              varying vec3 vColor; varying float vType;
+              varying vec3 vColor; varying float vType; varying float vMouseDist;
               void main() {
                 vColor = customColor; vType = pType;
                 vec3 pos = position;
                 if (pType > 0.5) {
-                  float speed = time * (0.8 + prismPulse * 0.5);
-                  // Gentle orbital drift, not wild thrashing
+                  float speed = time * (0.8 + prismPulse * 0.3);
+                  // Gentle orbital drift
                   pos.x += sin(speed*0.5+pos.y*0.05)*(1.5+audioPulse*4.0);
                   pos.y += cos(speed*0.3+pos.x*0.05)*(1.5+audioPulse*4.0);
                   pos.z += sin(speed*0.4+pos.z*0.05)*(1.5+audioPulse*4.0);
-                  // No outward explosion - just gentle breathing
-                  pos += burstOffset * prismPulse * 0.08;
+                  // Gentle breathing on bop, no explosion
+                  pos += burstOffset * prismPulse * 0.05;
+
+                  // Mouse ripple: particles near mouse get pushed outward like water
+                  float mouseDist = distance(pos, mousePos);
+                  float rippleRadius = 20.0;
+                  if (mouseDist < rippleRadius && length(mousePos) > 1.0) {
+                    vec3 pushDir = normalize(pos - mousePos);
+                    float rippleStr = (1.0 - mouseDist / rippleRadius);
+                    rippleStr = rippleStr * rippleStr * 8.0;
+                    // Ripple wave - particles oscillate as the ripple passes through
+                    float wave = sin(mouseDist * 0.5 - time * 4.0) * 0.5 + 0.5;
+                    pos += pushDir * rippleStr * wave;
+                  }
+                  vMouseDist = mouseDist;
+                } else {
+                  vMouseDist = 999.0;
                 }
                 vec4 mv = modelViewMatrix * vec4(pos,1.0);
                 gl_Position = projectionMatrix * mv;
-                // Visible dust, gentle prism glow-up
-                float baseSize = (pType>0.5) ? aScale*(1.0 + audioPulse*3.0 + prismPulse*2.0) : aScale*(1.8+audioPulse*2.0);
+                // Gentle prism glow-up (reduced from before)
+                float baseSize = (pType>0.5) ? aScale*(1.0 + audioPulse*3.0 + prismPulse*1.2) : aScale*(1.8+audioPulse*2.0);
                 gl_PointSize = baseSize * pixelRatio * (300.0 / -mv.z);
               }
             `,
             fragmentShader: `
-              varying vec3 vColor; varying float vType; uniform float audioPulse; uniform float prismPulse; uniform float time;
+              varying vec3 vColor; varying float vType; varying float vMouseDist;
+              uniform float audioPulse; uniform float prismPulse; uniform float time;
               void main() {
                 vec2 xy = gl_PointCoord.xy - vec2(0.5);
                 float ll = length(xy);
                 if(ll>0.5) discard;
                 float glow = (vType>0.5) ? smoothstep(0.5,0.0,ll) : smoothstep(0.5,0.4,ll);
-                float alpha = glow * (0.6 + audioPulse*0.4 + prismPulse*0.4);
-                // Gentle prismatic color shift - ethereal shimmer not white flash
+                float alpha = glow * (0.6 + audioPulse*0.4 + prismPulse*0.3);
+
+                // Mouse proximity glow - particles near cursor glow brighter
+                float mouseGlow = (vMouseDist < 20.0) ? (1.0 - vMouseDist / 20.0) * 0.5 : 0.0;
+
+                // Gentle prismatic color shift
                 vec3 prismatic = vec3(
                   0.5 + 0.5 * sin(time * 3.0),
                   0.5 + 0.5 * sin(time * 3.0 + 2.094),
                   0.5 + 0.5 * sin(time * 3.0 + 4.189)
                 );
-                vec3 shimmer = mix(vColor, prismatic, prismPulse * 0.5);
-                gl_FragColor = vec4(shimmer*(1.0 + audioPulse*0.8 + prismPulse*0.5), alpha);
+                vec3 shimmer = mix(vColor, prismatic, prismPulse * 0.4);
+                // Mouse makes nearby particles glow white/bright
+                shimmer += vec3(0.3, 0.5, 1.0) * mouseGlow;
+                gl_FragColor = vec4(shimmer*(1.0 + audioPulse*0.8 + prismPulse*0.3 + mouseGlow), alpha + mouseGlow * 0.3);
               }
             `,
             transparent: true, blending: THREE.AdditiveBlending, depthWrite: false
@@ -976,9 +1033,11 @@ export default function Home() {
                 globe.customUniforms.introIntensity.value = Math.max(0, globe.customUniforms.introIntensity.value - dt * 0.2);
               }
 
-              // Decay Prism Pulse organically
+              // Decay Prism Pulse slowly and organically (5+ second fade)
               if (globe.customUniforms.prismPulse.value > 0) {
-                 globe.customUniforms.prismPulse.value = Math.max(0, globe.customUniforms.prismPulse.value - dt * 0.35);
+                 const pp = globe.customUniforms.prismPulse.value;
+                 // Exponential decay: fast at first, then slow graceful return
+                 globe.customUniforms.prismPulse.value = Math.max(0, pp - dt * (0.15 + pp * 0.1));
               }
 
               if (window.globalAnalyser) {
@@ -1039,7 +1098,7 @@ export default function Home() {
 
               // Animate Satellites & Planes
               if (globe.satellitesGroup) {
-                const globalPrismMultiplier = 1.0 + (globe.customUniforms.prismPulse.value * 5.0); // Graceful acceleration on bop
+                const globalPrismMultiplier = 1.0 + (globe.customUniforms.prismPulse.value * 2.0); // Gentle acceleration on bop
                 globe.satellitesGroup.children.forEach(m => {
                   m.userData.lat += m.userData.speedLat * dt * globalPrismMultiplier;
                   m.userData.lng += m.userData.speedLng * dt * globalPrismMultiplier;
@@ -1077,6 +1136,7 @@ export default function Home() {
       }
       if (autoRotateTimer.current) clearTimeout(autoRotateTimer.current);
       if (globeCycleTimer.current) clearInterval(globeCycleTimer.current);
+      if (globeRef.current?._particleMouseCleanup) globeRef.current._particleMouseCleanup();
     };
   }, [globeMounted, startGlobeCycle]);
 
