@@ -245,6 +245,8 @@ export default function Home() {
           const earthTex = texLoader.load('//unpkg.com/three-globe/example/img/earth-blue-marble.jpg');
           const nightTex = texLoader.load('//cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/textures/planets/earth_night_4096.jpg');
           const waterTex = texLoader.load('//unpkg.com/three-globe/example/img/earth-water.png');
+          // 4K packed texture: R=bump, G=roughness, B=clouds (Bobby Roe / three.js Journey approach)
+          const packedTex = texLoader.load('//cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/textures/planets/earth_bump_roughness_clouds_4096.jpg');
           const sunDirVec = new THREE.Vector3(1.0, 0.5, 1.0).normalize();
 
           const oceanMat = new THREE.ShaderMaterial({
@@ -252,6 +254,7 @@ export default function Home() {
               earthMap: { value: earthTex },
               nightMap: { value: nightTex },
               waterMask: { value: waterTex },
+              packedTex: { value: packedTex },
               time: globe.customUniforms.time,
               audioPulse: globe.customUniforms.audioPulse,
               prismPulse: globe.customUniforms.prismPulse,
@@ -272,6 +275,7 @@ export default function Home() {
               uniform sampler2D earthMap;
               uniform sampler2D nightMap;
               uniform sampler2D waterMask;
+              uniform sampler2D packedTex;
               uniform float time;
               uniform float audioPulse;
               uniform float prismPulse;
@@ -355,6 +359,18 @@ export default function Home() {
 
                 vec3 finalColor = mix(landColor, waterColor, isWater);
 
+                // --- PACKED TEXTURE: roughness + cloud shadows ---
+                vec3 packed = texture2D(packedTex, vUv).rgb;
+                // Green channel = roughness (high = rough/matte, low = shiny)
+                // Modulate land specular: rough areas get less shine
+                float roughness = packed.g;
+                float landShine = (1.0 - roughness) * pow(max(dot(normalize(vNormal + vec3(0.0)), normalize(sunDir + viewDir)), 0.0), 40.0);
+                finalColor += vec3(0.8, 0.85, 0.9) * landShine * 0.15 * (1.0 - isWater) * dayStrength;
+
+                // Blue channel = cloud density - cast soft shadows on surface
+                float cloudDensity = smoothstep(0.2, 0.7, packed.b);
+                finalColor *= (1.0 - cloudDensity * 0.3 * dayStrength);
+
                 // --- ATMOSPHERIC SCATTERING at terminator ---
                 float terminatorBand = smoothstep(0.0, 0.15, max(NdotL, 0.0)) * smoothstep(0.35, 0.15, max(NdotL, 0.0));
                 vec3 sunsetColor = mix(vec3(1.0, 0.25, 0.05), vec3(1.0, 0.55, 0.2), max(NdotL, 0.0) * 3.0);
@@ -382,24 +398,29 @@ export default function Home() {
           globe.oceanMaterialSet = true;
         }
 
-        // --- B2. Volumetric Cloud Layer (separate mesh for realism) ---
+        // --- B2. Volumetric Cloud Layer (4K from packed texture blue channel) ---
         if (!globe.cloudMesh) {
-          const cLoader = new THREE.TextureLoader();
-          const cloudsTex = cLoader.load('//cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/textures/planets/earth_clouds_1024.png');
+          // Use the same 4K packed texture - blue channel has high-res cloud data
+          const cloud4KTex = new THREE.TextureLoader().load(
+            '//cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/textures/planets/earth_bump_roughness_clouds_4096.jpg'
+          );
 
           const cloudMat = new THREE.ShaderMaterial({
             uniforms: {
-              cloudsMap: { value: cloudsTex },
+              cloudsMap: { value: cloud4KTex },
               sunDir: { value: new THREE.Vector3(1.0, 0.5, 1.0).normalize() },
               time: globe.customUniforms.time,
+              audioPulse: globe.customUniforms.audioPulse,
             },
             vertexShader: `
               varying vec2 vUv;
               varying vec3 vNormal;
               varying vec3 vViewPos;
+              varying vec3 vWorldNormal;
               void main() {
                 vUv = uv;
                 vNormal = normalize(normalMatrix * normal);
+                vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
                 vViewPos = (modelViewMatrix * vec4(position, 1.0)).xyz;
                 gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
               }
@@ -408,39 +429,55 @@ export default function Home() {
               uniform sampler2D cloudsMap;
               uniform vec3 sunDir;
               uniform float time;
+              uniform float audioPulse;
               varying vec2 vUv;
               varying vec3 vNormal;
               varying vec3 vViewPos;
+              varying vec3 vWorldNormal;
 
               void main() {
-                float cloudVal = texture2D(cloudsMap, vUv).r;
-                float alpha = smoothstep(0.15, 0.65, cloudVal);
+                // BLUE channel = cloud density in packed texture (4096x2048)
+                float cloudVal = texture2D(cloudsMap, vUv).b;
 
-                float NdotL = dot(vNormal, sunDir);
-                float illumination = 0.1 + max(NdotL, 0.0) * 0.9;
+                // Smooth threshold: only show actual clouds, not noise floor
+                float alpha = smoothstep(0.2, 0.8, cloudVal);
 
-                // Cloud color: bright white in sunlight, dark on night side
-                vec3 litCloud = vec3(1.0, 0.99, 0.96) * illumination;
-                vec3 shadowCloud = vec3(0.2, 0.22, 0.28);
-                vec3 cloudColor = mix(shadowCloud, litCloud, smoothstep(-0.1, 0.4, NdotL));
+                // Sun illumination
+                float NdotL = dot(vWorldNormal, sunDir);
+                float dayFactor = smoothstep(-0.15, 0.5, NdotL);
+                float illumination = 0.08 + max(NdotL, 0.0) * 0.92;
 
-                // Self-shadowing: thicker cloud cores slightly darker
-                cloudColor *= (1.0 - cloudVal * cloudVal * 0.15);
+                // Lit clouds are bright white, shadow side is blue-gray
+                vec3 litCloud = vec3(1.0, 0.99, 0.96);
+                vec3 shadowCloud = vec3(0.15, 0.18, 0.25);
+                vec3 cloudColor = mix(shadowCloud, litCloud, dayFactor) * illumination;
 
-                // Sunset/terminator scattering (golden/orange edge)
-                float terminator = smoothstep(0.0, 0.12, max(NdotL, 0.0)) * smoothstep(0.25, 0.12, max(NdotL, 0.0));
-                cloudColor += vec3(1.0, 0.35, 0.08) * terminator * cloudVal * 1.5;
+                // Self-shadowing: thicker cloud masses have darker cores
+                float thickness = cloudVal * cloudVal;
+                cloudColor *= (1.0 - thickness * 0.2);
 
-                // Silver lining rim light
+                // Subsurface scattering: thick clouds glow slightly warm on sun-facing side
+                cloudColor += vec3(0.15, 0.12, 0.08) * thickness * max(NdotL, 0.0);
+
+                // Sunset/terminator scattering - golden edge glow
+                float terminator = smoothstep(0.0, 0.1, max(NdotL, 0.0)) * smoothstep(0.22, 0.1, max(NdotL, 0.0));
+                cloudColor += vec3(1.0, 0.4, 0.1) * terminator * cloudVal * 2.0;
+
+                // Silver lining: bright rim light on cloud edges facing camera
                 vec3 viewDir = normalize(-vViewPos);
-                float rim = pow(1.0 - max(dot(viewDir, vNormal), 0.0), 3.0);
-                cloudColor += vec3(1.0, 0.95, 0.9) * rim * 0.25 * illumination;
+                float rim = pow(1.0 - max(dot(viewDir, vNormal), 0.0), 3.5);
+                cloudColor += vec3(1.0, 0.97, 0.93) * rim * 0.3 * illumination;
 
-                // Night side: clouds nearly invisible (backlit by starlight only)
-                float nightFade = smoothstep(-0.15, 0.05, NdotL);
-                alpha *= max(nightFade, 0.03);
+                // Music-reactive cloud brightness
+                cloudColor += cloudColor * audioPulse * 0.15;
 
-                gl_FragColor = vec4(cloudColor, alpha * 0.85);
+                // Night side: clouds fade but thin wisp remains for realism
+                alpha *= max(dayFactor, 0.04);
+
+                // Bump alpha based on cloud thickness for volumetric feel
+                alpha = alpha * (0.7 + thickness * 0.3);
+
+                gl_FragColor = vec4(cloudColor, alpha * 0.9);
               }
             `,
             transparent: true,
@@ -450,9 +487,10 @@ export default function Home() {
           });
 
           const cloudMesh = new THREE.Mesh(
-            new THREE.SphereGeometry(100.8, 64, 64),
+            new THREE.SphereGeometry(100.8, 96, 96),  // Higher segments for 4K detail
             cloudMat
           );
+          cloudMesh.renderOrder = 1;  // After globe surface (0), before aurora (2)
           scene.add(cloudMesh);
           globe.cloudMesh = cloudMesh;
         }
@@ -562,6 +600,7 @@ export default function Home() {
             side: THREE.FrontSide
           });
           const auroraMesh = new THREE.Mesh(new THREE.SphereGeometry(101.5, 64, 64), auroraMat);
+          auroraMesh.renderOrder = 2;
           scene.add(auroraMesh);
           globe.auroraShell = auroraMesh;
         }
@@ -619,6 +658,7 @@ export default function Home() {
             side: THREE.FrontSide
           });
           const innerAtmos = new THREE.Mesh(new THREE.SphereGeometry(102, 64, 64), innerAtmosMat);
+          innerAtmos.renderOrder = 3;
           scene.add(innerAtmos);
 
           // Outer atmospheric halo (BackSide - glowing rim AROUND the globe silhouette)
@@ -668,6 +708,7 @@ export default function Home() {
             side: THREE.BackSide
           });
           const outerAtmos = new THREE.Mesh(new THREE.SphereGeometry(107, 64, 64), outerAtmosMat);
+          outerAtmos.renderOrder = 3;
           scene.add(outerAtmos);
 
           globe.atmosShell = { inner: innerAtmos, outer: outerAtmos };
