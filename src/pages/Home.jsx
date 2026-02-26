@@ -313,7 +313,7 @@ export default function Home() {
               void main() {
                 vec4 dayCol = texture2D(earthMap, vUv);
                 vec3 nightCol = texture2D(nightMap, vUv).rgb;
-                float waterVal = 1.0 - texture2D(waterMask, vUv).r;
+                float waterVal = texture2D(waterMask, vUv).r;
                 float isWater = smoothstep(0.3, 0.7, waterVal);
                 vec3 packed = texture2D(packedTex, vUv).rgb;
 
@@ -336,8 +336,8 @@ export default function Home() {
                 vec3 landColor = mix(landNight, landDay, dayStrength);
 
                 // --- WATER: animated undulating ocean + specular + Fresnel ---
-                vec2 waveUv = vUv * 50.0;
-                vec2 bigWaveUv = vUv * 10.0;
+                vec2 waveUv = vUv * 18.0;
+                vec2 bigWaveUv = vUv * 4.0;
                 float t = time * 0.12;
 
                 // Large ocean swells (visible undulation)
@@ -394,18 +394,17 @@ export default function Home() {
                 float cloudDensity = smoothstep(0.2, 0.7, packed.b);
                 finalColor *= (1.0 - cloudDensity * 0.3 * dayStrength);
 
-                // --- ATMOSPHERIC SCATTERING at terminator (subtle, narrow) ---
-                float tNdotL = max(NdotL, 0.0);
-                float terminatorBand = smoothstep(0.0, 0.1, tNdotL) * smoothstep(0.25, 0.1, tNdotL);
-                vec3 sunsetColor = mix(vec3(1.0, 0.25, 0.05), vec3(1.0, 0.55, 0.2), tNdotL * 3.0);
-                finalColor += sunsetColor * terminatorBand * rawFresnel * 0.2;
+                // --- Diffuse sunset glow near day/night transition ---
+                float sunsetGlow = smoothstep(-0.05, 0.3, NdotL) * smoothstep(0.5, 0.05, max(NdotL, 0.0));
+                vec3 sunsetColor = vec3(1.0, 0.35, 0.12);
+                finalColor += sunsetColor * sunsetGlow * 0.08;
 
                 // --- Atmospheric rim haze (subtle blue glow at edges) ---
                 float rimHaze = pow(rawFresnel, 4.0);
                 vec3 dayHaze = vec3(0.2, 0.4, 1.0);
                 vec3 nightHaze = vec3(0.04, 0.02, 0.12);
                 vec3 hazeColor = mix(nightHaze, dayHaze, dayStrength);
-                hazeColor = mix(hazeColor, vec3(1.0, 0.4, 0.1), terminatorBand);
+                hazeColor = mix(hazeColor, vec3(1.0, 0.4, 0.1), sunsetGlow);
                 finalColor += hazeColor * rimHaze * 0.15;
 
                 gl_FragColor = vec4(finalColor, 1.0);
@@ -1259,8 +1258,8 @@ export default function Home() {
                   const hits = globe._globeMesh ? globe._flareRaycaster.intersectObjects([globe._globeMesh], false) : [];
                   const sunDist = camera.position.distanceTo(flareWorldPos);
                   occlusionTarget = (hits.length > 0 && hits[0].distance < sunDist) ? 1.0 : 0.0;
-                  // Smooth transition
-                  globe._flareOcclusion += (occlusionTarget - globe._flareOcclusion) * dt * 3.0;
+                  // Sharp clip at earth edge
+                  globe._flareOcclusion += (occlusionTarget - globe._flareOcclusion) * Math.min(dt * 15.0, 1.0);
                 }
                 const flareVis = 1.0 - (globe._flareOcclusion || 0);
 
@@ -1986,7 +1985,7 @@ export default function Home() {
                   </motion.div>
                 )}
               </AnimatePresence>
-              <svg className="peek-prism" width="56" height="64" viewBox="0 0 56 64" fill="none">
+              <svg className="peek-prism" width="64" height="60" viewBox="-8 0 72 60" fill="none">
                 <defs>
                   <linearGradient id="prism-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
                     <stop offset="0%" stopColor="#7c3aed">
@@ -1999,83 +1998,80 @@ export default function Home() {
                       <animate attributeName="stop-color" values="#f472b6;#22c55e;#fbbf24;#7c3aed;#38bdf8;#f472b6" dur="5s" repeatCount="indefinite" />
                     </stop>
                   </linearGradient>
-                  {/* Glass internal reflection layers */}
                   <linearGradient id="prism-glass" x1="30%" y1="0%" x2="70%" y2="100%">
-                    <stop offset="0%" stopColor="rgba(255,255,255,0.5)">
-                      <animate attributeName="stopColor" values="rgba(255,255,255,0.5);rgba(255,255,255,0.2);rgba(255,255,255,0.5)" dur="3s" repeatCount="indefinite" />
-                    </stop>
+                    <stop offset="0%" stopColor="rgba(255,255,255,0.5)" />
                     <stop offset="35%" stopColor="rgba(255,255,255,0.05)" />
-                    <stop offset="55%" stopColor="rgba(255,255,255,0.15)">
-                      <animate attributeName="stopColor" values="rgba(255,255,255,0.15);rgba(255,255,255,0.3);rgba(255,255,255,0.15)" dur="4s" repeatCount="indefinite" />
-                    </stop>
+                    <stop offset="55%" stopColor="rgba(255,255,255,0.18)" />
                     <stop offset="100%" stopColor="rgba(255,255,255,0.25)" />
                   </linearGradient>
                   <linearGradient id="prism-edge" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="rgba(255,255,255,0.4)" />
+                    <stop offset="0%" stopColor="rgba(255,255,255,0.5)" />
                     <stop offset="50%" stopColor="rgba(255,255,255,0.1)" />
-                    <stop offset="100%" stopColor="rgba(255,255,255,0.3)" />
+                    <stop offset="100%" stopColor="rgba(255,255,255,0.4)" />
                   </linearGradient>
                   <filter id="prism-glow">
-                    <feGaussianBlur stdDeviation="2.5" result="blur" />
-                    <feColorMatrix type="saturate" values="1.8" in="blur" result="saturated" />
-                    <feMerge>
-                      <feMergeNode in="saturated" />
-                      <feMergeNode in="SourceGraphic" />
-                    </feMerge>
+                    <feGaussianBlur stdDeviation="2" result="blur" />
+                    <feColorMatrix type="saturate" values="2" in="blur" result="sat" />
+                    <feMerge><feMergeNode in="sat" /><feMergeNode in="SourceGraphic" /></feMerge>
                   </filter>
-                  <clipPath id="prism-clip">
-                    <polygon points="28,4 50,48 6,48" />
-                  </clipPath>
+                  {/* Soft glow filter for realistic light rays */}
+                  <filter id="ray-glow" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur stdDeviation="2.5" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                  </filter>
+                  {/* Gradient for each ray color to fade out */}
+                  <linearGradient id="ray-red" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#ef4444" stopOpacity="0.9" /><stop offset="100%" stopColor="#ef4444" stopOpacity="0" /></linearGradient>
+                  <linearGradient id="ray-orange" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#f59e0b" stopOpacity="0.85" /><stop offset="100%" stopColor="#f59e0b" stopOpacity="0" /></linearGradient>
+                  <linearGradient id="ray-green" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#22c55e" stopOpacity="0.8" /><stop offset="100%" stopColor="#22c55e" stopOpacity="0" /></linearGradient>
+                  <linearGradient id="ray-blue" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#38bdf8" stopOpacity="0.85" /><stop offset="100%" stopColor="#38bdf8" stopOpacity="0" /></linearGradient>
+                  <linearGradient id="ray-purple" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#7c3aed" stopOpacity="0.9" /><stop offset="100%" stopColor="#7c3aed" stopOpacity="0" /></linearGradient>
+                  <linearGradient id="ray-pink" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#ec4899" stopOpacity="0.8" /><stop offset="100%" stopColor="#ec4899" stopOpacity="0" /></linearGradient>
+                  <linearGradient id="beam-in" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="white" stopOpacity="0" /><stop offset="70%" stopColor="white" stopOpacity="0.6" /><stop offset="100%" stopColor="white" stopOpacity="0.8" /></linearGradient>
+                  <clipPath id="prism-clip"><polygon points="28,4 50,48 6,48" /></clipPath>
                 </defs>
-                {/* Glass body with color-cycling gradient */}
+                {/* Soft incoming light beam */}
+                <line x1="-4" y1="22" x2="20" y2="28" stroke="url(#beam-in)" strokeWidth="3.5" strokeLinecap="round" filter="url(#ray-glow)">
+                  <animate attributeName="opacity" values="0.7;0.4;0.7" dur="3s" repeatCount="indefinite" />
+                </line>
+                {/* Glass body */}
                 <polygon points="28,4 50,48 6,48" fill="url(#prism-gradient)" filter="url(#prism-glow)" opacity="0.85" />
-                {/* Glass highlight layer */}
                 <polygon points="28,4 50,48 6,48" fill="url(#prism-glass)" />
-                {/* Glass edge highlight */}
-                <polygon points="28,4 50,48 6,48" fill="none" stroke="url(#prism-edge)" strokeWidth="1" opacity="0.7" />
-                {/* Internal caustic refraction lines */}
-                <g clipPath="url(#prism-clip)" opacity="0.35">
-                  <line x1="28" y1="10" x2="14" y2="44" stroke="rgba(255,255,255,0.5)" strokeWidth="0.5">
-                    <animate attributeName="x2" values="14;18;14" dur="3s" repeatCount="indefinite" />
+                <polygon points="28,4 50,48 6,48" fill="none" stroke="url(#prism-edge)" strokeWidth="0.8" opacity="0.6" />
+                {/* Internal caustic shimmer */}
+                <g clipPath="url(#prism-clip)" opacity="0.3">
+                  <line x1="28" y1="10" x2="15" y2="44" stroke="white" strokeWidth="0.4">
+                    <animate attributeName="x2" values="15;19;15" dur="3s" repeatCount="indefinite" />
                   </line>
-                  <line x1="28" y1="10" x2="42" y2="44" stroke="rgba(255,255,255,0.4)" strokeWidth="0.5">
-                    <animate attributeName="x2" values="42;38;42" dur="3.5s" repeatCount="indefinite" />
-                  </line>
-                  <line x1="28" y1="10" x2="28" y2="44" stroke="rgba(255,255,255,0.2)" strokeWidth="0.3">
-                    <animate attributeName="opacity" values="0.2;0.4;0.2" dur="2s" repeatCount="indefinite" />
+                  <line x1="28" y1="10" x2="41" y2="44" stroke="white" strokeWidth="0.4">
+                    <animate attributeName="x2" values="41;37;41" dur="3.5s" repeatCount="indefinite" />
                   </line>
                 </g>
                 {/* Eye */}
-                <circle cx="28" cy="30" r="5.5" fill="rgba(0,0,0,0.35)" />
-                <circle cx="28" cy="30" r="3.5" fill="rgba(255,255,255,0.9)">
-                  <animate attributeName="r" values="3.5;4;3.5" dur="2s" repeatCount="indefinite" />
+                <circle cx="28" cy="30" r="5" fill="rgba(0,0,0,0.35)" />
+                <circle cx="28" cy="30" r="3.2" fill="rgba(255,255,255,0.9)">
+                  <animate attributeName="r" values="3.2;3.6;3.2" dur="2s" repeatCount="indefinite" />
                 </circle>
-                <circle cx="28" cy="30" r="1.8" fill="#050510" />
-                <circle cx="29.5" cy="28.5" r="0.9" fill="rgba(255,255,255,0.9)" />
-                {/* Light beam entering prism */}
-                <line x1="0" y1="24" x2="18" y2="28" stroke="rgba(255,255,255,0.5)" strokeWidth="2.5" strokeLinecap="round">
-                  <animate attributeName="opacity" values="0.5;0.25;0.5" dur="2.5s" repeatCount="indefinite" />
-                </line>
-                {/* Rainbow refraction rays exiting prism */}
-                <g opacity="0.75">
-                  <line x1="42" y1="28" x2="56" y2="18" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round">
-                    <animate attributeName="x2" values="56;52;56" dur="2.2s" repeatCount="indefinite" />
-                    <animate attributeName="opacity" values="0.8;0.5;0.8" dur="3s" repeatCount="indefinite" />
+                <circle cx="28" cy="30" r="1.6" fill="#050510" />
+                <circle cx="29.3" cy="28.5" r="0.8" fill="white" />
+                {/* Prismatic light rays - realistic glowing beams */}
+                <g filter="url(#ray-glow)">
+                  <line x1="42" y1="26" x2="64" y2="14" stroke="url(#ray-red)" strokeWidth="2.5" strokeLinecap="round">
+                    <animate attributeName="y2" values="14;16;14" dur="2.2s" repeatCount="indefinite" />
                   </line>
-                  <line x1="43" y1="30" x2="56" y2="24" stroke="#f59e0b" strokeWidth="1.5" strokeLinecap="round">
-                    <animate attributeName="x2" values="56;53;56" dur="2.5s" repeatCount="indefinite" />
+                  <line x1="43" y1="29" x2="64" y2="22" stroke="url(#ray-orange)" strokeWidth="2.2" strokeLinecap="round">
+                    <animate attributeName="y2" values="22;24;22" dur="2.5s" repeatCount="indefinite" />
                   </line>
-                  <line x1="44" y1="32" x2="56" y2="30" stroke="#22c55e" strokeWidth="1.5" strokeLinecap="round">
-                    <animate attributeName="x2" values="56;54;56" dur="2.8s" repeatCount="indefinite" />
+                  <line x1="44" y1="32" x2="64" y2="30" stroke="url(#ray-green)" strokeWidth="2" strokeLinecap="round">
+                    <animate attributeName="y2" values="30;32;30" dur="2.8s" repeatCount="indefinite" />
                   </line>
-                  <line x1="44" y1="34" x2="56" y2="36" stroke="#38bdf8" strokeWidth="1.5" strokeLinecap="round">
-                    <animate attributeName="x2" values="56;53;56" dur="2.3s" repeatCount="indefinite" />
+                  <line x1="44" y1="35" x2="64" y2="38" stroke="url(#ray-blue)" strokeWidth="2.2" strokeLinecap="round">
+                    <animate attributeName="y2" values="38;36;38" dur="2.3s" repeatCount="indefinite" />
                   </line>
-                  <line x1="43" y1="36" x2="56" y2="42" stroke="#7c3aed" strokeWidth="1.5" strokeLinecap="round">
-                    <animate attributeName="x2" values="56;52;56" dur="2.6s" repeatCount="indefinite" />
+                  <line x1="43" y1="38" x2="64" y2="46" stroke="url(#ray-purple)" strokeWidth="2.5" strokeLinecap="round">
+                    <animate attributeName="y2" values="46;44;46" dur="2.6s" repeatCount="indefinite" />
                   </line>
-                  <line x1="42" y1="38" x2="56" y2="48" stroke="#ec4899" strokeWidth="1.5" strokeLinecap="round">
-                    <animate attributeName="x2" values="56;51;56" dur="2.1s" repeatCount="indefinite" />
+                  <line x1="42" y1="41" x2="64" y2="54" stroke="url(#ray-pink)" strokeWidth="2" strokeLinecap="round">
+                    <animate attributeName="y2" values="54;52;54" dur="2.1s" repeatCount="indefinite" />
                   </line>
                 </g>
               </svg>
