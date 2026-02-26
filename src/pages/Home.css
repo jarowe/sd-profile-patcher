@@ -518,6 +518,16 @@
 .hero-avatar {
     cursor: pointer;
     transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s;
+    overflow: hidden;
+    position: relative;
+}
+
+.avatar-photo-inner {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background-size: cover;
+    background-position: center;
 }
 
 .hero-avatar:hover {

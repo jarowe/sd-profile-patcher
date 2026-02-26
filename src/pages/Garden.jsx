@@ -289,6 +289,56 @@ export default function Garden() {
     const container = useRef();
     const [activeNote, setActiveNote] = useState(null);
 
+    // Gallery drag-to-scroll + wheel-to-scroll
+    const galleryScrollRef = useRef(null);
+    const isDragging = useRef(false);
+    const dragStartX = useRef(0);
+    const dragScrollLeft = useRef(0);
+
+    // Attach wheel handler (needs passive: false to preventDefault)
+    useEffect(() => {
+        const el = galleryScrollRef.current;
+        if (!el) return;
+
+        const handleWheel = (e) => {
+            if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+                e.preventDefault();
+                el.scrollLeft += e.deltaY;
+            }
+        };
+
+        el.addEventListener('wheel', handleWheel, { passive: false });
+        return () => el.removeEventListener('wheel', handleWheel);
+    }, [activeNote]);
+
+    const handleGalleryMouseDown = useCallback((e) => {
+        const el = galleryScrollRef.current;
+        if (!el) return;
+        isDragging.current = true;
+        dragStartX.current = e.pageX;
+        dragScrollLeft.current = el.scrollLeft;
+        el.style.cursor = 'grabbing';
+        el.style.scrollSnapType = 'none';
+    }, []);
+
+    const handleGalleryMouseUp = useCallback(() => {
+        isDragging.current = false;
+        const el = galleryScrollRef.current;
+        if (el) {
+            el.style.cursor = '';
+            el.style.scrollSnapType = '';
+        }
+    }, []);
+
+    const handleGalleryMouseMove = useCallback((e) => {
+        if (!isDragging.current) return;
+        e.preventDefault();
+        const el = galleryScrollRef.current;
+        if (!el) return;
+        const walk = (e.pageX - dragStartX.current) * 1.5;
+        el.scrollLeft = dragScrollLeft.current - walk;
+    }, []);
+
     useGSAP(() => {
         gsap.from('.garden-header', {
             y: -20, opacity: 0, duration: 0.8, ease: 'power3.out'
@@ -472,7 +522,14 @@ export default function Garden() {
                                         animate={{ y: 0, opacity: 1 }}
                                         transition={{ delay: 0.5 }}
                                     >
-                                        <div className="gallery-scroll">
+                                        <div
+                                            className="gallery-scroll"
+                                            ref={galleryScrollRef}
+                                            onMouseDown={handleGalleryMouseDown}
+                                            onMouseMove={handleGalleryMouseMove}
+                                            onMouseUp={handleGalleryMouseUp}
+                                            onMouseLeave={handleGalleryMouseUp}
+                                        >
                                             {activeNote.gallery.map((src, i) => (
                                                 <div key={i} className="gallery-item">
                                                     <img
@@ -480,6 +537,7 @@ export default function Garden() {
                                                         alt={`${activeNote.title} photo ${i + 1}`}
                                                         className="gallery-photo"
                                                         loading="lazy"
+                                                        draggable={false}
                                                     />
                                                 </div>
                                             ))}

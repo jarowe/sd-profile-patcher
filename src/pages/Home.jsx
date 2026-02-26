@@ -37,6 +37,18 @@ const currentlyMessages = [
 
 const avatarEffects = ['float', 'glitch', 'spin', 'ripple'];
 
+const avatarPhotos = [
+  'headshot.jpg',
+  'family-alps.jpg',
+  'couple-golden-hour.jpg',
+  'boys-selfie.jpg',
+  'greek-island.jpg',
+  '514485957_10106849219267053_8426182179315507744_n.jpg',
+  '514538141_18508719016008994_6802406149798537855_n.jpg',
+  'rooftop-social.jpg',
+  'jaredIMG_4650-3smVbD.jpg',
+];
+
 const expeditions = [
   // Europe
   { lat: 36.43, lng: -5.15, name: 'Estepona, Spain', region: 'europe', color: '#38bdf8', photo: 'couple-golden-hour.jpg' },
@@ -116,66 +128,97 @@ export default function Home() {
   useEffect(() => {
     if (!globeMounted || !globeRef.current) return;
 
-    const globe = globeRef.current;
-    const controls = globe.controls();
-    controls.autoRotate = true;
-    controls.autoRotateSpeed = 1.2;
-    controls.enableZoom = true;
-    controls.minDistance = 80;
-    controls.maxDistance = 400;
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
+    let handleStart, handleEnd;
 
-    // Cinematic entrance: start zoomed far out, dramatically sweep down to first location
-    globe.pointOfView({ lat: 20, lng: 0, altitude: 3.5 });
-    setTimeout(() => {
-      if (globeRef.current) {
-        const first = expeditions[0];
-        globeRef.current.pointOfView({ lat: first.lat, lng: first.lng, altitude: 0.4 }, 4000);
+    // Defer setup to ensure Three.js internals are fully initialized
+    const initTimer = setTimeout(() => {
+      const globe = globeRef.current;
+      if (!globe) return;
+
+      try {
+        const controls = globe.controls();
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 1.2;
+        controls.enableZoom = true;
+        controls.minDistance = 80;
+        controls.maxDistance = 400;
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // Cinematic entrance
+        globe.pointOfView({ lat: 20, lng: 0, altitude: 3.5 });
+        setTimeout(() => {
+          if (globeRef.current) {
+            const first = expeditions[0];
+            globeRef.current.pointOfView({ lat: first.lat, lng: first.lng, altitude: 0.4 }, 4000);
+          }
+        }, 300);
+
+        // Enhance Globe Material (may not be ready, wrap in try)
+        try {
+          const globeMaterial = globe.globeMaterial();
+          globeMaterial.color = new Color(0xffffff);
+          globeMaterial.emissive = new Color(0x1a1040);
+          globeMaterial.emissiveIntensity = 0.3;
+          globeMaterial.roughness = 0.3;
+          globeMaterial.metalness = 0.7;
+        } catch (_) {
+          // Material not ready yet, try once more after a frame
+          requestAnimationFrame(() => {
+            try {
+              const gm = globe.globeMaterial();
+              gm.color = new Color(0xffffff);
+              gm.emissive = new Color(0x1a1040);
+              gm.emissiveIntensity = 0.3;
+              gm.roughness = 0.3;
+              gm.metalness = 0.7;
+            } catch (_) { /* Globe material unavailable, skip */ }
+          });
+        }
+
+        // Pause autoRotate on interaction, resume after 4s
+        handleStart = () => {
+          isUserInteracting.current = true;
+          controls.autoRotate = false;
+          if (autoRotateTimer.current) clearTimeout(autoRotateTimer.current);
+          if (globeCycleTimer.current) clearInterval(globeCycleTimer.current);
+        };
+        handleEnd = () => {
+          autoRotateTimer.current = setTimeout(() => {
+            isUserInteracting.current = false;
+            controls.autoRotateSpeed = 0;
+            controls.autoRotate = true;
+            const ramp = setInterval(() => {
+              if (controls.autoRotateSpeed < 1.2) {
+                controls.autoRotateSpeed += 0.03;
+              } else {
+                controls.autoRotateSpeed = 1.2;
+                clearInterval(ramp);
+              }
+            }, 50);
+            startGlobeCycle();
+          }, 4000);
+        };
+
+        controls.addEventListener('start', handleStart);
+        controls.addEventListener('end', handleEnd);
+
+        // Start auto-cycling after initial animation
+        setTimeout(() => startGlobeCycle(), 6000);
+      } catch (e) {
+        console.warn('Globe init deferred:', e);
       }
     }, 300);
 
-    // Enhance Globe Material
-    const globeMaterial = globe.globeMaterial();
-    globeMaterial.color = new Color(0xffffff);
-    globeMaterial.emissive = new Color(0x1a1040);
-    globeMaterial.emissiveIntensity = 0.3;
-    globeMaterial.roughness = 0.3;
-    globeMaterial.metalness = 0.7;
-
-    // Pause autoRotate on interaction, resume after 4s
-    const handleStart = () => {
-      isUserInteracting.current = true;
-      controls.autoRotate = false;
-      if (autoRotateTimer.current) clearTimeout(autoRotateTimer.current);
-      if (globeCycleTimer.current) clearInterval(globeCycleTimer.current);
-    };
-    const handleEnd = () => {
-      autoRotateTimer.current = setTimeout(() => {
-        isUserInteracting.current = false;
-        controls.autoRotateSpeed = 0;
-        controls.autoRotate = true;
-        const ramp = setInterval(() => {
-          if (controls.autoRotateSpeed < 1.2) {
-            controls.autoRotateSpeed += 0.03;
-          } else {
-            controls.autoRotateSpeed = 1.2;
-            clearInterval(ramp);
-          }
-        }, 50);
-        startGlobeCycle();
-      }, 4000);
-    };
-
-    controls.addEventListener('start', handleStart);
-    controls.addEventListener('end', handleEnd);
-
-    // Start auto-cycling after initial animation
-    setTimeout(() => startGlobeCycle(), 6000);
-
     return () => {
-      controls.removeEventListener('start', handleStart);
-      controls.removeEventListener('end', handleEnd);
+      clearTimeout(initTimer);
+      if (globeRef.current && handleStart) {
+        try {
+          const controls = globeRef.current.controls();
+          controls.removeEventListener('start', handleStart);
+          controls.removeEventListener('end', handleEnd);
+        } catch (_) {}
+      }
       if (autoRotateTimer.current) clearTimeout(autoRotateTimer.current);
       if (globeCycleTimer.current) clearInterval(globeCycleTimer.current);
     };
@@ -287,10 +330,19 @@ export default function Home() {
     playClickSound();
   }, [activeExpedition]);
 
-  // Avatar click effects
+  // Avatar click effects + photo cycling
   const [avatarEffect, setAvatarEffect] = useState(null);
+  const [avatarPhotoIdx, setAvatarPhotoIdx] = useState(0);
   const avatarClickCount = useRef(0);
   const avatarDiscovered = useRef(localStorage.getItem('jarowe_avatar_discovered') === 'true');
+
+  // Auto-cycle avatar photos every 6 seconds
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setAvatarPhotoIdx(prev => (prev + 1) % avatarPhotos.length);
+    }, 6000);
+    return () => clearInterval(timer);
+  }, []);
 
   const handleAvatarClick = useCallback((e) => {
     e.stopPropagation();
@@ -298,6 +350,9 @@ export default function Home() {
     setAvatarEffect(avatarEffects[effectIndex]);
     avatarClickCount.current++;
     playClickSound();
+
+    // Advance to next photo on click
+    setAvatarPhotoIdx(prev => (prev + 1) % avatarPhotos.length);
 
     if (avatarEffects[effectIndex] === 'ripple') {
       confetti({
@@ -356,6 +411,14 @@ export default function Home() {
     "I see everything...",
     "Did you try the cipher?",
     "Go explore the universe!",
+    "I'm made of pure light!",
+    "Refraction is my cardio",
+    "The boys would love me",
+    "I've been to Greece too!",
+    "Click the avatar... trust me",
+    "Type 'vault' for a surprise!",
+    "Your vibes are immaculate",
+    "I'm basically a disco ball",
   ];
 
   useEffect(() => {
@@ -426,18 +489,29 @@ export default function Home() {
               <div className="hero-header">
                 <div
                   className={`hero-avatar ${avatarEffect ? `avatar-${avatarEffect}` : ''}`}
-                  style={{ backgroundImage: `url(${BASE}images/headshot.jpg)` }}
                   onClick={handleAvatarClick}
                   role="button"
                   tabIndex={0}
-                ></div>
+                >
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={avatarPhotoIdx}
+                      className="avatar-photo-inner"
+                      style={{ backgroundImage: `url(${BASE}images/${avatarPhotos[avatarPhotoIdx]})` }}
+                      initial={{ opacity: 0, scale: 1.1 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{ duration: 0.8 }}
+                    />
+                  </AnimatePresence>
+                </div>
                 <div className="hero-titles">
                   <h1>Jared Rowe</h1>
                   <h2>Dad. Builder. Noise Maker.</h2>
                 </div>
               </div>
               <p className="hero-bio">
-                I build things that shouldn't exist yet. By day I'm shaping the creative tools ecosystem at Elgato. By night I'm running Starseed Labs. And somehow in between, my wife and I are dragging three boys across the planet and calling it school.
+                Worldschooling dad of three. Maria and I traded the traditional classroom for the Austrian Alps, Greek islands, and everywhere in between. By day I shape creative tools at Elgato, by night I build at Starseed Labs. The whole world is our school.
               </p>
             </div>
           </div>
