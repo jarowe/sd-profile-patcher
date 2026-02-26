@@ -993,20 +993,47 @@ export default function Home() {
                 globe.cloudMesh.rotation.y += dt * 0.008;
               }
 
-              // Animate lens flare (subtle ray rotation + breathing)
+              // Animate lens flare with occlusion (fades behind globe)
               if (globe.lensFlare) {
                 const lf = globe.lensFlare;
+                const camera = globe.camera();
+                const flareWorldPos = lf.main.position.clone();
+
+                // Occlusion: raycast from camera toward sun, check if globe blocks it
+                let occlusionTarget = 0;
+                if (camera && !globe._flareRaycaster) {
+                  globe._flareRaycaster = new THREE.Raycaster();
+                  globe._flareOcclusion = 0;
+                }
+                if (globe._flareRaycaster && camera) {
+                  const dir = flareWorldPos.clone().sub(camera.position).normalize();
+                  globe._flareRaycaster.set(camera.position, dir);
+                  const hits = globe._flareRaycaster.intersectObjects(scene.children, false);
+                  const sunDist = camera.position.distanceTo(flareWorldPos);
+                  occlusionTarget = (hits.length > 0 && hits[0].distance < sunDist) ? 1.0 : 0.0;
+                  // Smooth transition
+                  globe._flareOcclusion += (occlusionTarget - globe._flareOcclusion) * dt * 3.0;
+                }
+                const flareVis = 1.0 - (globe._flareOcclusion || 0);
+
                 if (lf.rays) {
                   lf.rays.material.rotation = elTs * 0.05;
-                  lf.rays.material.opacity = 0.35 + Math.sin(elTs * 0.8) * 0.1;
+                  lf.rays.material.opacity = (0.4 + Math.sin(elTs * 0.8) * 0.12) * flareVis;
                 }
                 if (lf.main) {
-                  const breathe = 1.0 + Math.sin(elTs * 1.2) * 0.08;
-                  lf.main.scale.set(60 * breathe, 60 * breathe, 1);
+                  const breathe = 1.0 + Math.sin(elTs * 1.2) * 0.1;
+                  lf.main.scale.set(70 * breathe, 70 * breathe, 1);
+                  lf.main.material.opacity = 0.8 * flareVis;
                 }
                 if (lf.halo) {
-                  const hBreath = 1.0 + Math.sin(elTs * 0.5) * 0.05;
-                  lf.halo.scale.set(250 * hBreath, 250 * hBreath, 1);
+                  const hBreath = 1.0 + Math.sin(elTs * 0.5) * 0.06;
+                  lf.halo.scale.set(280 * hBreath, 280 * hBreath, 1);
+                  lf.halo.material.opacity = 0.3 * flareVis;
+                }
+                if (lf.artifacts) {
+                  lf.artifacts.forEach(a => {
+                    a.material.opacity = a.material.opacity > 0 ? a.material.opacity * flareVis : 0;
+                  });
                 }
               }
 
