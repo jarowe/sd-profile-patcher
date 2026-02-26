@@ -1,0 +1,152 @@
+.cipher-game-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+}
+
+.cipher-header {
+    color: #fff;
+    font-weight: bold;
+    font-size: 1.2rem;
+    font-family: var(--font-display);
+    letter-spacing: 2px;
+    margin-bottom: 2px;
+}
+
+.cipher-subtitle {
+    color: #888;
+    font-size: 0.75rem;
+    margin-bottom: 12px;
+    text-align: center;
+}
+
+.cipher-grid {
+    display: grid;
+    grid-template-rows: repeat(6, 1fr);
+    gap: 4px;
+    margin-bottom: 12px;
+}
+
+.cipher-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 4px;
+}
+
+.cipher-row.shake {
+    animation: shake 0.5s;
+}
+
+@keyframes shake {
+    0% {
+        transform: translate(1px, 1px) rotate(0deg);
+    }
+
+    10% {
+        transform: translate(-1px, -2px) rotate(-1deg);
+    }
+
+    20% {
+        transform: translate(-3px, 0px) rotate(1deg);
+    }
+
+    30% {
+        transform: translate(3px, 2px) rotate(0deg);
+    }
+
+    40% {
+        transform: translate(1px, -1px) rotate(1deg);
+    }
+
+    50% {
+        transform: translate(-1px, 2px) rotate(-1deg);
+    }
+
+    60% {
+        transform: translate(-3px, 1px) rotate(0deg);
+    }
+
+    70% {
+        transform: translate(3px, 1px) rotate(-1deg);
+    }
+
+    80% {
+        transform: translate(-1px, -1px) rotate(1deg);
+    }
+
+    90% {
+        transform: translate(1px, 2px) rotate(0deg);
+    }
+
+    100% {
+        transform: translate(1px, -2px) rotate(-1deg);
+    }
+}
+
+.cipher-cell {
+    width: 32px;
+    height: 32px;
+    background: #1a1a1a;
+    border: 2px solid #333;
+    border-radius: 4px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #fff;
+    text-transform: uppercase;
+    transition: all 0.3s ease;
+}
+
+.cipher-cell.filled {
+    border-color: #7c3aed;
+    box-shadow: 0 0 10px rgba(124, 58, 237, 0.2);
+}
+
+.cipher-cell.submitted {
+    transform: rotateX(180deg);
+    animation: flipIn 0.5s forwards;
+    box-shadow: none;
+    border-color: transparent;
+}
+
+@keyframes flipIn {
+    to {
+        transform: rotateX(0);
+    }
+}
+
+.cipher-cell.correct {
+    background-color: #22c55e;
+}
+
+.cipher-cell.present {
+    background-color: #fbbf24;
+}
+
+.cipher-cell.absent {
+    background-color: #4b5563;
+}
+
+.cipher-message {
+    font-weight: bold;
+    font-size: 0.85rem;
+    text-align: center;
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin-top: 8px;
+}
+
+.cipher-message.success {
+    background: rgba(34, 197, 94, 0.2);
+    color: #22c55e;
+    border: 1px solid rgba(34, 197, 94, 0.5);
+}
+
+.cipher-message.error {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.5);
+}

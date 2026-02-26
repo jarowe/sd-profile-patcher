@@ -1,0 +1,143 @@
+.music-suno-active {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+}
+
+.music-top {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.music-art-icon {
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #7c3aed, #38bdf8, #f472b6, #7c3aed);
+    background-size: 300% 300%;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 15px rgba(124, 58, 237, 0.4);
+}
+
+.music-art-icon.playing {
+    animation: rotateGradient 4s ease infinite;
+}
+
+@keyframes rotateGradient {
+    0% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 100% 50%;
+    }
+
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+.music-meta {
+    margin-top: 1.5rem;
+}
+
+.music-meta .song-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 0.2rem;
+}
+
+.music-meta .song-artist {
+    font-size: 0.9rem;
+    color: #a1a1aa;
+}
+
+.music-controls-bar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.control-btn {
+    border: none;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.2s, background-color 0.2s;
+}
+
+.play-btn {
+    width: 44px;
+    height: 44px;
+    background: #fff;
+    color: #000;
+}
+
+.play-btn:hover {
+    transform: scale(1.05);
+    background: #eee;
+}
+
+.next-btn {
+    width: 36px;
+    height: 36px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    backdrop-filter: blur(5px);
+}
+
+.next-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Spotify Active State */
+.music-spotify-active {
+    background-size: cover;
+    background-position: center;
+    position: relative;
+    padding: 0;
+    overflow: hidden;
+}
+
+.spotify-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.3));
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 1.5rem;
+}
+
+.spotify-overlay .music-art {
+    margin-bottom: 0.5rem;
+}
+
+.spotify-overlay .now-playing {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 0.2rem;
+}
+
+.spotify-overlay .song-title {
+    font-size: 1.4rem;
+    font-weight: bold;
+    color: #fff;
+    margin-bottom: 0.2rem;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.spotify-overlay .song-artist {
+    font-size: 1rem;
+    color: #ddd;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}

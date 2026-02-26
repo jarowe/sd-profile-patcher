@@ -22,63 +22,194 @@
     font-size: 1.2rem;
 }
 
-.garden-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 2rem;
+.garden-timeline {
+    position: relative;
+    max-width: 800px;
+    margin: 4rem auto;
+    padding: 2rem 0;
 }
 
-.garden-card {
+.vine-line {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(180deg, transparent, rgba(167, 139, 250, 0.3) 10%, rgba(56, 189, 248, 0.3) 90%, transparent);
+    transform: translateX(-50%);
+    border-radius: 2px;
+}
+
+.garden-node {
+    position: relative;
+    width: 50%;
+    padding: 2rem 3rem;
+    box-sizing: border-box;
+}
+
+.garden-node.left {
+    left: 0;
+    text-align: right;
+}
+
+.garden-node.right {
+    left: 50%;
+    text-align: left;
+}
+
+.vine-bud {
+    position: absolute;
+    top: 50%;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    transform: translateY(-50%);
+    box-shadow: 0 0 10px currentColor;
+    z-index: 2;
+}
+
+.garden-node.left .vine-bud {
+    right: -7px;
+}
+
+.garden-node.right .vine-bud {
+    left: -7px;
+}
+
+.node-content {
     padding: 2rem;
     display: flex;
     flex-direction: column;
-    transition: all 0.3s ease;
-    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    background: rgba(20, 20, 25, 0.6);
 }
 
-.garden-card:hover {
-    transform: translateY(-5px);
-    border-color: rgba(124, 58, 237, 0.4);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+.node-content:hover {
+    transform: scale(1.02);
+    border-color: rgba(167, 139, 250, 0.5);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
 }
 
-.card-top {
+.garden-node.left .node-content {
+    align-items: flex-end;
+}
+
+.garden-node.right .node-content {
+    align-items: flex-start;
+}
+
+.node-header {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: 1.5rem;
+    gap: 1rem;
+    margin-bottom: 1rem;
 }
 
-.garden-card h2 {
-    font-size: 1.3rem;
+.garden-node.left .node-header {
+    flex-direction: row-reverse;
+}
+
+.node-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+}
+
+.garden-node h2 {
+    font-size: 1.5rem;
     color: #fff;
     margin-bottom: 0.5rem;
+    font-family: var(--font-display);
 }
 
-.garden-card .date {
+.garden-node .date {
     font-size: 0.85rem;
     color: var(--accent-secondary);
     font-weight: 600;
     margin-bottom: 1rem;
 }
 
-.garden-card .excerpt {
-    color: #ccc;
+.garden-node .excerpt {
+    color: #a1a1aa;
     line-height: 1.6;
-    flex: 1;
-    margin-bottom: 1.5rem;
 }
 
-.read-more {
+.note-expanded {
+    overflow: hidden;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.note-paragraph {
+    color: #d4d4d8;
+    line-height: 1.8;
+    font-size: 0.95rem;
+    margin-bottom: 1rem;
+}
+
+.note-paragraph:last-child {
+    margin-bottom: 0;
+}
+
+.read-toggle {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    font-family: var(--font-display);
-    font-weight: bold;
-    color: var(--text-muted);
-    transition: color 0.2s;
+    gap: 6px;
+    margin-top: 1rem;
+    font-size: 0.8rem;
+    color: #7c3aed;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
 }
 
-.garden-card:hover .read-more {
-    color: var(--accent-primary);
+.node-content.expanded {
+    border-color: rgba(124, 58, 237, 0.4);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(124, 58, 237, 0.2);
+}
+
+.garden-node.left .read-toggle {
+    justify-content: flex-end;
+}
+
+.garden-node.left .note-paragraph {
+    text-align: left;
+}
+
+@media (max-width: 768px) {
+    .vine-line {
+        left: 20px;
+    }
+
+    .garden-node {
+        width: 100%;
+        padding-left: 60px;
+        padding-right: 0;
+        text-align: left;
+    }
+
+    .garden-node.left,
+    .garden-node.right {
+        left: 0;
+    }
+
+    .garden-node.left .vine-bud,
+    .garden-node.right .vine-bud {
+        left: 13px;
+        /* 20px - 7px */
+        right: auto;
+    }
+
+    .garden-node.left .node-content {
+        align-items: flex-start;
+    }
+
+    .garden-node.left .node-header {
+        flex-direction: row;
+    }
 }

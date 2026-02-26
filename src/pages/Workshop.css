@@ -1,0 +1,138 @@
+.workshop-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 6rem 2rem 4rem 2rem;
+    color: #fff;
+}
+
+.workshop-header {
+    text-align: center;
+    margin-bottom: 4rem;
+}
+
+.workshop-header h1 {
+    font-family: var(--font-display);
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+}
+
+.workshop-header p {
+    color: #a1a1aa;
+    max-width: 600px;
+    margin: 0 auto;
+    font-size: 1.1rem;
+    line-height: 1.6;
+}
+
+.workshop-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+}
+
+.workshop-card {
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    transform-style: preserve-3d;
+    background: rgba(30, 30, 40, 0.4);
+    min-height: 350px;
+    will-change: transform;
+}
+
+.card-bg-image {
+    position: absolute;
+    inset: -5%;
+    /* slightly larger to avoid clipping during tilt */
+    background-size: cover;
+    background-position: center;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    z-index: 0;
+    transform: translateZ(-20px);
+}
+
+.workshop-card:hover .card-bg-image {
+    opacity: 0.25;
+    /* Reveal slowly on hover */
+}
+
+/* Base content wrapper pushed up in Z space */
+.card-content-wrapper {
+    position: relative;
+    z-index: 2;
+    transform: translateZ(30px);
+    /* Brings content forward relative to the card base */
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.workshop-card:hover {
+    background: rgba(30, 30, 40, 0.8);
+    border-color: rgba(167, 139, 250, 0.4);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+}
+
+.workshop-card .card-top {
+    margin-bottom: 1.5rem;
+    transform: translateZ(20px);
+}
+
+.workshop-card h2 {
+    font-family: var(--font-display);
+    font-size: 1.8rem;
+    margin-bottom: 0.5rem;
+    color: #f4f4f5;
+    transform: translateZ(40px);
+}
+
+.workshop-card .description {
+    color: #a1a1aa;
+    line-height: 1.6;
+    margin-bottom: 2rem;
+    flex-grow: 1;
+    transform: translateZ(25px);
+}
+
+.workshop-card .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+    transform: translateZ(30px);
+}
+
+.tool-tag {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 0.2rem 0.6rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    color: #d4d4d8;
+}
+
+.launch-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #a78bfa;
+    font-weight: 600;
+    transition: color 0.2s ease, gap 0.2s ease;
+    transform: translateZ(35px);
+}
+
+.workshop-card:hover .launch-btn {
+    color: #c4b5fd;
+    gap: 0.75rem;
+}

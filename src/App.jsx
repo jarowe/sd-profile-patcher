@@ -9,30 +9,41 @@ const UniversePage = React.lazy(() => import('./pages/UniversePage'));
 import GameOverlay from './components/GameOverlay';
 import Garden from './pages/Garden';
 import Now from './pages/Now';
+import Workshop from './pages/Workshop';
+import Favorites from './pages/Favorites';
+import Vault from './pages/Vault';
+import { AudioProvider } from './context/AudioContext';
+import GlobalPlayer from './components/GlobalPlayer';
 
 function App() {
   return (
-    <Router basename={import.meta.env.BASE_URL}>
-      <div className="app-container">
-        <Navbar />
-        <main className="main-content">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/tools/sd-profile-patcher" element={<Patcher />} />
-            <Route path="/projects/beamy" element={<BeamyProject />} />
-            <Route path="/projects/starseed" element={<StarseedProject />} />
-            <Route path="/universe" element={
-              <Suspense fallback={<div style={{ color: 'white', padding: '2rem', textAlign: 'center' }}>Loading Universe...</div>}>
-                <UniversePage />
-              </Suspense>
-            } />
-            <Route path="/garden" element={<Garden />} />
-            <Route path="/now" element={<Now />} />
-          </Routes>
-          <GameOverlay />
-        </main>
-      </div>
-    </Router>
+    <AudioProvider>
+      <Router basename={import.meta.env.BASE_URL}>
+        <div className="app-container">
+          <Navbar />
+          <main className="main-content">
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/tools/sd-profile-patcher" element={<Patcher />} />
+              <Route path="/projects/beamy" element={<BeamyProject />} />
+              <Route path="/projects/starseed" element={<StarseedProject />} />
+              <Route path="/workshop" element={<Workshop />} />
+              <Route path="/universe" element={
+                <Suspense fallback={<div style={{ color: 'white', padding: '2rem', textAlign: 'center' }}>Loading Universe...</div>}>
+                  <UniversePage />
+                </Suspense>
+              } />
+              <Route path="/garden" element={<Garden />} />
+              <Route path="/now" element={<Now />} />
+              <Route path="/favorites" element={<Favorites />} />
+              <Route path="/vault" element={<Vault />} />
+            </Routes>
+            <GameOverlay />
+            <GlobalPlayer />
+          </main>
+        </div>
+      </Router>
+    </AudioProvider>
   );
 }
 

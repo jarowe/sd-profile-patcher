@@ -1,15 +1,31 @@
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Github, Twitter, Linkedin, Wrench, Instagram } from 'lucide-react';
-import './Navbar.css'; // We'll create a dedicated css file
+import { Github, Linkedin, Wrench, Instagram, Volume2, VolumeX } from 'lucide-react';
+import { useState } from 'react';
+import { getMuted, setMuted, playClickSound } from '../utils/sounds';
+import './Navbar.css';
 
 export default function Navbar() {
     const location = useLocation();
 
     const links = [
         { name: 'Home', path: '/' },
-        { name: 'SD Patcher', path: '/tools/sd-profile-patcher' },
+        { name: 'Workshop', path: '/workshop' },
+        { name: 'Garden', path: '/garden' },
+        { name: 'Now', path: '/now' }
     ];
+
+    const [isMuted, setIsMuted] = useState(getMuted());
+
+    const toggleMute = () => {
+        const newState = !isMuted;
+        setMuted(newState);
+        setIsMuted(newState);
+        if (!newState) {
+            // Play a tiny sound after unmuting to confirm
+            setTimeout(playClickSound, 50);
+        }
+    };
 
     return (
         <nav className="navbar glass-panel">
@@ -39,10 +55,12 @@ export default function Navbar() {
                 </div>
 
                 <div className="nav-socials">
-                    <a href="https://x.com/jaredalanrowe" target="_blank" rel="noreferrer" className="social-icon">
-                        <Twitter size={18} />
+                    <a href="https://x.com/jaredalanrowe" target="_blank" rel="noreferrer" className="social-icon" title="X (Twitter)">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                        </svg>
                     </a>
-                    <a href="https://www.linkedin.com/in/jaredalanrowe/" target="_blank" rel="noreferrer" className="social-icon">
+                    <a href="https://linkedin.com/in/jaredalanrowe" target="_blank" rel="noreferrer" className="social-icon" title="LinkedIn">
                         <Linkedin size={18} />
                     </a>
                     <a href="https://www.instagram.com/jaredrowe/" target="_blank" rel="noreferrer" className="social-icon">
@@ -51,6 +69,15 @@ export default function Navbar() {
                     <a href="https://starseed.llc/" target="_blank" rel="noreferrer" className="social-icon" title="Starseed Labs">
                         <Wrench size={18} />
                     </a>
+
+                    <button
+                        onClick={toggleMute}
+                        className="social-icon"
+                        title={isMuted ? "Unmute UI Sounds" : "Mute UI Sounds"}
+                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', outline: 'none', marginLeft: '8px' }}
+                    >
+                        {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                    </button>
                 </div>
             </div>
         </nav>
