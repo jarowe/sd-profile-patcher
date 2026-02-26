@@ -243,7 +243,7 @@ export default function Home() {
         if (!globe.oceanMaterialSet) {
           const texLoader = new THREE.TextureLoader();
           const earthTex = texLoader.load('//unpkg.com/three-globe/example/img/earth-blue-marble.jpg');
-          const nightTex = texLoader.load('//cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/textures/planets/earth_night_4096.jpg');
+          const nightTex = texLoader.load('//cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/textures/planets/earth_lights_2048.png');
           const waterTex = texLoader.load('//unpkg.com/three-globe/example/img/earth-water.png');
           // 4K packed texture: R=bump, G=roughness, B=clouds (Bobby Roe / three.js Journey approach)
           const packedTex = texLoader.load('//cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/textures/planets/earth_bump_roughness_clouds_4096.jpg');
@@ -332,12 +332,14 @@ export default function Home() {
                 float roughness = packed.g;
                 float landSpec = (1.0 - roughness) * pow(max(dot(vNormal, halfDir), 0.0), 60.0) * 0.12;
                 landDay += vec3(0.7, 0.75, 0.8) * landSpec;
-                vec3 landNight = nightCol * 1.8;
+                // City lights: boost bright areas exponentially for visible glow
+                float lightPeak = max(max(nightCol.r, nightCol.g), nightCol.b);
+                vec3 landNight = nightCol * 2.5 + nightCol * lightPeak * 4.0;
                 vec3 landColor = mix(landNight, landDay, dayStrength);
 
                 // --- WATER: animated undulating ocean + specular + Fresnel ---
-                vec2 waveUv = vUv * 120.0;
-                vec2 bigWaveUv = vUv * 30.0;
+                vec2 waveUv = vUv * 1200.0;
+                vec2 bigWaveUv = vUv * 300.0;
                 float t = time * 0.12;
 
                 // Large ocean swells (visible undulation)
@@ -377,7 +379,10 @@ export default function Home() {
                   + vec3(0.9, 0.85, 0.7) * glare * 0.5
                   + skyReflection * wFresnel * 0.5
                   + vec3(0.3, 0.5, 0.8) * waves * audioPulse * 0.3;
-                vec3 waterNight = deepSea * 0.15 + vec3(0.01, 0.02, 0.05) * bigWaves;
+                // Night water reflects city light glow from nearby land
+                float cityGlow = max(max(nightCol.r, nightCol.g), nightCol.b);
+                vec3 waterNight = deepSea * 0.2 + vec3(0.01, 0.02, 0.05) * bigWaves
+                  + vec3(0.8, 0.6, 0.3) * cityGlow * 0.15;
                 vec3 waterColor = mix(waterNight, waterDay, dayStrength);
 
                 // Liquid glass shimmer on prism bop (water goes prismatic)
@@ -460,8 +465,16 @@ export default function Home() {
               varying vec3 vWorldNormal;
 
               void main() {
+                // Organic noise warp: clouds drift and distort subtly
+                vec2 cloudUv = vUv;
+                float warpX = sin(vUv.y * 10.0 + time * 0.15) * 0.004
+                            + sin(vUv.y * 25.0 + time * 0.08) * 0.002;
+                float warpY = cos(vUv.x * 8.0 + time * 0.12) * 0.003
+                            + cos(vUv.x * 20.0 + time * 0.1) * 0.001;
+                cloudUv += vec2(warpX, warpY);
+
                 // BLUE channel = cloud density in packed texture (4096x2048)
-                float cloudVal = texture2D(cloudsMap, vUv).b;
+                float cloudVal = texture2D(cloudsMap, cloudUv).b;
 
                 // Smooth threshold: only show actual clouds, not noise floor
                 float alpha = smoothstep(0.2, 0.8, cloudVal);
@@ -517,6 +530,71 @@ export default function Home() {
           cloudMesh.renderOrder = 1;  // After globe surface (0), before aurora (2)
           scene.add(cloudMesh);
           globe.cloudMesh = cloudMesh;
+        }
+
+        // --- B3. Iridescent Atmospheric Haze (noise fog between clouds and aurora) ---
+        if (!globe.hazeShell) {
+          const hazeMat = new THREE.ShaderMaterial({
+            uniforms: {
+              time: globe.customUniforms.time,
+              sunDir: { value: new THREE.Vector3(1.0, 0.5, 1.0).normalize() }
+            },
+            vertexShader: `
+              varying vec3 vNormal;
+              varying vec3 vPosition;
+              varying vec3 vWorldNormal;
+              void main() {
+                vNormal = normalize(normalMatrix * normal);
+                vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+                vPosition = (modelViewMatrix * vec4(position, 1.0)).xyz;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+              }
+            `,
+            fragmentShader: `
+              uniform float time;
+              uniform vec3 sunDir;
+              varying vec3 vNormal;
+              varying vec3 vPosition;
+              varying vec3 vWorldNormal;
+              void main() {
+                vec3 viewDir = normalize(-vPosition);
+                float rawFresnel = pow(1.0 - max(dot(viewDir, vNormal), 0.0), 2.8);
+
+                // Noise-based atmospheric fog bands
+                float n1 = sin(vWorldNormal.x * 14.0 + time * 0.2) * 0.5 + 0.5;
+                float n2 = sin(vWorldNormal.y * 10.0 + time * 0.15 + 1.5) * 0.5 + 0.5;
+                float n3 = sin(vWorldNormal.z * 12.0 + time * 0.18 + 3.0) * 0.5 + 0.5;
+                float n4 = sin((vWorldNormal.x + vWorldNormal.z) * 7.0 + time * 0.1) * 0.5 + 0.5;
+                float fogPattern = n1 * 0.3 + n2 * 0.25 + n3 * 0.25 + n4 * 0.2;
+
+                // Iridescent prismatic color cycling based on view angle
+                float sunFacing = dot(vWorldNormal, sunDir) * 0.5 + 0.5;
+                vec3 iriColor = vec3(
+                  0.3 + 0.25 * sin(rawFresnel * 8.0 + time * 0.25),
+                  0.4 + 0.25 * sin(rawFresnel * 8.0 + time * 0.25 + 2.094),
+                  0.65 + 0.2 * sin(rawFresnel * 8.0 + time * 0.25 + 4.189)
+                );
+
+                // Warm sunset on terminator zone
+                float terminator = smoothstep(0.3, 0.5, sunFacing) * smoothstep(0.7, 0.5, sunFacing);
+                iriColor = mix(iriColor, vec3(1.0, 0.5, 0.2), terminator * 0.4);
+                // Night side: deeper blue/purple
+                iriColor = mix(vec3(0.08, 0.04, 0.2), iriColor, smoothstep(0.15, 0.5, sunFacing));
+
+                float alpha = rawFresnel * fogPattern * 0.1;
+                gl_FragColor = vec4(iriColor, alpha);
+              }
+            `,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            depthTest: false,
+            side: THREE.FrontSide
+          });
+          const hazeMesh = new THREE.Mesh(new THREE.SphereGeometry(101.2, 64, 64), hazeMat);
+          hazeMesh.renderOrder = 1.5;
+          scene.add(hazeMesh);
+          globe.hazeShell = hazeMesh;
         }
 
         // --- C. Aurora Borealis Shell (depthTest off = renders OVER globe face) ---
@@ -823,39 +901,39 @@ export default function Home() {
             return new THREE.CanvasTexture(c);
           })();
 
-          const flarePos = sunDir.clone().multiplyScalar(350);
+          const flarePos = sunDir.clone().multiplyScalar(800);
 
-          // Layer 1: Main sun glow (bigger for cinematic impact)
+          // Layer 1: Main sun glow (massive cinematic star)
           const mainMat = new THREE.SpriteMaterial({
             map: mainTex, transparent: true,
             blending: THREE.AdditiveBlending,
-            depthWrite: false, depthTest: false, opacity: 0.8
+            depthWrite: false, depthTest: false, opacity: 0.9
           });
           const mainFlare = new THREE.Sprite(mainMat);
           mainFlare.position.copy(flarePos);
-          mainFlare.scale.set(80, 80, 1);
+          mainFlare.scale.set(150, 150, 1);
           scene.add(mainFlare);
 
           // Layer 2: Starburst rays
           const rayMat = new THREE.SpriteMaterial({
             map: rayTex, transparent: true,
             blending: THREE.AdditiveBlending,
-            depthWrite: false, depthTest: false, opacity: 0.55
+            depthWrite: false, depthTest: false, opacity: 0.6
           });
           const rays = new THREE.Sprite(rayMat);
           rays.position.copy(flarePos);
-          rays.scale.set(160, 160, 1);
+          rays.scale.set(300, 300, 1);
           scene.add(rays);
 
           // Layer 3: Wide halo
           const haloMat = new THREE.SpriteMaterial({
             map: haloTex, transparent: true,
             blending: THREE.AdditiveBlending,
-            depthWrite: false, depthTest: false, opacity: 0.3
+            depthWrite: false, depthTest: false, opacity: 0.35
           });
           const halo = new THREE.Sprite(haloMat);
           halo.position.copy(flarePos);
-          halo.scale.set(320, 320, 1);
+          halo.scale.set(550, 550, 1);
           scene.add(halo);
 
           // Layer 4: JJ Abrams anamorphic horizontal streak
@@ -891,7 +969,7 @@ export default function Home() {
           });
           const anamorphic = new THREE.Sprite(anamorphicMat);
           anamorphic.position.copy(flarePos);
-          anamorphic.scale.set(500, 25, 1);
+          anamorphic.scale.set(900, 40, 1);
           scene.add(anamorphic);
 
           // Lens artifacts along sun-to-center line
@@ -926,7 +1004,7 @@ export default function Home() {
               color: i % 2 === 0 ? 0x88aaff : 0xcc88ff
             });
             const s = new THREE.Sprite(mat);
-            s.position.copy(sunDir.clone().multiplyScalar(350 * (1 - t)));
+            s.position.copy(sunDir.clone().multiplyScalar(800 * (1 - t)));
             const size = 12 + i * 8;
             s.scale.set(size, size, 1);
             scene.add(s);
@@ -1235,9 +1313,10 @@ export default function Home() {
                 globe.customUniforms.audioPulse.value = (sum / 32) / 255.0;
               }
 
-              // Rotate cloud layer slowly (counter to globe rotation)
+              // Rotate cloud layer slowly (counter to globe rotation) + subtle tilt
               if (globe.cloudMesh) {
-                globe.cloudMesh.rotation.y += dt * 0.008;
+                globe.cloudMesh.rotation.y += dt * 0.012;
+                globe.cloudMesh.rotation.x = Math.sin(elTs * 0.03) * 0.005;
               }
 
               // Animate lens flare with occlusion (fades behind globe)
@@ -1269,18 +1348,18 @@ export default function Home() {
                 }
                 if (lf.main) {
                   const breathe = 1.0 + Math.sin(elTs * 1.2) * 0.12;
-                  lf.main.scale.set(90 * breathe, 90 * breathe, 1);
-                  lf.main.material.opacity = 0.85 * flareVis;
+                  lf.main.scale.set(150 * breathe, 150 * breathe, 1);
+                  lf.main.material.opacity = 0.9 * flareVis;
                 }
                 if (lf.halo) {
                   const hBreath = 1.0 + Math.sin(elTs * 0.5) * 0.08;
-                  lf.halo.scale.set(350 * hBreath, 350 * hBreath, 1);
-                  lf.halo.material.opacity = 0.35 * flareVis;
+                  lf.halo.scale.set(550 * hBreath, 550 * hBreath, 1);
+                  lf.halo.material.opacity = 0.4 * flareVis;
                 }
                 if (lf.anamorphic) {
                   const streakBreath = 1.0 + Math.sin(elTs * 0.6) * 0.08;
-                  lf.anamorphic.scale.set(500 * streakBreath, 25, 1);
-                  lf.anamorphic.material.opacity = 0.4 * flareVis;
+                  lf.anamorphic.scale.set(900 * streakBreath, 40, 1);
+                  lf.anamorphic.material.opacity = 0.5 * flareVis;
                 }
                 if (lf.artifacts) {
                   lf.artifacts.forEach(a => {
@@ -2050,7 +2129,7 @@ export default function Home() {
                       <feComposite in="SourceGraphic" in2="blur" operator="over" />
                     </filter>
                     {/* Clip for internal effects */}
-                    <clipPath id="prism-clip"><polygon points="28,4 50,48 6,48" /></clipPath>
+                    <clipPath id="prism-clip"><path d="M31,9 L47,43 Q51,49 45,49 L11,49 Q5,49 9,43 L25,9 Q28,3 31,9 Z" /></clipPath>
                     {/* Ray gradients - wider bands with soft falloff */}
                     <linearGradient id="ray-r" x1="0%" x2="100%"><stop offset="0%" stopColor="#ff4444" stopOpacity="0.9"/><stop offset="50%" stopColor="#ff4444" stopOpacity="0.35"/><stop offset="100%" stopColor="#ff4444" stopOpacity="0"/></linearGradient>
                     <linearGradient id="ray-o" x1="0%" x2="100%"><stop offset="0%" stopColor="#ff9900" stopOpacity="0.85"/><stop offset="50%" stopColor="#ff9900" stopOpacity="0.3"/><stop offset="100%" stopColor="#ff9900" stopOpacity="0"/></linearGradient>
@@ -2070,17 +2149,21 @@ export default function Home() {
                     <animate attributeName="opacity" values="0.8;0.45;0.8" dur="3s" repeatCount="indefinite" />
                   </rect>
                   {/* Shadow underneath for 3D grounding */}
-                  <ellipse cx="28" cy="52" rx="16" ry="3" fill="rgba(0,0,0,0.2)" filter="url(#ray-soft)" />
-                  {/* Glass body - base refraction color */}
-                  <polygon points="28,4 50,48 6,48" fill="url(#prism-glass-base)" filter="url(#glass-glow)" opacity="0.92" />
+                  <ellipse cx="28" cy="54" rx="18" ry="4" fill="rgba(0,0,0,0.25)" filter="url(#ray-soft)" />
+                  {/* 3D back face (offset for depth) */}
+                  <path d="M32,10 L48,44 Q52,50 46,50 L12,50 Q6,50 10,44 L26,10 Q29,4 32,10 Z" fill="rgba(60,30,120,0.3)" />
+                  {/* Glass body - base refraction color (rounded corners) */}
+                  <path d="M31,9 L47,43 Q51,49 45,49 L11,49 Q5,49 9,43 L25,9 Q28,3 31,9 Z" fill="url(#prism-glass-base)" filter="url(#glass-glow)" opacity="0.92" />
                   {/* Glass body - specular highlight layer */}
-                  <polygon points="28,4 50,48 6,48" fill="url(#prism-specular)" />
+                  <path d="M31,9 L47,43 Q51,49 45,49 L11,49 Q5,49 9,43 L25,9 Q28,3 31,9 Z" fill="url(#prism-specular)" />
                   {/* Glass body - internal radial light */}
-                  <polygon points="28,4 50,48 6,48" fill="url(#prism-inner-light)" />
+                  <path d="M31,9 L47,43 Q51,49 45,49 L11,49 Q5,49 9,43 L25,9 Q28,3 31,9 Z" fill="url(#prism-inner-light)" />
                   {/* Glass facet edge - left face (slightly darker for depth) */}
-                  <polygon points="28,4 6,48 28,48" fill="rgba(0,0,0,0.08)" />
-                  {/* Glass edge outline - crisp glass border */}
-                  <polygon points="28,4 50,48 6,48" fill="none" stroke="url(#prism-edge-glow)" strokeWidth="1.2" strokeLinejoin="round" opacity="0.8" />
+                  <path d="M25,9 Q28,3 28,9 L28,49 L11,49 Q5,49 9,43 Z" fill="rgba(0,0,0,0.1)" />
+                  {/* Glass facet edge - right face highlight */}
+                  <path d="M31,9 L47,43 Q51,49 45,49 L28,49 L28,9 Q28,3 31,9 Z" fill="rgba(255,255,255,0.06)" />
+                  {/* Glass edge outline - crisp glass border (rounded) */}
+                  <path d="M31,9 L47,43 Q51,49 45,49 L11,49 Q5,49 9,43 L25,9 Q28,3 31,9 Z" fill="none" stroke="url(#prism-edge-glow)" strokeWidth="1.2" strokeLinejoin="round" opacity="0.8" />
                   {/* Internal caustic shimmer - animated light lines inside glass */}
                   <g clipPath="url(#prism-clip)" opacity="0.5">
                     <line x1="28" y1="8" x2="12" y2="46" stroke="rgba(255,255,255,0.7)" strokeWidth="0.6">
