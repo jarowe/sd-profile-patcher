@@ -131,19 +131,15 @@ export default function Home() {
   }, []);
 
   const container = useRef();
-  const [showBrand, setShowBrand] = useState(false);
-
-  useEffect(() => {
-    if (!sessionStorage.getItem('jarowe_visited')) {
-      setShowBrand(true);
-    }
-  }, []);
+  const [showBrand, setShowBrand] = useState(() => !sessionStorage.getItem('jarowe_visited'));
+  const brandCompleted = useRef(false);
 
   useGSAP(() => {
     if (showBrand) {
       const tl = gsap.timeline({
         onComplete: () => {
           sessionStorage.setItem('jarowe_visited', 'true');
+          brandCompleted.current = true;
           setShowBrand(false);
         }
       });
@@ -154,9 +150,10 @@ export default function Home() {
           opacity: 0, y: -20, duration: 0.5, stagger: 0.05, delay: 1
         })
         .from('.bento-cell', {
-          y: 50, opacity: 0, stagger: 0.1, duration: 0.8, ease: 'spring.out(1, 0.5)'
+          y: 50, opacity: 0, stagger: 0.1, duration: 0.8, ease: 'power2.out'
         }, "-=0.2");
-    } else {
+    } else if (!brandCompleted.current) {
+      // Only run entrance animation on direct visits (no brand reveal)
       gsap.from('.bento-cell', {
         y: 30, opacity: 0, stagger: 0.05, duration: 0.6, ease: 'power2.out'
       });

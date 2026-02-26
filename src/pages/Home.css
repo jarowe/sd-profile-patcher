@@ -501,19 +501,25 @@
 /* Currently Cell Bubble */
 .cell-now {
     position: relative;
+    overflow: visible;
+    z-index: 15;
+}
+
+.cell-now .bento-content {
+    overflow: visible;
 }
 
 .currently-bubble {
     position: absolute;
-    bottom: -8px;
+    bottom: 0.5rem;
+    left: 1rem;
     right: 1rem;
     background: rgba(124, 58, 237, 0.9);
     color: #fff;
-    padding: 6px 12px;
-    border-radius: 12px 12px 2px 12px;
+    padding: 8px 12px;
+    border-radius: 10px;
     font-size: 0.75rem;
     font-weight: 500;
-    max-width: 220px;
     line-height: 1.4;
     box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);
     z-index: 20;
