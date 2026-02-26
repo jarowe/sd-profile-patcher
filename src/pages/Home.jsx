@@ -100,6 +100,7 @@ export default function Home() {
   const mapContainerRef = useRef();
   const [globeSize, setGlobeSize] = useState({ width: 0, height: 0 });
   const [globeMounted, setGlobeMounted] = useState(false);
+  const [globeReady, setGlobeReady] = useState(false);
 
   useEffect(() => {
     const observer = new ResizeObserver((entries) => {
@@ -241,13 +242,11 @@ export default function Home() {
         if (!globe.oceanMaterialSet) {
           const texLoader = new THREE.TextureLoader();
           const earthTex = texLoader.load('//unpkg.com/three-globe/example/img/earth-blue-marble.jpg');
-          const bumpTex = texLoader.load('//unpkg.com/three-globe/example/img/earth-topology.png');
           const waterTex = texLoader.load('//unpkg.com/three-globe/example/img/earth-water.png');
 
           const oceanMat = new THREE.ShaderMaterial({
             uniforms: {
               earthMap: { value: earthTex },
-              bumpMap: { value: bumpTex },
               waterMask: { value: waterTex },
               time: globe.customUniforms.time,
               audioPulse: globe.customUniforms.audioPulse,
@@ -258,18 +257,15 @@ export default function Home() {
               varying vec2 vUv;
               varying vec3 vNormal;
               varying vec3 vViewPos;
-              varying vec3 vWorldNormal;
               void main() {
                 vUv = uv;
                 vNormal = normalize(normalMatrix * normal);
-                vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
                 vViewPos = (modelViewMatrix * vec4(position, 1.0)).xyz;
                 gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
               }
             `,
             fragmentShader: `
               uniform sampler2D earthMap;
-              uniform sampler2D bumpMap;
               uniform sampler2D waterMask;
               uniform float time;
               uniform float audioPulse;
@@ -278,9 +274,7 @@ export default function Home() {
               varying vec2 vUv;
               varying vec3 vNormal;
               varying vec3 vViewPos;
-              varying vec3 vWorldNormal;
 
-              // Hash + noise for ocean waves
               float hash21(vec2 p) {
                 p = fract(p * vec2(234.34, 435.345));
                 p += dot(p, p + 34.23);
@@ -314,42 +308,46 @@ export default function Home() {
 
                 vec3 viewDir = normalize(-vViewPos);
                 float NdotL = max(dot(vNormal, sunDir), 0.0);
-                float dayLight = 0.1 + NdotL * 0.9;
+                float dayLight = 0.12 + NdotL * 0.88;
 
-                // --- LAND: matte diffuse, no specular ---
+                // --- LAND: matte diffuse only ---
                 vec3 landColor = texCol.rgb * dayLight;
 
-                // --- WATER: animated wave normals + specular ---
+                // --- WATER: animated waves, strong specular, sun glare ---
                 vec2 waveUv = vUv * 50.0;
                 float t = time * 0.12;
                 float w1 = fbm(waveUv + vec2(t, t * 0.7));
                 float w2 = fbm(waveUv * 0.7 - vec2(t * 0.5, t * 0.3));
                 float waves = (w1 + w2) * 0.5;
 
-                // Wave-perturbed normal for specular highlights
+                // Perturbed normal from wave height
                 float dx = fbm(waveUv + vec2(0.01, 0.0) + vec2(t, t*0.7)) - w1;
                 float dy = fbm(waveUv + vec2(0.0, 0.01) + vec2(t, t*0.7)) - w1;
-                vec3 waveN = normalize(vNormal + vec3(dx, dy, 0.0) * 4.0);
+                vec3 waveN = normalize(vNormal + vec3(dx, dy, 0.0) * 5.0);
 
+                // Sharp specular (sun sparkle on waves)
                 vec3 halfDir = normalize(sunDir + viewDir);
-                float spec = pow(max(dot(waveN, halfDir), 0.0), 80.0);
-                float waterFresnel = pow(1.0 - max(dot(viewDir, waveN), 0.0), 3.0);
+                float spec = pow(max(dot(waveN, halfDir), 0.0), 120.0);
+                // Wider sun glare bloom
+                float glare = pow(max(dot(waveN, halfDir), 0.0), 12.0);
+                // Water fresnel (rim reflections)
+                float wFresnel = pow(1.0 - max(dot(viewDir, waveN), 0.0), 4.0);
 
-                // Blend ocean color with texture
-                vec3 deepSea = vec3(0.01, 0.04, 0.14);
-                vec3 midSea = vec3(0.03, 0.12, 0.32);
+                // Ocean color - richer deep blues
+                vec3 deepSea = vec3(0.01, 0.03, 0.12);
+                vec3 midSea = vec3(0.03, 0.10, 0.28);
                 vec3 oceanBase = mix(deepSea, midSea, waves);
-                vec3 oceanCol = mix(texCol.rgb * 0.7, oceanBase, 0.35);
+                vec3 oceanCol = mix(texCol.rgb * 0.6, oceanBase, 0.4);
 
                 vec3 waterColor = oceanCol * dayLight
-                  + vec3(0.9, 0.95, 1.0) * spec * 0.7
-                  + vec3(0.2, 0.4, 0.7) * waterFresnel * 0.12
-                  + vec3(0.3, 0.5, 0.8) * waves * audioPulse * 0.2;
+                  + vec3(1.0, 0.95, 0.85) * spec * 1.2          // bright sun sparkle
+                  + vec3(0.9, 0.85, 0.7) * glare * 0.25          // wide sun glare
+                  + vec3(0.2, 0.35, 0.6) * wFresnel * 0.3        // edge reflections
+                  + vec3(0.3, 0.5, 0.8) * waves * audioPulse * 0.25;
 
-                // Mix land and water
                 vec3 finalColor = mix(landColor, waterColor, isWater);
 
-                // Night-side city glow on land only
+                // Night-side city glow on land
                 float nightGlow = max(0.0, 1.0 - NdotL * 3.0);
                 finalColor += texCol.rgb * nightGlow * 0.12 * (1.0 - isWater);
 
@@ -358,15 +356,16 @@ export default function Home() {
             `,
           });
 
+          // Replace the globe's default MeshPhongMaterial
           scene.traverse((child) => {
-            if (child.isMesh && child.geometry?.parameters?.radius > 90) {
+            if (child.isMesh && child.material && child.material.type === 'MeshPhongMaterial' && child.geometry?.parameters?.radius > 90) {
               child.material = oceanMat;
             }
           });
           globe.oceanMaterialSet = true;
         }
 
-        // --- D. Aurora Fresnel (audio & prism pulse reactive) ---
+        // --- C. Aurora Borealis Shell (depthTest off = renders OVER globe face) ---
         if (!globe.auroraShell) {
           const auroraMat = new THREE.ShaderMaterial({
             uniforms: globe.customUniforms,
@@ -385,9 +384,10 @@ export default function Home() {
               uniform float prismPulse;
               varying vec3 vNormal;
               varying vec3 vPosition;
-              const vec3 color1 = vec3(0.0, 0.9, 0.6);
-              const vec3 color2 = vec3(0.5, 0.1, 0.9);
-              const vec3 color3 = vec3(0.1, 0.5, 1.0);
+              const vec3 auroraGreen = vec3(0.0, 0.95, 0.5);
+              const vec3 auroraPurple = vec3(0.5, 0.1, 0.95);
+              const vec3 auroraBlue = vec3(0.1, 0.5, 1.0);
+              const vec3 auroraRed = vec3(0.8, 0.1, 0.3);
 
               vec4 permute(vec4 x){return mod(((x*34.0)+1.0)*x, 289.0);}
               vec4 taylorInvSqrt(vec4 r){return 1.79284291400159 - 0.85373472095314 * r;}
@@ -421,13 +421,21 @@ export default function Home() {
               void main() {
                 vec3 viewDir = normalize(cameraPosition - vPosition);
                 float fresnel = clamp(1.0 - dot(viewDir, vNormal), 0.0, 1.0);
-                // Soft fresnel: visible across surface but strongest at edges
-                fresnel = pow(fresnel, max(1.0, 2.2 - prismPulse * 1.5));
-                float speed = time * (0.2 + prismPulse * 0.2);
-                float n = snoise(vPosition * 0.015 + vec3(0.0, speed, speed * 0.5));
-                float mask = smoothstep(0.1, 0.9, n * 0.5 + 0.5);
-                vec3 col = mix(color1, color2, mask);
-                col = mix(col, color3, audioPulse * fresnel);
+                // Graduated fresnel: strong at edges, gentle wash across face
+                fresnel = pow(fresnel, max(0.8, 2.0 - prismPulse * 1.2));
+
+                float speed = time * (0.18 + prismPulse * 0.25);
+                float n1 = snoise(vPosition * 0.012 + vec3(0.0, speed, speed * 0.5));
+                float n2 = snoise(vPosition * 0.025 + vec3(speed * 0.3, 0.0, speed));
+                float n = n1 * 0.7 + n2 * 0.3; // layered noise for richer patterns
+                float mask = smoothstep(0.0, 1.0, n * 0.5 + 0.5);
+
+                // Multi-color aurora bands
+                vec3 col = mix(auroraGreen, auroraPurple, mask);
+                col = mix(col, auroraBlue, smoothstep(0.3, 0.7, n2 * 0.5 + 0.5));
+                col = mix(col, auroraRed, smoothstep(0.7, 1.0, fresnel) * 0.3);
+                col = mix(col, col * 1.5, audioPulse * fresnel);
+
                 // Prismatic rainbow on prism bop
                 vec3 hitColor = vec3(
                   0.5 + 0.5 * sin(time * 2.5),
@@ -435,17 +443,20 @@ export default function Home() {
                   0.5 + 0.5 * sin(time * 2.5 + 4.189)
                 );
                 col = mix(col, hitColor, prismPulse * 0.6);
-                // Rich alpha: aurora clearly visible but Earth shows through
-                float alpha = fresnel * (0.6 + n * 0.3 + audioPulse * 0.4 + prismPulse * 0.6);
-                gl_FragColor = vec4(col * (1.0 + audioPulse*0.4 + prismPulse*0.5), alpha * 0.45);
+
+                // Flowing curtain alpha - visible across surface, intense at edges
+                float curtain = smoothstep(-0.2, 0.6, n1) * smoothstep(-0.3, 0.5, n2);
+                float alpha = fresnel * curtain * (0.7 + audioPulse * 0.5 + prismPulse * 0.8);
+                gl_FragColor = vec4(col * (1.2 + audioPulse*0.5 + prismPulse*0.6), alpha * 0.55);
               }
             `,
             transparent: true,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
+            depthTest: false,
             side: THREE.FrontSide
           });
-          const auroraMesh = new THREE.Mesh(new THREE.SphereGeometry(103.5, 64, 64), auroraMat);
+          const auroraMesh = new THREE.Mesh(new THREE.SphereGeometry(101.5, 64, 64), auroraMat);
           scene.add(auroraMesh);
           globe.auroraShell = auroraMesh;
         }
@@ -518,8 +529,8 @@ export default function Home() {
                 }
                 vec4 mv = modelViewMatrix * vec4(pos,1.0);
                 gl_Position = projectionMatrix * mv;
-                // Subtle glow-up: dust brightens gently, doesn't balloon
-                float baseSize = (pType>0.5) ? aScale*(0.5 + audioPulse*2.0 + prismPulse*1.5) : aScale*(1.5+audioPulse*2.0);
+                // Visible dust, gentle prism glow-up
+                float baseSize = (pType>0.5) ? aScale*(1.0 + audioPulse*3.0 + prismPulse*2.0) : aScale*(1.8+audioPulse*2.0);
                 gl_PointSize = baseSize * pixelRatio * (300.0 / -mv.z);
               }
             `,
@@ -530,7 +541,7 @@ export default function Home() {
                 float ll = length(xy);
                 if(ll>0.5) discard;
                 float glow = (vType>0.5) ? smoothstep(0.5,0.0,ll) : smoothstep(0.5,0.4,ll);
-                float alpha = glow * (0.4 + audioPulse*0.3 + prismPulse*0.3);
+                float alpha = glow * (0.6 + audioPulse*0.4 + prismPulse*0.4);
                 // Gentle prismatic color shift - ethereal shimmer not white flash
                 vec3 prismatic = vec3(
                   0.5 + 0.5 * sin(time * 3.0),
@@ -576,18 +587,21 @@ export default function Home() {
         }
 
         // ------------------------------------------------------------------
-        // CINEMATIC ENTRANCE - smooth camera fly-in, no warp
+        // CINEMATIC ENTRANCE - fade reveal + sweeping camera
         // ------------------------------------------------------------------
         if (!hasAnimatedIn.current) {
           hasAnimatedIn.current = true;
           const first = expeditions[0];
-          // Start from a gentle overhead angle
-          globe.pointOfView({ lat: first.lat + 30, lng: first.lng - 40, altitude: 2.8 }, 0);
+          // Position camera BEFORE revealing (container starts at opacity 0)
+          globe.pointOfView({ lat: first.lat + 25, lng: first.lng - 50, altitude: 3.0 }, 0);
 
+          // Reveal the globe (CSS opacity transition handles the fade)
+          requestAnimationFrame(() => setGlobeReady(true));
+
+          // Begin cinematic sweep
           setTimeout(() => {
             if (!globeRef.current) return;
-            // Smooth fly to first location
-            globeRef.current.pointOfView({ lat: first.lat, lng: first.lng, altitude: 1.5 }, 3500);
+            globeRef.current.pointOfView({ lat: first.lat, lng: first.lng, altitude: 1.5 }, 4000);
 
             setTimeout(() => {
               if (globeRef.current) {
@@ -595,8 +609,8 @@ export default function Home() {
                 if (c) c.enableZoom = true;
               }
               startGlobeCycle();
-            }, 4000);
-          }, 100);
+            }, 4500);
+          }, 200);
         }
 
         // --- G. Animation loop for shaders & motion ---
@@ -982,13 +996,15 @@ export default function Home() {
 
           {/* WORLD MAP CELL */}
           <div className="bento-cell cell-map">
-            <div className="map-container" ref={mapContainerRef}>
+            <div className="map-container" ref={mapContainerRef} style={{ opacity: globeReady ? 1 : 0, transition: 'opacity 1.5s ease-in' }}>
               <Suspense fallback={<div style={{ color: '#fff', padding: '2rem' }}>Loading globe...</div>}>
                 {globeSize.width > 0 && (
                   <Globe
                     ref={handleGlobeRef}
                     width={globeSize.width}
                     height={globeSize.height}
+                    globeImageUrl="//unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
+                    bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
                     backgroundColor="rgba(0,0,0,0)"
                     atmosphereColor="#7c3aed"
                     atmosphereAltitude={0.25}
