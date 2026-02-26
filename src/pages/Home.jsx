@@ -243,18 +243,19 @@ export default function Home() {
         if (!globe.oceanMaterialSet) {
           const texLoader = new THREE.TextureLoader();
           const earthTex = texLoader.load('//unpkg.com/three-globe/example/img/earth-blue-marble.jpg');
-          const cloudsTex = texLoader.load('//cdn.jsdelivr.net/gh/mrdoob/three.js/examples/textures/planets/earth_clouds_1024.png');
+          const nightTex = texLoader.load('//cdn.jsdelivr.net/gh/mrdoob/three.js/examples/textures/planets/earth_lights_2048.png');
           const waterTex = texLoader.load('//unpkg.com/three-globe/example/img/earth-water.png');
+          const sunDirVec = new THREE.Vector3(1.0, 0.5, 1.0).normalize();
 
           const oceanMat = new THREE.ShaderMaterial({
             uniforms: {
               earthMap: { value: earthTex },
-              cloudsMap: { value: cloudsTex },
+              nightMap: { value: nightTex },
               waterMask: { value: waterTex },
               time: globe.customUniforms.time,
               audioPulse: globe.customUniforms.audioPulse,
               prismPulse: globe.customUniforms.prismPulse,
-              sunDir: { value: new THREE.Vector3(1.0, 0.5, 1.0).normalize() }
+              sunDir: { value: sunDirVec }
             },
             vertexShader: `
               varying vec2 vUv;
@@ -269,7 +270,7 @@ export default function Home() {
             `,
             fragmentShader: `
               uniform sampler2D earthMap;
-              uniform sampler2D cloudsMap;
+              uniform sampler2D nightMap;
               uniform sampler2D waterMask;
               uniform float time;
               uniform float audioPulse;
@@ -306,109 +307,66 @@ export default function Home() {
               }
 
               void main() {
-                vec4 texCol = texture2D(earthMap, vUv);
+                vec4 dayCol = texture2D(earthMap, vUv);
+                vec3 nightCol = texture2D(nightMap, vUv).rgb;
                 float waterVal = 1.0 - texture2D(waterMask, vUv).r;
                 float isWater = smoothstep(0.3, 0.7, waterVal);
 
                 vec3 viewDir = normalize(-vViewPos);
-                float NdotL = max(dot(vNormal, sunDir), 0.0);
-                float dayLight = 0.12 + NdotL * 0.88;
-
-                // --- LAND: matte diffuse only ---
+                float NdotL = dot(vNormal, sunDir);
+                float dayStrength = smoothstep(-0.1, 0.25, NdotL);
+                float dayLight = 0.08 + max(NdotL, 0.0) * 0.92;
                 float rawFresnel = clamp(1.0 - dot(viewDir, vNormal), 0.0, 1.0);
-                float landFresnel = pow(rawFresnel, 3.0);
-                vec3 landColor = texCol.rgb * dayLight + texCol.rgb * landFresnel * 0.15;
 
-                // --- WATER: animated waves, strong specular, sun glare ---
+                // --- LAND: day texture + NASA night lights blend ---
+                float landFresnel = pow(rawFresnel, 3.0);
+                vec3 landDay = dayCol.rgb * dayLight + dayCol.rgb * landFresnel * 0.12;
+                vec3 landNight = nightCol * 1.8;
+                vec3 landColor = mix(landNight, landDay, dayStrength);
+
+                // --- WATER: animated waves + specular + day/night ---
                 vec2 waveUv = vUv * 50.0;
                 float t = time * 0.12;
                 float w1 = fbm(waveUv + vec2(t, t * 0.7));
                 float w2 = fbm(waveUv * 0.7 - vec2(t * 0.5, t * 0.3));
                 float waves = (w1 + w2) * 0.5;
 
-                // Perturbed normal from wave height
                 float dx = fbm(waveUv + vec2(0.01, 0.0) + vec2(t, t*0.7)) - w1;
                 float dy = fbm(waveUv + vec2(0.0, 0.01) + vec2(t, t*0.7)) - w1;
                 vec3 waveN = normalize(vNormal + vec3(dx, dy, 0.0) * 5.0);
 
-                // Sharp specular (sun sparkle on waves)
                 vec3 halfDir = normalize(sunDir + viewDir);
                 float spec = pow(max(dot(waveN, halfDir), 0.0), 120.0);
-                // Wider sun glare bloom
                 float glare = pow(max(dot(waveN, halfDir), 0.0), 12.0);
-                // Water fresnel (rim reflections)
                 float wFresnel = pow(1.0 - max(dot(viewDir, waveN), 0.0), 4.0);
 
-                // Ocean color - richer deep blues
-                vec3 deepSea = vec3(0.01, 0.03, 0.12);
-                vec3 midSea = vec3(0.03, 0.10, 0.28);
+                vec3 deepSea = vec3(0.005, 0.02, 0.08);
+                vec3 midSea = vec3(0.02, 0.08, 0.22);
                 vec3 oceanBase = mix(deepSea, midSea, waves);
-                vec3 oceanCol = mix(texCol.rgb * 0.6, oceanBase, 0.4);
+                vec3 oceanCol = mix(dayCol.rgb * 0.5, oceanBase, 0.5);
 
-                vec3 waterColor = oceanCol * dayLight
-                  + vec3(1.0, 0.95, 0.85) * spec * 1.2          // bright sun sparkle
-                  + vec3(0.9, 0.85, 0.7) * glare * 0.25          // wide sun glare
-                  + vec3(0.2, 0.35, 0.6) * wFresnel * 0.3        // edge reflections
+                vec3 waterDay = oceanCol * dayLight
+                  + vec3(1.0, 0.95, 0.85) * spec * 1.5
+                  + vec3(0.9, 0.85, 0.7) * glare * 0.3
+                  + vec3(0.2, 0.35, 0.6) * wFresnel * 0.35
                   + vec3(0.3, 0.5, 0.8) * waves * audioPulse * 0.25;
+                vec3 waterNight = deepSea * 0.15;
+                vec3 waterColor = mix(waterNight, waterDay, dayStrength);
 
                 vec3 finalColor = mix(landColor, waterColor, isWater);
-                
-                // --- HIGH FIDELITY CLOUDS ---
-                vec2 cloUv = vUv + vec2(time * -0.003, 0.0);
-                float cloudVal = texture2D(cloudsMap, cloUv).r;
-                
-                // Add sub-detail noise to the clouds
-                float cNoise = fbm(cloUv * 30.0 + time * 0.05);
-                float cloudMask = mix(cloudVal, cloudVal * (0.5 + cNoise * 0.5), 0.5);
-                
-                float cloudAlpha = smoothstep(0.05, 0.5, cloudMask);
-                
-                // Self-shadowing on clouds (thicker clouds are darker at the core relative to sun)
-                float sunAngle = dot(vNormal, sunDir);
-                float cloudIllum = smoothstep(-0.2, 0.8, sunAngle); // Clouds catch light early on the terminator
-                
-                vec3 baseCloud = vec3(0.95, 0.98, 1.0);
-                vec3 shadowCloud = vec3(0.25, 0.3, 0.4); // Darker cloud shadow
-                vec3 cloudColor = mix(shadowCloud, baseCloud, cloudIllum) * dayLight;
-                
-                // Sunset edge scattering (warm orange/pink light on the terminator line)
-                float terminatorLine = smoothstep(0.0, 0.3, sunAngle) * smoothstep(0.6, 0.3, sunAngle);
-                vec3 sunsetScatter = vec3(1.0, 0.4, 0.1) * terminatorLine * 1.5;
-                
-                // Rim lighting for clouds
-                float cloudFresnel = pow(1.0 - max(dot(viewDir, vNormal), 0.0), 3.0);
-                
-                vec3 finalCloudColor = cloudColor + (sunsetScatter * cloudVal) + (vec3(1.0, 0.95, 0.9) * cloudFresnel * 0.4 * cloudIllum);
-
-                // Add drop shadow from clouds onto the earth
-                float shadowOffset = 0.005;
-                float cloudShadowVal = texture2D(cloudsMap, cloUv - vec2(sunDir.x, sunDir.y) * shadowOffset).r;
-                float shadowAlpha = smoothstep(0.1, 0.8, cloudShadowVal) * 0.6 * dayLight;
-                finalColor = mix(finalColor, finalColor * 0.2, shadowAlpha); // Darken ground
-                
-                // Thicker clouds
-                cloudAlpha = pow(cloudAlpha, 0.8);
-
-                // Paint clouds
-                finalColor = mix(finalColor, finalCloudColor, cloudAlpha * 0.9);
-
-                // Night-side city glow on land (golden dots of civilization)
-                float nightMask = smoothstep(0.1, 0.0, NdotL);
-                float cityNoise = vnoise(vUv * 300.0) * vnoise(vUv * 150.0 + 42.0);
-                float cityLights = smoothstep(0.3, 0.7, cityNoise) * nightMask * (1.0 - isWater);
-                finalColor += vec3(1.0, 0.85, 0.5) * cityLights * 0.35;
-                // Subtle overall night glow on land
-                finalColor += texCol.rgb * nightMask * 0.08 * (1.0 - isWater);
 
                 // --- ATMOSPHERIC SCATTERING at terminator ---
-                float terminatorBand = smoothstep(0.0, 0.2, NdotL) * smoothstep(0.4, 0.2, NdotL);
-                vec3 sunsetColor = mix(vec3(1.0, 0.3, 0.05), vec3(1.0, 0.6, 0.2), NdotL * 3.0);
-                finalColor += sunsetColor * terminatorBand * rawFresnel * 0.5;
+                float terminatorBand = smoothstep(0.0, 0.15, max(NdotL, 0.0)) * smoothstep(0.35, 0.15, max(NdotL, 0.0));
+                vec3 sunsetColor = mix(vec3(1.0, 0.25, 0.05), vec3(1.0, 0.55, 0.2), max(NdotL, 0.0) * 3.0);
+                finalColor += sunsetColor * terminatorBand * rawFresnel * 0.6;
 
-                // --- Atmospheric rim haze (blue glow on edges) ---
+                // --- Atmospheric rim haze ---
                 float rimHaze = pow(rawFresnel, 2.5);
-                vec3 hazeColor = mix(vec3(0.15, 0.3, 0.8), vec3(0.8, 0.4, 0.1), terminatorBand);
-                finalColor += hazeColor * rimHaze * 0.2 * dayLight;
+                vec3 dayHaze = vec3(0.2, 0.4, 1.0);
+                vec3 nightHaze = vec3(0.04, 0.02, 0.12);
+                vec3 hazeColor = mix(nightHaze, dayHaze, dayStrength);
+                hazeColor = mix(hazeColor, vec3(1.0, 0.4, 0.1), terminatorBand);
+                finalColor += hazeColor * rimHaze * 0.25;
 
                 gl_FragColor = vec4(finalColor, 1.0);
               }
@@ -422,6 +380,80 @@ export default function Home() {
             }
           });
           globe.oceanMaterialSet = true;
+        }
+
+        // --- B2. Volumetric Cloud Layer (separate mesh for realism) ---
+        if (!globe.cloudMesh) {
+          const cLoader = new THREE.TextureLoader();
+          const cloudsTex = cLoader.load('//cdn.jsdelivr.net/gh/mrdoob/three.js/examples/textures/planets/earth_clouds_1024.png');
+
+          const cloudMat = new THREE.ShaderMaterial({
+            uniforms: {
+              cloudsMap: { value: cloudsTex },
+              sunDir: { value: new THREE.Vector3(1.0, 0.5, 1.0).normalize() },
+              time: globe.customUniforms.time,
+            },
+            vertexShader: `
+              varying vec2 vUv;
+              varying vec3 vNormal;
+              varying vec3 vViewPos;
+              void main() {
+                vUv = uv;
+                vNormal = normalize(normalMatrix * normal);
+                vViewPos = (modelViewMatrix * vec4(position, 1.0)).xyz;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+              }
+            `,
+            fragmentShader: `
+              uniform sampler2D cloudsMap;
+              uniform vec3 sunDir;
+              uniform float time;
+              varying vec2 vUv;
+              varying vec3 vNormal;
+              varying vec3 vViewPos;
+
+              void main() {
+                float cloudVal = texture2D(cloudsMap, vUv).r;
+                float alpha = smoothstep(0.15, 0.65, cloudVal);
+
+                float NdotL = dot(vNormal, sunDir);
+                float illumination = 0.1 + max(NdotL, 0.0) * 0.9;
+
+                // Cloud color: bright white in sunlight, dark on night side
+                vec3 litCloud = vec3(1.0, 0.99, 0.96) * illumination;
+                vec3 shadowCloud = vec3(0.2, 0.22, 0.28);
+                vec3 cloudColor = mix(shadowCloud, litCloud, smoothstep(-0.1, 0.4, NdotL));
+
+                // Self-shadowing: thicker cloud cores slightly darker
+                cloudColor *= (1.0 - cloudVal * cloudVal * 0.15);
+
+                // Sunset/terminator scattering (golden/orange edge)
+                float terminator = smoothstep(0.0, 0.12, max(NdotL, 0.0)) * smoothstep(0.25, 0.12, max(NdotL, 0.0));
+                cloudColor += vec3(1.0, 0.35, 0.08) * terminator * cloudVal * 1.5;
+
+                // Silver lining rim light
+                vec3 viewDir = normalize(-vViewPos);
+                float rim = pow(1.0 - max(dot(viewDir, vNormal), 0.0), 3.0);
+                cloudColor += vec3(1.0, 0.95, 0.9) * rim * 0.25 * illumination;
+
+                // Night side: clouds nearly invisible (backlit by starlight only)
+                float nightFade = smoothstep(-0.15, 0.05, NdotL);
+                alpha *= max(nightFade, 0.03);
+
+                gl_FragColor = vec4(cloudColor, alpha * 0.85);
+              }
+            `,
+            transparent: true,
+            depthWrite: false,
+            side: THREE.DoubleSide
+          });
+
+          const cloudMesh = new THREE.Mesh(
+            new THREE.SphereGeometry(100.8, 64, 64),
+            cloudMat
+          );
+          scene.add(cloudMesh);
+          globe.cloudMesh = cloudMesh;
         }
 
         // --- C. Aurora Borealis Shell (depthTest off = renders OVER globe face) ---
@@ -533,13 +565,16 @@ export default function Home() {
           globe.auroraShell = auroraMesh;
         }
 
-        // --- D. Atmospheric Glow Shell (blue halo from space) ---
+        // --- D. Atmospheric Glow (inner rim + outer halo, matching NASA reference) ---
         if (!globe.atmosShell) {
-          const atmosMat = new THREE.ShaderMaterial({
+          const atmosSunDir = new THREE.Vector3(1.0, 0.5, 1.0).normalize();
+
+          // Inner atmosphere rim (FrontSide - visible edge glow ON the globe)
+          const innerAtmosMat = new THREE.ShaderMaterial({
             uniforms: {
               time: globe.customUniforms.time,
               introIntensity: globe.customUniforms.introIntensity,
-              sunDir: { value: new THREE.Vector3(1.0, 0.5, 1.0).normalize() }
+              sunDir: { value: atmosSunDir }
             },
             vertexShader: `
               varying vec3 vNormal;
@@ -561,20 +596,19 @@ export default function Home() {
               varying vec3 vWorldNormal;
               void main() {
                 vec3 viewDir = normalize(-vPosition);
-                float fresnel = pow(1.0 - dot(viewDir, vNormal), 4.0);
+                float fresnel = pow(1.0 - dot(viewDir, vNormal), 3.5);
 
-                // Sun-facing side gets brighter blue, dark side gets deep indigo
                 float sunFacing = dot(vWorldNormal, sunDir) * 0.5 + 0.5;
-                vec3 dayAtmos = vec3(0.25, 0.45, 1.0);
-                vec3 nightAtmos = vec3(0.08, 0.03, 0.25);
-                vec3 terminatorGlow = vec3(1.0, 0.35, 0.08);
+                vec3 dayAtmos = vec3(0.3, 0.55, 1.0);
+                vec3 nightAtmos = vec3(0.06, 0.02, 0.2);
+                vec3 terminatorGlow = vec3(1.0, 0.4, 0.08);
 
                 float terminatorLine = smoothstep(0.3, 0.5, sunFacing) * smoothstep(0.7, 0.5, sunFacing);
-                vec3 atmosColor = mix(nightAtmos, dayAtmos, smoothstep(0.3, 0.7, sunFacing));
-                atmosColor += terminatorGlow * terminatorLine * 1.5;
+                vec3 atmosColor = mix(nightAtmos, dayAtmos, smoothstep(0.25, 0.7, sunFacing));
+                atmosColor += terminatorGlow * terminatorLine * 2.0;
 
-                float alpha = fresnel * (0.5 + introIntensity * 0.3);
-                gl_FragColor = vec4(atmosColor * (1.3 + introIntensity * 0.4), alpha);
+                float alpha = fresnel * (0.55 + introIntensity * 0.3);
+                gl_FragColor = vec4(atmosColor * (1.4 + introIntensity * 0.4), alpha);
               }
             `,
             transparent: true,
@@ -583,9 +617,59 @@ export default function Home() {
             depthTest: false,
             side: THREE.FrontSide
           });
-          const atmosMesh = new THREE.Mesh(new THREE.SphereGeometry(104, 64, 64), atmosMat);
-          scene.add(atmosMesh);
-          globe.atmosShell = atmosMesh;
+          const innerAtmos = new THREE.Mesh(new THREE.SphereGeometry(102, 64, 64), innerAtmosMat);
+          scene.add(innerAtmos);
+
+          // Outer atmospheric halo (BackSide - glowing rim AROUND the globe silhouette)
+          const outerAtmosMat = new THREE.ShaderMaterial({
+            uniforms: {
+              sunDir: { value: atmosSunDir },
+              introIntensity: globe.customUniforms.introIntensity
+            },
+            vertexShader: `
+              varying vec3 vNormal;
+              varying vec3 vWorldNormal;
+              varying vec3 vPosition;
+              void main() {
+                vNormal = normalize(normalMatrix * normal);
+                vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+                vPosition = (modelViewMatrix * vec4(position, 1.0)).xyz;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+              }
+            `,
+            fragmentShader: `
+              uniform vec3 sunDir;
+              uniform float introIntensity;
+              varying vec3 vNormal;
+              varying vec3 vWorldNormal;
+              varying vec3 vPosition;
+              void main() {
+                vec3 viewDir = normalize(-vPosition);
+                float fresnel = pow(dot(viewDir, vNormal), 2.0);
+
+                float sunFacing = dot(vWorldNormal, sunDir) * 0.5 + 0.5;
+                vec3 dayGlow = vec3(0.25, 0.5, 1.0);
+                vec3 twilightGlow = vec3(1.0, 0.5, 0.15);
+                vec3 nightGlow = vec3(0.03, 0.01, 0.1);
+
+                float terminator = smoothstep(0.3, 0.5, sunFacing) * smoothstep(0.7, 0.5, sunFacing);
+                vec3 color = mix(nightGlow, dayGlow, smoothstep(0.2, 0.65, sunFacing));
+                color += twilightGlow * terminator * 2.5;
+
+                float alpha = fresnel * (0.35 + introIntensity * 0.15);
+                gl_FragColor = vec4(color * 1.2, alpha);
+              }
+            `,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            depthTest: false,
+            side: THREE.BackSide
+          });
+          const outerAtmos = new THREE.Mesh(new THREE.SphereGeometry(107, 64, 64), outerAtmosMat);
+          scene.add(outerAtmos);
+
+          globe.atmosShell = { inner: innerAtmos, outer: outerAtmos };
         }
 
         // --- D2. Cinematic Lens Flare (procedural, at sun position) ---
@@ -902,6 +986,11 @@ export default function Home() {
                 let sum = 0;
                 for (let k = 0; k < 32; k++) sum += audioDataArray[k];
                 globe.customUniforms.audioPulse.value = (sum / 32) / 255.0;
+              }
+
+              // Rotate cloud layer slowly (counter to globe rotation)
+              if (globe.cloudMesh) {
+                globe.cloudMesh.rotation.y += dt * 0.008;
               }
 
               // Animate lens flare (subtle ray rotation + breathing)
