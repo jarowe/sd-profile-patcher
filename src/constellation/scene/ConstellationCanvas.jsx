@@ -1,6 +1,6 @@
 import { useRef, useEffect, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, useDetectGPU } from '@react-three/drei';
+import { OrbitControls } from '@react-three/drei';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import { useConstellationStore } from '../store';
 import { computeHelixLayout, getHelixCenter, getHelixBounds } from '../layout/helixLayout';
@@ -49,21 +49,16 @@ function getGPUConfig(tier) {
 }
 
 /**
- * Component that runs inside the Canvas to detect GPU tier.
- * Must be inside Canvas tree to access WebGL context.
+ * Detect GPU tier synchronously before Canvas mounts.
+ * Avoids creating a second WebGL context inside the Canvas tree.
  */
-function GPUDetector({ onDetect }) {
-  const gpu = useDetectGPU();
-  useEffect(() => {
-    if (gpu) {
-      const tier = gpu.tier ?? 1;
-      onDetect(tier);
-    }
-  }, [gpu, onDetect]);
-  return null;
+function detectGPUTier() {
+  const cores = navigator.hardwareConcurrency || 2;
+  const mobile = /Mobi|Android/i.test(navigator.userAgent);
+  if (mobile || cores <= 2) return 1;
+  if (cores <= 4) return 2;
+  return 3;
 }
-
-/* CameraController now imported from ./CameraController.jsx */
 
 /**
  * Main R3F Canvas for the constellation scene.
@@ -72,7 +67,11 @@ export default function ConstellationCanvas() {
   const rendererRef = useRef();
   const controlsRef = useRef();
   const setGpuTier = useConstellationStore((s) => s.setGpuTier);
-  const [gpuConfig, setGpuConfig] = useState(() => getGPUConfig(2)); // default medium until detected
+  const [gpuConfig] = useState(() => {
+    const tier = detectGPUTier();
+    setGpuTier(tier);
+    return getGPUConfig(tier);
+  });
 
   // Compute helix layout once
   const layoutNodes = useMemo(
@@ -109,14 +108,6 @@ export default function ConstellationCanvas() {
     }));
   }, [layoutNodes]);
 
-  const handleGPUDetect = useMemo(
-    () => (tier) => {
-      setGpuTier(tier);
-      setGpuConfig(getGPUConfig(tier));
-    },
-    [setGpuTier]
-  );
-
   // Disposal verification on unmount
   useEffect(() => {
     return () => {
@@ -134,7 +125,7 @@ export default function ConstellationCanvas() {
 
   return (
     <Canvas
-      gl={{ antialias: true }}
+      gl={{ antialias: true, powerPreference: 'high-performance' }}
       camera={{
         position: [0, center.y, 80],
         fov: 60,
@@ -142,10 +133,17 @@ export default function ConstellationCanvas() {
       dpr={gpuConfig.dpr}
       onCreated={({ gl }) => {
         rendererRef.current = gl;
+        // Handle WebGL context loss gracefully
+        const canvas = gl.domElement;
+        canvas.addEventListener('webglcontextlost', (e) => {
+          e.preventDefault();
+          console.warn('Constellation: WebGL context lost, will restore');
+        });
+        canvas.addEventListener('webglcontextrestored', () => {
+          console.log('Constellation: WebGL context restored');
+        });
       }}
     >
-      <GPUDetector onDetect={handleGPUDetect} />
-
       <OrbitControls
         ref={controlsRef}
         autoRotate

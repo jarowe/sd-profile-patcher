@@ -92,7 +92,7 @@ export default function NodeCloud({ nodes, gpuConfig }) {
   // Working color array that gets modified for dimming
   const colors = useMemo(() => new Float32Array(baseColors), [baseColors]);
 
-  // Set initial instance transforms
+  // Set initial instance transforms AND color attribute imperatively
   useEffect(() => {
     if (!meshRef.current) return;
 
@@ -104,8 +104,14 @@ export default function NodeCloud({ nodes, gpuConfig }) {
     });
 
     meshRef.current.instanceMatrix.needsUpdate = true;
+
+    // Imperatively set per-instance color attribute on the geometry
+    const geo = meshRef.current.geometry;
+    const colorAttr = new THREE.InstancedBufferAttribute(new Float32Array(baseColors), 3);
+    geo.setAttribute('color', colorAttr);
+
     meshRef.current.computeBoundingSphere();
-  }, [nodes]);
+  }, [nodes, baseColors]);
 
   // Focus dimming and entity filter dimming
   useEffect(() => {
@@ -198,12 +204,7 @@ export default function NodeCloud({ nodes, gpuConfig }) {
     >
       <sphereGeometry
         args={[1, gpuConfig.sphereSegments, gpuConfig.sphereSegments]}
-      >
-        <instancedBufferAttribute
-          attach="attributes-color"
-          args={[colors, 3]}
-        />
-      </sphereGeometry>
+      />
       <meshStandardMaterial
         ref={materialRef}
         emissive="white"
