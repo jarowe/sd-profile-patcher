@@ -1122,9 +1122,13 @@
     top: calc(-1 * var(--globe-breakout-px, 60px));
     height: calc(100% + var(--globe-breakout-px, 60px) + 10px);
 }
-/* Hide top glass border where globe breaks through */
+/* Feather glass border at top where globe breaks through */
 .bento-cell.cell-map.globe-breakout .liquid-glass-edge {
-    clip-path: inset(6px 0 0 0);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.3) 4%, rgba(0,0,0,0.7) 8%, black 15%);
+    mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.3) 4%, rgba(0,0,0,0.7) 8%, black 15%);
+}
+.bento-cell.cell-map.globe-breakout .liquid-glass-edge::before,
+.bento-cell.cell-map.globe-breakout .liquid-glass-edge::after {
     border-radius: 0 0 28px 28px;
 }
 

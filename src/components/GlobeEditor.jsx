@@ -128,6 +128,12 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
       p.globeBreakoutClipPad = v;
     });
 
+    // ── Expedition Photo Card ──
+    const photoFolder = controlsFolder.addFolder('Photo Card');
+    photoFolder.add(proxy, 'photoCardTop', -40, 80, 1).name('Top (px)').onChange(updateParam('photoCardTop'));
+    photoFolder.add(proxy, 'photoCardRight', -60, 40, 1).name('Right (px)').onChange(updateParam('photoCardRight'));
+    photoFolder.add(proxy, 'photoCardWidth', 80, 260, 5).name('Width (px)').onChange(updateParam('photoCardWidth'));
+
     // ── Visibility Toggles ──
     const visFolder = controlsFolder.addFolder('Visibility');
     visFolder.add(proxy, 'cloudsVisible').name('Clouds').onChange(updateParam('cloudsVisible'));

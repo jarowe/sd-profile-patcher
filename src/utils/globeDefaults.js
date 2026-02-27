@@ -190,6 +190,11 @@ export const GLOBE_DEFAULTS = {
   globeBreakoutPx: 60,
   globeBreakoutClipPad: 4,
 
+  // ── Expedition Photo Card ──
+  photoCardTop: 12,
+  photoCardRight: -8,
+  photoCardWidth: 160,
+
   // ── Visibility Toggles ──
   satellitesVisible: true,
   planesVisible: true,

@@ -2991,46 +2991,48 @@ export default function Home() {
                   />
                 )}
               </Suspense>
-              <AnimatePresence>
-                {hoveredMarker && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.9, y: 5 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.9, y: 5 }}
-                    transition={{ duration: 0.25, ease: 'easeOut' }}
-                    style={{
-                      position: 'absolute',
-                      top: '12px',
-                      right: '12px',
-                      background: 'rgba(10, 10, 20, 0.85)',
-                      backdropFilter: 'blur(16px)',
-                      padding: '12px',
-                      borderRadius: '14px',
-                      border: '1px solid rgba(124, 58, 237, 0.3)',
-                      zIndex: 100,
-                      pointerEvents: 'none',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '8px',
-                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
-                    }}
-                  >
-                    <strong style={{ color: '#fff', fontSize: '13px', letterSpacing: '0.5px' }}>{hoveredMarker.name}</strong>
-                    {hoveredMarker.photo && (
-                      <motion.img
-                        key={hoveredMarker.photo}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ duration: 0.5 }}
-                        src={`${BASE}images/${hoveredMarker.photo}`}
-                        alt={hoveredMarker.name}
-                        style={{ width: '140px', height: '90px', objectFit: 'cover', borderRadius: '8px' }}
-                      />
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
             </div>
+            {/* Expedition photo card — anchored to cell-map, not map-container */}
+            <AnimatePresence>
+              {hoveredMarker && (
+                <motion.div
+                  className="expedition-photo-card"
+                  initial={{ opacity: 0, scale: 0.9, y: 5 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, y: 5 }}
+                  transition={{ duration: 0.25, ease: 'easeOut' }}
+                  style={{
+                    position: 'absolute',
+                    top: `${editorParams.current.photoCardTop}px`,
+                    right: `${editorParams.current.photoCardRight}px`,
+                    background: 'rgba(10, 10, 20, 0.85)',
+                    backdropFilter: 'blur(16px)',
+                    padding: '12px',
+                    borderRadius: '14px',
+                    border: '1px solid rgba(124, 58, 237, 0.3)',
+                    zIndex: 100,
+                    pointerEvents: 'none',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+                  }}
+                >
+                  <strong style={{ color: '#fff', fontSize: '13px', letterSpacing: '0.5px' }}>{hoveredMarker.name}</strong>
+                  {hoveredMarker.photo && (
+                    <motion.img
+                      key={hoveredMarker.photo}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.5 }}
+                      src={`${BASE}images/${hoveredMarker.photo}`}
+                      alt={hoveredMarker.name}
+                      style={{ width: `${editorParams.current.photoCardWidth}px`, height: `${Math.round(editorParams.current.photoCardWidth * 0.625)}px`, objectFit: 'cover', borderRadius: '8px' }}
+                    />
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
             {/* Fog / particle overlay (controllable via editor) */}
             {editorParams.current.fogLayerEnabled && <div className="globe-fog-layer" />}
             {editorParams.current.particlesLayerEnabled && <div className="globe-particles-layer" />}
