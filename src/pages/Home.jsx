@@ -361,11 +361,11 @@ export default function Home() {
                 float roughness = packed.g;
                 float landSpec = (1.0 - roughness) * pow(max(dot(vWorldNormal, halfDir), 0.0), 60.0) * 0.12;
                 landDay += vec3(0.7, 0.75, 0.8) * landSpec;
-                // City lights: warm golden glow (only amplify real city pixels, keep dark areas dark)
+                // City lights: only actual city pixels visible, everything else is black
                 float lightPeak = max(max(nightCol.r, nightCol.g), nightCol.b);
-                float cityMask = smoothstep(0.08, 0.25, lightPeak);
-                vec3 landNight = nightCol * vec3(1.1, 1.0, 0.85) * (1.0 + cityMask * 2.0);
-                landNight += vec3(1.0, 0.8, 0.4) * pow(lightPeak, 2.0) * cityMask * 2.0;
+                float cityGate = smoothstep(0.04, 0.15, lightPeak);
+                vec3 landNight = nightCol * vec3(3.0, 2.7, 2.0) * cityGate;
+                landNight += vec3(1.0, 0.8, 0.4) * pow(lightPeak, 2.0) * cityGate * 2.5;
                 vec3 landColor = mix(landNight, landDay, dayStrength);
 
                 // --- WATER: animated ocean + tidal currents + specular + Fresnel ---
@@ -425,10 +425,9 @@ export default function Home() {
                   + vec3(0.9, 0.85, 0.7) * glare * 0.5
                   + skyReflection * wFresnel * 0.5
                   + vec3(0.3, 0.5, 0.8) * waves * audioPulse * 0.3;
-                // Night water: near-black ocean with faint city light reflections
+                // Night water: black ocean with faint city light reflections
                 float cityGlow = max(max(nightCol.r, nightCol.g), nightCol.b);
-                vec3 waterNight = vec3(0.002, 0.004, 0.01)
-                  + vec3(0.5, 0.4, 0.2) * cityGlow * 0.08;
+                vec3 waterNight = vec3(0.5, 0.4, 0.2) * smoothstep(0.04, 0.15, cityGlow) * cityGlow * 0.1;
                 vec3 waterColor = mix(waterNight, waterDay, dayStrength);
 
                 // Liquid glass shimmer on prism bop (water goes prismatic)
@@ -578,137 +577,11 @@ export default function Home() {
 
         // (B3 haze shell removed - surface shader handles atmosphere tinting)
 
-        // --- C. Aurora Borealis Shell (depthTest off = renders OVER globe face) ---
-        if (!globe.auroraShell) {
-          const auroraMat = new THREE.ShaderMaterial({
-            uniforms: globe.customUniforms,
-            vertexShader: `
-              varying vec3 vNormal;
-              varying vec3 vPosition;
-              varying vec3 vWorldPos;
-              void main() {
-                vNormal = normalize(normalMatrix * normal);
-                vPosition = (modelViewMatrix * vec4(position, 1.0)).xyz;
-                vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
-                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-              }
-            `,
-            fragmentShader: `
-              uniform float time;
-              uniform float audioPulse;
-              uniform float prismPulse;
-              uniform float introIntensity;
-              uniform vec3 sunDir;
-              varying vec3 vNormal;
-              varying vec3 vPosition;
-              varying vec3 vWorldPos;
-              const vec3 auroraGreen = vec3(0.0, 0.95, 0.5);
-              const vec3 auroraPurple = vec3(0.5, 0.1, 0.95);
-              const vec3 auroraBlue = vec3(0.1, 0.5, 1.0);
-              const vec3 auroraRed = vec3(0.8, 0.1, 0.3);
-              const vec3 auroraGold = vec3(1.0, 0.8, 0.3);
+        // (Aurora shell removed - was creating purple wash via additive blending over globe face)
 
-              vec4 permute(vec4 x){return mod(((x*34.0)+1.0)*x, 289.0);}
-              vec4 taylorInvSqrt(vec4 r){return 1.79284291400159 - 0.85373472095314 * r;}
-              float snoise(vec3 v){
-                const vec2 C = vec2(1.0/6.0, 1.0/3.0);
-                const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
-                vec3 i = floor(v + dot(v, C.yyy));
-                vec3 x0 = v - i + dot(i, C.xxx);
-                vec3 g = step(x0.yzx, x0.xyz);
-                vec3 l = 1.0 - g;
-                vec3 i1 = min(g.xyz, l.zxy);
-                vec3 i2 = max(g.xyz, l.zxy);
-                vec3 x1 = x0 - i1 + C.xxx;
-                vec3 x2 = x0 - i2 + C.yyy;
-                vec3 x3 = x0 - D.yyy;
-                i = mod(i, 289.0);
-                vec4 p = permute(permute(permute(i.z + vec4(0.0, i1.z, i2.z, 1.0)) + i.y + vec4(0.0, i1.y, i2.y, 1.0)) + i.x + vec4(0.0, i1.x, i2.x, 1.0));
-                float n_ = 0.142857142857; vec3 ns = n_ * D.wyz - D.xzx;
-                vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
-                vec4 x_ = floor(j * ns.z); vec4 y_ = floor(j - 7.0 * x_);
-                vec4 x = x_ * ns.x + ns.yyyy; vec4 y = y_ * ns.x + ns.yyyy;
-                vec4 h = 1.0 - abs(x) - abs(y); vec4 b0 = vec4(x.xy, y.xy); vec4 b1 = vec4(x.zw, y.zw);
-                vec4 s0 = floor(b0)*2.0 + 1.0; vec4 s1 = floor(b1)*2.0 + 1.0; vec4 sh = -step(h, vec4(0.0));
-                vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy; vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww;
-                vec3 p0 = vec3(a0.xy,h.x); vec3 p1 = vec3(a0.zw,h.y); vec3 p2 = vec3(a1.xy,h.z); vec3 p3 = vec3(a1.zw,h.w);
-                vec4 norm = taylorInvSqrt(vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3)));
-                p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
-                vec4 m = max(0.6 - vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)), 0.0);
-                m = m * m; return 42.0 * dot(m*m, vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));
-              }
-              void main() {
-                vec3 viewDir = normalize(cameraPosition - vPosition);
-                float rawFresnel = clamp(1.0 - dot(viewDir, vNormal), 0.0, 1.0);
-
-                // Latitude constraint: aurora in polar regions only (after intro)
-                float latitude = abs(normalize(vWorldPos).y);
-                // Northern lights event: ~30s cycle with sharp burst extending south
-                float eventCycle = sin(time * 0.3) * 0.5 + 0.5;
-                float eventPulse = pow(eventCycle, 6.0);
-                float auroraZone = smoothstep(0.55 - eventPulse * 0.15, 0.75, latitude);
-                // Aurora prefers night/twilight side (more visible where it's dark)
-                float sunOrientation = dot(normalize(vWorldPos), sunDir);
-                float nightFactor = smoothstep(0.3, -0.2, sunOrientation);
-                auroraZone *= max(nightFactor, 0.2);
-                // During intro: full globe coverage, then settle to poles
-                auroraZone = mix(auroraZone, 1.0, introIntensity);
-                // Prism bop briefly extends aurora
-                auroraZone = mix(auroraZone, 1.0, prismPulse * 0.4);
-
-                // Fresnel: intro wraps globe, settles to edge glow
-                float fresnelPow = max(0.15, 2.0 - introIntensity * 1.8 - prismPulse * 0.6);
-                float fresnel = pow(rawFresnel, fresnelPow);
-
-                // Flowing aurora speed (slower prism response)
-                float speed = time * (0.18 + introIntensity * 0.4 + prismPulse * 0.1);
-                float n1 = snoise(vPosition * 0.012 + vec3(0.0, speed, speed * 0.5));
-                float n2 = snoise(vPosition * 0.025 + vec3(speed * 0.3, 0.0, speed));
-                float n3 = snoise(vPosition * 0.008 + vec3(speed * 0.15, speed * 0.2, 0.0));
-                float n = n1 * 0.5 + n2 * 0.3 + n3 * 0.2;
-                float mask = smoothstep(0.0, 1.0, n * 0.5 + 0.5);
-
-                // Multi-color aurora bands
-                vec3 col = mix(auroraGreen, auroraPurple, mask);
-                col = mix(col, auroraBlue, smoothstep(0.3, 0.7, n2 * 0.5 + 0.5));
-                col = mix(col, auroraRed, smoothstep(0.7, 1.0, rawFresnel) * 0.3);
-                col = mix(col, auroraGold, introIntensity * smoothstep(0.4, 0.8, n3 * 0.5 + 0.5) * 0.4);
-                // Electric event burst: brighter green during events
-                col = mix(col, auroraGreen * 2.5, eventPulse * auroraZone * 0.4);
-                col = mix(col, col * 1.5, audioPulse * rawFresnel);
-
-                // Slow prismatic color shift on bop
-                vec3 hitColor = vec3(
-                  0.5 + 0.5 * sin(time * 1.5),
-                  0.5 + 0.5 * sin(time * 1.5 + 2.094),
-                  0.5 + 0.5 * sin(time * 1.5 + 4.189)
-                );
-                col = mix(col, hitColor, prismPulse * 0.25);
-
-                // Curtain bands + intro coverage
-                float curtain = smoothstep(-0.2, 0.6, n1) * smoothstep(-0.3, 0.5, n2);
-                float introBoost = introIntensity * (0.6 + n3 * 0.4);
-                float alpha = max(fresnel * curtain * auroraZone, introBoost) * (0.7 + audioPulse * 0.5 + prismPulse * 0.2);
-
-                float brightness = 1.0 + introIntensity * 0.8 + audioPulse * 0.3 + eventPulse * 0.5 + prismPulse * 0.2;
-                float alphaOut = alpha * (0.25 + introIntensity * 0.3);
-                gl_FragColor = vec4(col * brightness, alphaOut);
-              }
-            `,
-            transparent: true,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
-            depthTest: false,
-            side: THREE.FrontSide
-          });
-          const auroraMesh = new THREE.Mesh(new THREE.SphereGeometry(101.5, 64, 64), auroraMat);
-          auroraMesh.renderOrder = 2;
-          scene.add(auroraMesh);
-          globe.auroraShell = auroraMesh;
-        }
-
-        // --- D. Atmospheric Glow (BackSide halo only, matching TSL Earth reference) ---
-        // No inner FrontSide atmosphere - surface shader handles on-globe atmosphere tinting
+        // --- D. Atmospheric Glow (BackSide halo - Franky/TSL hybrid approach) ---
+        // Single BackSide sphere with additive blending for clean glow without dark edges.
+        // Pow-based fresnel concentrates glow at rim. Sun-masked for day/twilight/dark.
         if (!globe.atmosShell) {
           const atmosMat = new THREE.ShaderMaterial({
             uniforms: {
@@ -730,36 +603,39 @@ export default function Home() {
               varying vec3 vWorldNormal;
               varying vec3 vWorldPos;
               void main() {
-                // World-space view direction (matching TSL reference exactly)
+                // World-space fresnel (TSL approach)
                 vec3 viewDir = normalize(vWorldPos - cameraPosition);
                 float fresnel = 1.0 - abs(dot(viewDir, vWorldNormal));
 
-                // TSL remap: fresnel 0.73->1 maps to alpha 1->0, then pow(3) for sharp rim
-                float rimAlpha = clamp((fresnel - 0.73) / 0.27, 0.0, 1.0);
-                rimAlpha = 1.0 - rimAlpha;
-                float alpha = pow(rimAlpha, 3.0);
+                // Rim intensity: pow(4) concentrates at edge, * 6.0 for visible brightness
+                float rimGlow = pow(fresnel, 4.0) * 6.0;
 
-                // Atmosphere color: blue day + warm twilight (TSL exact values)
-                float sunOrientation = dot(vWorldNormal, sunDir);
-                vec3 atmosphereDayColor = vec3(0.302, 0.698, 1.0);
-                vec3 atmosphereTwilightColor = vec3(0.737, 0.286, 0.043);
-                vec3 color = mix(atmosphereTwilightColor, atmosphereDayColor, smoothstep(-0.25, 0.75, sunOrientation));
+                // Atmosphere color: blue day side, warm orange at twilight/terminator
+                float sunOri = dot(vWorldNormal, sunDir);
+                vec3 dayColor = vec3(0.302, 0.698, 1.0);
+                vec3 twilightColor = vec3(0.737, 0.286, 0.043);
+                vec3 color = mix(twilightColor, dayColor, smoothstep(-0.25, 0.75, sunOri));
 
-                // Kill atmosphere on dark side (TSL formula)
-                alpha *= smoothstep(-0.5, 1.0, sunOrientation);
+                // Atmosphere whitening toward thicker center (Franky technique)
+                color = mix(color, color + vec3(0.12), fresnel);
 
-                // Intro boost
-                alpha = max(alpha, introIntensity * 0.3 * pow(rimAlpha, 2.0));
+                // Sun mask: glow on day side + twilight, fading on deep dark side
+                // smoothstep(-0.5, 1.0) lets warm orange extend past terminator for backlit effect
+                float sunMask = smoothstep(-0.5, 1.0, sunOri);
 
-                gl_FragColor = vec4(color, alpha);
+                // Final intensity with intro boost
+                float intensity = rimGlow * max(sunMask, introIntensity * 0.4);
+
+                gl_FragColor = vec4(color * intensity, intensity);
               }
             `,
             transparent: true,
+            blending: THREE.AdditiveBlending,
             depthWrite: false,
             side: THREE.BackSide
           });
-          // TSL reference uses scale 1.04 (4% larger than globe)
-          const atmosMesh = new THREE.Mesh(new THREE.SphereGeometry(104, 64, 64), atmosMat);
+          // 8% larger than globe for visible atmospheric rim
+          const atmosMesh = new THREE.Mesh(new THREE.SphereGeometry(108, 64, 64), atmosMat);
           atmosMesh.renderOrder = 3;
           scene.add(atmosMesh);
 
@@ -1228,7 +1104,7 @@ export default function Home() {
 
               // Decay intro aurora (swirling orb fades over ~5 seconds)
               if (globe.customUniforms.introIntensity.value > 0) {
-                globe.customUniforms.introIntensity.value = Math.max(0, globe.customUniforms.introIntensity.value - dt * 0.2);
+                globe.customUniforms.introIntensity.value = Math.max(0, globe.customUniforms.introIntensity.value - dt * 0.5);
               }
 
               // Decay Prism Pulse slowly and gracefully (8+ second fade)
