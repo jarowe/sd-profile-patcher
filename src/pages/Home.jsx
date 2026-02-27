@@ -15,6 +15,27 @@ import { Howler } from 'howler';
 import * as THREE from 'three';
 const Globe = lazy(() => import('react-globe.gl'));
 
+// Real-time sun position based on UTC time (solar declination + hour angle)
+function getSunDirection() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 0);
+  const diff = now - start;
+  const oneDay = 1000 * 60 * 60 * 24;
+  const dayOfYear = Math.floor(diff / oneDay);
+  // Solar declination: axial tilt effect (-23.4° to +23.4°)
+  const declination = -23.4397 * Math.cos((2 * Math.PI / 365) * (dayOfYear + 10));
+  // Hour angle from UTC
+  const utcHours = now.getUTCHours() + now.getUTCMinutes() / 60 + now.getUTCSeconds() / 3600;
+  const solarLongitude = -((utcHours - 12) * 15);
+  const latRad = declination * (Math.PI / 180);
+  const lngRad = solarLongitude * (Math.PI / 180);
+  return new THREE.Vector3(
+    Math.cos(latRad) * Math.cos(lngRad),
+    Math.sin(latRad),
+    -Math.cos(latRad) * Math.sin(lngRad)
+  ).normalize();
+}
+
 const quotes = [
   { text: "Build what shouldn't exist yet.", author: "Me, probably at 2am" },
   { text: "The best interface is no interface.", author: "Golden Krishna" },
@@ -235,9 +256,16 @@ export default function Home() {
             time: { value: 0 },
             audioPulse: { value: 0 },
             prismPulse: { value: 0.0 },
-            introIntensity: { value: 1.0 } // Starts hot, decays during intro
+            introIntensity: { value: 1.0 },
+            sunDir: { value: getSunDirection() }
           };
         }
+        // Position lights to match real-time sun direction
+        const initSunPos = globe.customUniforms.sunDir.value.clone().multiplyScalar(200);
+        sunLight.position.copy(initSunPos);
+        rimColor.position.copy(initSunPos.clone().negate().add(new THREE.Vector3(0, 100, 0)));
+        globe._sunLight = sunLight;
+        globe._rimLight = rimColor;
 
         // --- B. Living Ocean Shader Material ---
         if (!globe.oceanMaterialSet) {
@@ -247,8 +275,6 @@ export default function Home() {
           const waterTex = texLoader.load('//unpkg.com/three-globe/example/img/earth-water.png');
           // 4K packed texture: R=bump, G=roughness, B=clouds (Bobby Roe / three.js Journey approach)
           const packedTex = texLoader.load('//cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/textures/planets/earth_bump_roughness_clouds_4096.jpg');
-          const sunDirVec = new THREE.Vector3(1.0, 0.5, 1.0).normalize();
-
           const oceanMat = new THREE.ShaderMaterial({
             uniforms: {
               earthMap: { value: earthTex },
@@ -258,7 +284,7 @@ export default function Home() {
               time: globe.customUniforms.time,
               audioPulse: globe.customUniforms.audioPulse,
               prismPulse: globe.customUniforms.prismPulse,
-              sunDir: { value: sunDirVec }
+              sunDir: globe.customUniforms.sunDir
             },
             vertexShader: `
               varying vec2 vUv;
@@ -319,7 +345,7 @@ export default function Home() {
 
                 vec3 viewDir = normalize(-vViewPos);
                 float NdotL = dot(vNormal, sunDir);
-                float dayStrength = smoothstep(-0.1, 0.25, NdotL);
+                float dayStrength = smoothstep(-0.25, 0.5, NdotL);
                 float dayLight = 0.08 + max(NdotL, 0.0) * 0.92;
                 float rawFresnel = clamp(1.0 - dot(viewDir, vNormal), 0.0, 1.0);
                 vec3 halfDir = normalize(sunDir + viewDir);
@@ -332,25 +358,39 @@ export default function Home() {
                 float roughness = packed.g;
                 float landSpec = (1.0 - roughness) * pow(max(dot(vNormal, halfDir), 0.0), 60.0) * 0.12;
                 landDay += vec3(0.7, 0.75, 0.8) * landSpec;
-                // City lights: boost bright areas exponentially for visible glow
+                // City lights: warm golden glow with exponential peak brightness
                 float lightPeak = max(max(nightCol.r, nightCol.g), nightCol.b);
-                vec3 landNight = nightCol * 2.5 + nightCol * lightPeak * 4.0;
+                vec3 warmLight = nightCol * vec3(1.2, 1.0, 0.7);
+                vec3 landNight = warmLight * 3.0 + warmLight * lightPeak * 5.0;
+                landNight += vec3(1.0, 0.7, 0.3) * pow(lightPeak, 3.0) * 2.0;
                 vec3 landColor = mix(landNight, landDay, dayStrength);
 
-                // --- WATER: animated undulating ocean + specular + Fresnel ---
-                vec2 waveUv = vUv * 1200.0;
-                vec2 bigWaveUv = vUv * 300.0;
+                // --- WATER: animated ocean + tidal currents + specular + Fresnel ---
+                // Ocean currents: large-scale flow patterns
+                float lat = vUv.y * 3.14159 - 1.5708;
+                vec2 currentFlow = vec2(
+                  sin(lat * 3.0) * 0.008 + sin(lat * 7.0 + time * 0.02) * 0.003,
+                  cos(vUv.x * 6.28 + time * 0.015) * 0.004
+                );
+                // Tidal pull (slow rhythmic surge)
+                float tide = sin(time * 0.03) * 0.003 + sin(time * 0.07 + vUv.x * 12.0) * 0.001;
+                vec2 tidalUv = vUv + currentFlow + vec2(tide, tide * 0.5);
+
+                vec2 waveUv = tidalUv * 1200.0;
+                vec2 bigWaveUv = tidalUv * 300.0;
                 float t = time * 0.12;
 
-                // Large ocean swells (visible undulation)
+                // Large ocean swells with tidal variation
                 float bigW1 = fbm(bigWaveUv + vec2(t * 0.8, t * 0.5));
                 float bigW2 = fbm(bigWaveUv * 0.6 - vec2(t * 0.3, t * 0.6));
-                float bigWaves = (bigW1 + bigW2) * 0.5;
+                float tidalSurge = sin(time * 0.05 + vUv.y * 8.0) * 0.15;
+                float bigWaves = (bigW1 + bigW2) * 0.5 + tidalSurge * 0.1;
 
-                // Fine detail ripples
+                // Fine detail ripples + crosshatch currents
                 float w1 = fbm(waveUv + vec2(t, t * 0.7));
                 float w2 = fbm(waveUv * 0.7 - vec2(t * 0.5, t * 0.3));
-                float waves = (w1 + w2) * 0.5;
+                float w3 = fbm(waveUv * 1.3 + vec2(t * 0.2, -t * 0.4)) * 0.3;
+                float waves = (w1 + w2) * 0.5 + w3;
 
                 // Combined wave normals: big swells + fine ripples
                 float dx = fbm(waveUv + vec2(0.01, 0.0) + vec2(t, t*0.7)) - w1;
@@ -363,12 +403,15 @@ export default function Home() {
                 float glare = pow(max(dot(waveN, halfDir), 0.0), 12.0);
                 float wFresnel = pow(1.0 - max(dot(viewDir, waveN), 0.0), 4.0);
 
-                // Ocean color with depth variation from swells
+                // Ocean color with depth variation + subsurface glow
                 vec3 deepSea = vec3(0.005, 0.02, 0.08);
                 vec3 midSea = vec3(0.02, 0.08, 0.22);
                 vec3 shallowSea = vec3(0.06, 0.18, 0.38);
                 vec3 oceanBase = mix(deepSea, midSea, waves);
                 oceanBase = mix(oceanBase, shallowSea, bigWaves * 0.4);
+                // Subsurface scattering: sun-facing water glows from within
+                vec3 subsurface = vec3(0.0, 0.12, 0.25) * pow(max(NdotL, 0.0), 2.0) * bigWaves;
+                oceanBase += subsurface;
                 vec3 oceanCol = mix(dayCol.rgb * 0.35, oceanBase, 0.65);
 
                 // Sky reflection via Fresnel
@@ -399,18 +442,16 @@ export default function Home() {
                 float cloudDensity = smoothstep(0.2, 0.7, packed.b);
                 finalColor *= (1.0 - cloudDensity * 0.3 * dayStrength);
 
-                // --- Diffuse sunset glow near day/night transition ---
-                float sunsetGlow = smoothstep(-0.05, 0.3, NdotL) * smoothstep(0.5, 0.05, max(NdotL, 0.0));
-                vec3 sunsetColor = vec3(1.0, 0.35, 0.12);
-                finalColor += sunsetColor * sunsetGlow * 0.08;
+                // --- TSL-style atmospheric blending on surface ---
+                vec3 atmosphereDayColor = vec3(0.3, 0.7, 1.0);
+                vec3 atmosphereTwilightColor = vec3(0.74, 0.29, 0.04);
+                vec3 atmosphereColor = mix(atmosphereTwilightColor, atmosphereDayColor, smoothstep(-0.25, 0.75, NdotL));
+                float atmosphereMix = clamp(smoothstep(-0.5, 1.0, NdotL) * pow(rawFresnel, 2.0), 0.0, 1.0);
+                finalColor = mix(finalColor, atmosphereColor, atmosphereMix * 0.6);
 
-                // --- Atmospheric rim haze (subtle blue glow at edges) ---
-                float rimHaze = pow(rawFresnel, 4.0);
-                vec3 dayHaze = vec3(0.2, 0.4, 1.0);
-                vec3 nightHaze = vec3(0.04, 0.02, 0.12);
-                vec3 hazeColor = mix(nightHaze, dayHaze, dayStrength);
-                hazeColor = mix(hazeColor, vec3(1.0, 0.4, 0.1), sunsetGlow);
-                finalColor += hazeColor * rimHaze * 0.15;
+                // Sunset glow at terminator
+                float sunsetGlow = smoothstep(-0.05, 0.3, NdotL) * smoothstep(0.5, 0.05, max(NdotL, 0.0));
+                finalColor += vec3(1.0, 0.35, 0.12) * sunsetGlow * 0.15;
 
                 gl_FragColor = vec4(finalColor, 1.0);
               }
@@ -437,7 +478,7 @@ export default function Home() {
           const cloudMat = new THREE.ShaderMaterial({
             uniforms: {
               cloudsMap: { value: cloud4KTex },
-              sunDir: { value: new THREE.Vector3(1.0, 0.5, 1.0).normalize() },
+              sunDir: globe.customUniforms.sunDir,
               time: globe.customUniforms.time,
               audioPulse: globe.customUniforms.audioPulse,
             },
@@ -537,7 +578,7 @@ export default function Home() {
           const hazeMat = new THREE.ShaderMaterial({
             uniforms: {
               time: globe.customUniforms.time,
-              sunDir: { value: new THREE.Vector3(1.0, 0.5, 1.0).normalize() }
+              sunDir: globe.customUniforms.sunDir
             },
             vertexShader: `
               varying vec3 vNormal;
@@ -567,22 +608,26 @@ export default function Home() {
                 float n4 = sin((vWorldNormal.x + vWorldNormal.z) * 7.0 + time * 0.1) * 0.5 + 0.5;
                 float fogPattern = n1 * 0.3 + n2 * 0.25 + n3 * 0.25 + n4 * 0.2;
 
-                // Iridescent prismatic color cycling based on view angle
-                float sunFacing = dot(vWorldNormal, sunDir) * 0.5 + 0.5;
-                vec3 iriColor = vec3(
-                  0.3 + 0.25 * sin(rawFresnel * 8.0 + time * 0.25),
-                  0.4 + 0.25 * sin(rawFresnel * 8.0 + time * 0.25 + 2.094),
-                  0.65 + 0.2 * sin(rawFresnel * 8.0 + time * 0.25 + 4.189)
+                // TSL-style atmosphere base + iridescent shimmer
+                float sunOrientation = dot(vWorldNormal, sunDir);
+                vec3 atmosphereDayColor = vec3(0.3, 0.7, 1.0);
+                vec3 atmosphereTwilightColor = vec3(0.74, 0.29, 0.04);
+                vec3 baseColor = mix(atmosphereTwilightColor, atmosphereDayColor, smoothstep(-0.25, 0.75, sunOrientation));
+
+                // Iridescent prismatic shimmer overlay
+                vec3 iriShimmer = vec3(
+                  0.15 * sin(rawFresnel * 8.0 + time * 0.25),
+                  0.15 * sin(rawFresnel * 8.0 + time * 0.25 + 2.094),
+                  0.12 * sin(rawFresnel * 8.0 + time * 0.25 + 4.189)
                 );
+                vec3 hazeColor = baseColor + iriShimmer;
 
-                // Warm sunset on terminator zone
-                float terminator = smoothstep(0.3, 0.5, sunFacing) * smoothstep(0.7, 0.5, sunFacing);
-                iriColor = mix(iriColor, vec3(1.0, 0.5, 0.2), terminator * 0.4);
-                // Night side: deeper blue/purple
-                iriColor = mix(vec3(0.08, 0.04, 0.2), iriColor, smoothstep(0.15, 0.5, sunFacing));
+                // Night side: deeper indigo
+                float dayStrength = smoothstep(-0.5, 0.5, sunOrientation);
+                hazeColor = mix(vec3(0.06, 0.03, 0.15), hazeColor, dayStrength);
 
-                float alpha = rawFresnel * fogPattern * 0.1;
-                gl_FragColor = vec4(iriColor, alpha);
+                float alpha = rawFresnel * fogPattern * 0.12;
+                gl_FragColor = vec4(hazeColor, alpha);
               }
             `,
             transparent: true,
@@ -617,6 +662,7 @@ export default function Home() {
               uniform float audioPulse;
               uniform float prismPulse;
               uniform float introIntensity;
+              uniform vec3 sunDir;
               varying vec3 vNormal;
               varying vec3 vPosition;
               varying vec3 vWorldPos;
@@ -663,11 +709,15 @@ export default function Home() {
                 float latitude = abs(normalize(vWorldPos).y);
                 // Northern lights event: ~30s cycle with sharp burst extending south
                 float eventCycle = sin(time * 0.3) * 0.5 + 0.5;
-                float eventPulse = pow(eventCycle, 6.0); // More frequent, gentler peaks
+                float eventPulse = pow(eventCycle, 6.0);
                 float auroraZone = smoothstep(0.25 - eventPulse * 0.25, 0.65, latitude);
+                // Aurora prefers night/twilight side (more visible where it's dark)
+                float sunOrientation = dot(normalize(vWorldPos), sunDir);
+                float nightFactor = smoothstep(0.3, -0.2, sunOrientation);
+                auroraZone *= max(nightFactor, 0.2);
                 // During intro: full globe coverage, then settle to poles
                 auroraZone = mix(auroraZone, 1.0, introIntensity);
-                // Prism bop briefly extends aurora (slower, gentler)
+                // Prism bop briefly extends aurora
                 auroraZone = mix(auroraZone, 1.0, prismPulse * 0.4);
 
                 // Fresnel: intro wraps globe, settles to edge glow
@@ -723,14 +773,12 @@ export default function Home() {
 
         // --- D. Atmospheric Glow (inner rim + outer halo, matching NASA reference) ---
         if (!globe.atmosShell) {
-          const atmosSunDir = new THREE.Vector3(1.0, 0.5, 1.0).normalize();
-
           // Inner atmosphere rim (FrontSide - visible edge glow ON the globe)
           const innerAtmosMat = new THREE.ShaderMaterial({
             uniforms: {
               time: globe.customUniforms.time,
               introIntensity: globe.customUniforms.introIntensity,
-              sunDir: { value: atmosSunDir }
+              sunDir: globe.customUniforms.sunDir
             },
             vertexShader: `
               varying vec3 vNormal;
@@ -752,30 +800,33 @@ export default function Home() {
               varying vec3 vWorldNormal;
               void main() {
                 vec3 viewDir = normalize(-vPosition);
-                float baseFresnel = pow(1.0 - dot(viewDir, vNormal), 4.5);
+                float rawFresnel = 1.0 - abs(dot(viewDir, vNormal));
+                float baseFresnel = pow(rawFresnel, 3.0);
 
-                // Dynamic atmospheric shimmer (breathing, alive)
-                float shimmer = sin(vWorldNormal.x * 10.0 + time * 0.5) * 0.12
-                              + sin(vWorldNormal.y * 8.0 + time * 0.35) * 0.08
-                              + sin(vWorldNormal.z * 6.0 + time * 0.25) * 0.05;
+                // Dynamic atmospheric shimmer
+                float shimmer = sin(vWorldNormal.x * 10.0 + time * 0.5) * 0.10
+                              + sin(vWorldNormal.y * 8.0 + time * 0.35) * 0.06
+                              + sin(vWorldNormal.z * 6.0 + time * 0.25) * 0.04;
                 float fresnel = baseFresnel * (1.0 + shimmer);
 
-                float sunFacing = dot(vWorldNormal, sunDir) * 0.5 + 0.5;
-                vec3 dayAtmos = vec3(0.3, 0.55, 1.0);
-                vec3 nightAtmos = vec3(0.06, 0.02, 0.2);
-                vec3 terminatorGlow = vec3(1.0, 0.4, 0.08);
+                // TSL-style atmosphere: blue day + warm twilight
+                float sunOrientation = dot(vWorldNormal, sunDir);
+                vec3 atmosphereDayColor = vec3(0.3, 0.7, 1.0);
+                vec3 atmosphereTwilightColor = vec3(0.74, 0.29, 0.04);
+                vec3 atmosColor = mix(atmosphereTwilightColor, atmosphereDayColor, smoothstep(-0.25, 0.75, sunOrientation));
 
-                float terminatorLine = smoothstep(0.3, 0.5, sunFacing) * smoothstep(0.7, 0.5, sunFacing);
-                vec3 atmosColor = mix(nightAtmos, dayAtmos, smoothstep(0.25, 0.7, sunFacing));
-                atmosColor += terminatorGlow * terminatorLine * 1.5;
+                // Night side: subtle purple/indigo
+                vec3 nightAtmos = vec3(0.06, 0.02, 0.15);
+                float dayMask = smoothstep(-0.5, 1.0, sunOrientation);
+                atmosColor = mix(nightAtmos, atmosColor, dayMask);
 
                 // Intro sweep: light wave sweeps around the globe
                 float sweepAngle = time * 1.8;
                 float sweepMask = pow(sin(vWorldNormal.x * 2.0 + vWorldNormal.z * 2.0 + sweepAngle) * 0.5 + 0.5, 3.0);
                 float introSweep = introIntensity * sweepMask * 0.4;
 
-                float alpha = fresnel * (0.35 + introIntensity * 0.25) + introSweep;
-                gl_FragColor = vec4(atmosColor * (1.1 + introIntensity * 0.4), alpha);
+                float alpha = fresnel * (0.4 + introIntensity * 0.25) + introSweep;
+                gl_FragColor = vec4(atmosColor * (1.2 + introIntensity * 0.4), alpha);
               }
             `,
             transparent: true,
@@ -791,7 +842,7 @@ export default function Home() {
           // Outer atmospheric halo (BackSide - glowing rim AROUND the globe silhouette)
           const outerAtmosMat = new THREE.ShaderMaterial({
             uniforms: {
-              sunDir: { value: atmosSunDir },
+              sunDir: globe.customUniforms.sunDir,
               introIntensity: globe.customUniforms.introIntensity
             },
             vertexShader: `
@@ -813,19 +864,24 @@ export default function Home() {
               varying vec3 vPosition;
               void main() {
                 vec3 viewDir = normalize(-vPosition);
-                float fresnel = pow(dot(viewDir, vNormal), 3.0);
+                float rawFresnel = 1.0 - abs(dot(viewDir, vNormal));
 
-                float sunFacing = dot(vWorldNormal, sunDir) * 0.5 + 0.5;
-                vec3 dayGlow = vec3(0.25, 0.5, 1.0);
-                vec3 twilightGlow = vec3(1.0, 0.5, 0.15);
-                vec3 nightGlow = vec3(0.03, 0.01, 0.1);
+                // TSL-style outer halo: visible from center, fades at extreme rim
+                float haloFresnel = clamp(1.0 - (rawFresnel - 0.73) / 0.27, 0.0, 1.0);
+                float alpha = pow(haloFresnel, 3.0);
 
-                float terminator = smoothstep(0.3, 0.5, sunFacing) * smoothstep(0.7, 0.5, sunFacing);
-                vec3 color = mix(nightGlow, dayGlow, smoothstep(0.2, 0.65, sunFacing));
-                color += twilightGlow * terminator * 2.0;
+                // Atmosphere color: blue day + warm twilight
+                float sunOrientation = dot(vWorldNormal, sunDir);
+                vec3 atmosphereDayColor = vec3(0.3, 0.7, 1.0);
+                vec3 atmosphereTwilightColor = vec3(0.74, 0.29, 0.04);
+                vec3 color = mix(atmosphereTwilightColor, atmosphereDayColor, smoothstep(-0.25, 0.75, sunOrientation));
 
-                float alpha = fresnel * (0.22 + introIntensity * 0.12);
-                gl_FragColor = vec4(color * 1.0, alpha);
+                // Mask by sun orientation (no glow on deep night side)
+                float dayStrength = smoothstep(-0.5, 1.0, sunOrientation);
+                alpha *= dayStrength;
+                alpha *= (0.25 + introIntensity * 0.15);
+
+                gl_FragColor = vec4(color * 1.2, alpha);
               }
             `,
             transparent: true,
@@ -843,7 +899,7 @@ export default function Home() {
 
         // --- D2. Cinematic Lens Flare (procedural, at sun position) ---
         if (!globe.lensFlare) {
-          const sunDir = new THREE.Vector3(1.0, 0.5, 1.0).normalize();
+          const flareSunDir = globe.customUniforms.sunDir.value;
 
           // Generate radial gradient texture
           const makeFlareTexture = (size, stops) => {
@@ -901,7 +957,7 @@ export default function Home() {
             return new THREE.CanvasTexture(c);
           })();
 
-          const flarePos = sunDir.clone().multiplyScalar(800);
+          const flarePos = flareSunDir.clone().multiplyScalar(800);
 
           // Layer 1: Main sun glow (massive cinematic star)
           const mainMat = new THREE.SpriteMaterial({
@@ -1004,7 +1060,7 @@ export default function Home() {
               color: i % 2 === 0 ? 0x88aaff : 0xcc88ff
             });
             const s = new THREE.Sprite(mat);
-            s.position.copy(sunDir.clone().multiplyScalar(800 * (1 - t)));
+            s.position.copy(flareSunDir.clone().multiplyScalar(800 * (1 - t)));
             const size = 12 + i * 8;
             s.scale.set(size, size, 1);
             scene.add(s);
@@ -1294,6 +1350,13 @@ export default function Home() {
               const elTs = clock.getElapsedTime();
               globe.customUniforms.time.value = elTs;
 
+              // Update real-time sun position (cheap computation, updates all shared sunDir uniforms)
+              const newSunDir = getSunDirection();
+              globe.customUniforms.sunDir.value.copy(newSunDir);
+              // Move directional lights to match sun
+              if (globe._sunLight) globe._sunLight.position.copy(newSunDir.clone().multiplyScalar(200));
+              if (globe._rimLight) globe._rimLight.position.copy(newSunDir.clone().negate().add(new THREE.Vector3(0, 100, 0)));
+
               // Decay intro aurora (swirling orb fades over ~5 seconds)
               if (globe.customUniforms.introIntensity.value > 0) {
                 globe.customUniforms.introIntensity.value = Math.max(0, globe.customUniforms.introIntensity.value - dt * 0.2);
@@ -1322,6 +1385,19 @@ export default function Home() {
               // Animate lens flare with occlusion (fades behind globe)
               if (globe.lensFlare) {
                 const lf = globe.lensFlare;
+                // Update flare positions to match dynamic sun direction
+                const flareBasePos = newSunDir.clone().multiplyScalar(800);
+                lf.main.position.copy(flareBasePos);
+                if (lf.rays) lf.rays.position.copy(flareBasePos);
+                if (lf.halo) lf.halo.position.copy(flareBasePos);
+                if (lf.anamorphic) lf.anamorphic.position.copy(flareBasePos);
+                if (lf.artifacts) {
+                  const offsets = [0.3, 0.55, -0.15, -0.4, -0.7];
+                  lf.artifacts.forEach((a, i) => {
+                    a.position.copy(newSunDir.clone().multiplyScalar(800 * (1 - offsets[i])));
+                  });
+                }
+
                 const camera = globe.camera();
                 const flareWorldPos = lf.main.position.clone();
 
