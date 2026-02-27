@@ -180,6 +180,7 @@ export const GLOBE_DEFAULTS = {
 
   // ── Particles: Wind (interactive fluid physics) ──
   windParticlesVisible: true,
+  windParticleCount: 12000,
   windGravity: 6.5,
   windInfluenceRadius: 15,
   windDamping: 0.985,
@@ -189,6 +190,9 @@ export const GLOBE_DEFAULTS = {
   windParticleSize: 0.35,
   windParticleOpacity: 0.8,
   windSpinInfluence: 1.5,
+  windSpinSmoothing: 5.0,
+  windSpinDecay: 0.92,
+  windSpinMax: 6.0,
   windTurbulence: 0.4,
   windVortexStrength: 0.8,
   windHomeForce: 0.0,

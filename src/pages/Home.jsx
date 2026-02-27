@@ -2485,7 +2485,63 @@ export default function Home() {
                 if (globe.lensFlare.artifacts) globe.lensFlare.artifacts.forEach(a => { a.visible = lfVis && ep.flareArtifactsVisible; });
               }
               if (globe.particleSystem) globe.particleSystem.visible = ep.starsVisible || ep.dustVisible;
-              if (globe.windParticles) globe.windParticles.visible = ep.windParticlesVisible !== false;
+              if (globe.windParticles) {
+                globe.windParticles.visible = ep.windParticlesVisible !== false;
+                // Rebuild if particle count changed
+                const targetCount = ep.windParticleCount ?? 12000;
+                if (globe._windCount !== targetCount) {
+                  const scene = globe.scene();
+                  scene.remove(globe.windParticles);
+                  globe.windParticles.geometry.dispose();
+                  globe.windParticles.material.dispose();
+                  const wc = targetCount;
+                  const wPos = new Float32Array(wc * 3);
+                  const wVel = new Float32Array(wc * 3);
+                  const wCol = new Float32Array(wc * 3);
+                  const wOrig = new Float32Array(wc * 3);
+                  const wHomeR = new Float32Array(wc);
+                  for (let i = 0; i < wc; i++) {
+                    const ix = i * 3;
+                    const t2 = Math.random();
+                    const r = 101.2 + t2 * t2 * 14;
+                    const th = Math.PI * 2 * Math.random();
+                    const ph = Math.acos(2 * Math.random() - 1);
+                    wPos[ix] = r * Math.sin(ph) * Math.cos(th);
+                    wPos[ix+1] = r * Math.sin(ph) * Math.sin(th);
+                    wPos[ix+2] = r * Math.cos(ph);
+                    wOrig[ix] = wPos[ix]; wOrig[ix+1] = wPos[ix+1]; wOrig[ix+2] = wPos[ix+2];
+                    wHomeR[i] = r;
+                    const nn = 1/r;
+                    const ax2 = Math.random()-0.5, ay2 = Math.random()-0.5, az2 = Math.random()-0.5;
+                    let tx2 = ay2*wPos[ix+2]*nn - az2*wPos[ix+1]*nn;
+                    let ty2 = az2*wPos[ix]*nn - ax2*wPos[ix+2]*nn;
+                    let tz2 = ax2*wPos[ix+1]*nn - ay2*wPos[ix]*nn;
+                    const tl2 = Math.sqrt(tx2*tx2+ty2*ty2+tz2*tz2)||1;
+                    const spd = 0.005 + Math.random()*0.015;
+                    wVel[ix] = tx2/tl2*spd; wVel[ix+1] = ty2/tl2*spd; wVel[ix+2] = tz2/tl2*spd;
+                    const df = (r-101.2)/14;
+                    const h = 0.55+df*0.35, s = 0.3+Math.random()*0.3, l = 0.25+Math.random()*0.2;
+                    const c = new THREE.Color().setHSL(h,s,l);
+                    wCol[ix] = c.r; wCol[ix+1] = c.g; wCol[ix+2] = c.b;
+                  }
+                  const wGeo = new THREE.BufferGeometry();
+                  wGeo.setAttribute('position', new THREE.BufferAttribute(wPos, 3));
+                  wGeo.setAttribute('color', new THREE.BufferAttribute(wCol, 3));
+                  const wMat = new THREE.PointsMaterial({
+                    size: ep.windParticleSize ?? 0.35,
+                    blending: THREE.AdditiveBlending, transparent: true,
+                    sizeAttenuation: true, vertexColors: true, depthWrite: false,
+                    opacity: ep.windParticleOpacity ?? 0.8,
+                  });
+                  const wPts = new THREE.Points(wGeo, wMat);
+                  scene.add(wPts);
+                  globe.windParticles = wPts;
+                  globe._windVel = wVel;
+                  globe._windOrigPos = wOrig;
+                  globe._windHomeR = wHomeR;
+                  globe._windCount = wc;
+                }
+              }
               if (globe.satellitesGroup) {
                 globe.satellitesGroup.children.forEach(m => {
                   const ud = m.userData;
@@ -2768,25 +2824,29 @@ export default function Home() {
                       let axZ = pnx * cny - pny * cnx;
                       const axLen = Math.sqrt(axX*axX + axY*axY + axZ*axZ) || 1;
                       axX /= axLen; axY /= axLen; axZ /= axLen;
-                      const angSpeed = Math.min(angle / safeDt, 8.0); // clamp max angular speed
-                      const smoothing = Math.min(safeDt * 5, 0.7);
+                      const spinSmooth = wp.windSpinSmoothing ?? 5.0;
+                      const spinDecay = wp.windSpinDecay ?? 0.92;
+                      const angSpeed = Math.min(angle / safeDt, (wp.windSpinMax ?? 6.0) * 1.5);
+                      const smoothing = Math.min(safeDt * spinSmooth, 0.85);
                       const keep = 1 - smoothing;
                       globe._angularVel.x = globe._angularVel.x * keep + (-axX * angSpeed) * smoothing;
                       globe._angularVel.y = globe._angularVel.y * keep + (-axY * angSpeed) * smoothing;
                       globe._angularVel.z = globe._angularVel.z * keep + (-axZ * angSpeed) * smoothing;
                       globe._spinMagnitude = globe._spinMagnitude * keep + angSpeed * smoothing;
                     } else {
-                      globe._angularVel.multiplyScalar(0.92);
-                      globe._spinMagnitude *= 0.92;
+                      const spinDecay = wp.windSpinDecay ?? 0.92;
+                      globe._angularVel.multiplyScalar(spinDecay);
+                      globe._spinMagnitude *= spinDecay;
                     }
                   }
                   globe._prevCamPos.set(cx, cy, cz);
                 }
                 // Clamp spin magnitude to prevent runaway
-                if (globe._spinMagnitude > 6.0) {
-                  const clampScale = 6.0 / globe._spinMagnitude;
+                const spinMaxCap = wp.windSpinMax ?? 6.0;
+                if (globe._spinMagnitude > spinMaxCap) {
+                  const clampScale = spinMaxCap / globe._spinMagnitude;
                   globe._angularVel.multiplyScalar(clampScale);
-                  globe._spinMagnitude = 6.0;
+                  globe._spinMagnitude = spinMaxCap;
                 }
                 const spinActive = globe._spinMagnitude > 0.02;
                 const avx = globe._angularVel.x, avy = globe._angularVel.y, avz = globe._angularVel.z;
