@@ -643,12 +643,80 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
         }
       },
       loadLive() { applyPreset(GLOBE_DEFAULTS); console.log('[GlobeEditor] Loaded live settings'); },
+      pushToLive() {
+        // Collect current settings
+        const current = {};
+        for (const [key, val] of Object.entries(p)) {
+          current[key] = Array.isArray(val) ? [...val] : val;
+        }
+
+        // Count changed settings vs GLOBE_DEFAULTS
+        let changedCount = 0;
+        for (const [key, val] of Object.entries(current)) {
+          const def = GLOBE_DEFAULTS[key];
+          if (def === undefined) continue;
+          if (Array.isArray(val) && Array.isArray(def)) {
+            if (val[0] !== def[0] || val[1] !== def[1] || val[2] !== def[2]) changedCount++;
+          } else if (val !== def) changedCount++;
+        }
+
+        // Prompt for passphrase (cached in sessionStorage)
+        const PASSPHRASE_KEY = 'jarowe_editor_passphrase';
+        let passphrase = sessionStorage.getItem(PASSPHRASE_KEY);
+        if (!passphrase) {
+          passphrase = prompt('Enter editor passphrase:');
+          if (!passphrase) return;
+          sessionStorage.setItem(PASSPHRASE_KEY, passphrase);
+        }
+
+        // Confirm
+        if (!confirm(`Push ${changedCount} changed setting${changedCount !== 1 ? 's' : ''} to live?\n\nThis will commit to GitHub and trigger a Vercel deploy.`)) return;
+
+        // Show overlay
+        const overlay = document.createElement('div');
+        Object.assign(overlay.style, {
+          position: 'fixed', inset: '0', zIndex: '99999',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+          color: '#fff', fontFamily: 'system-ui', fontSize: '1.1rem',
+        });
+        overlay.innerHTML = '<div style="font-size:1.5rem;margin-bottom:0.5rem">Pushing to live...</div><div style="opacity:0.6">Committing to GitHub</div>';
+        document.body.appendChild(overlay);
+
+        fetch('/api/save-settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ secret: passphrase, settings: current }),
+        })
+          .then((r) => r.json().then((data) => ({ ok: r.ok, status: r.status, data })))
+          .then(({ ok, status, data }) => {
+            if (ok && data.success) {
+              const sha = data.commitSha ? data.commitSha.slice(0, 7) : '?';
+              overlay.innerHTML = `<div style="font-size:1.5rem;color:#4f8;">Pushed to live!</div>`
+                + `<div style="opacity:0.7;margin-top:0.3rem">${data.changedCount} setting${data.changedCount !== 1 ? 's' : ''} updated</div>`
+                + `<div style="opacity:0.5;margin-top:0.3rem;font-family:monospace">commit ${sha}</div>`
+                + `<div style="opacity:0.4;margin-top:0.8rem;font-size:0.85rem">Vercel will auto-deploy in ~30s</div>`
+                + `<div style="opacity:0.4;margin-top:0.5rem;font-size:0.85rem;cursor:pointer" onclick="this.parentElement.remove()">Click to dismiss</div>`;
+            } else {
+              if (status === 401) sessionStorage.removeItem(PASSPHRASE_KEY);
+              overlay.innerHTML = `<div style="font-size:1.5rem;color:#f44">Push failed</div>`
+                + `<div style="opacity:0.7;margin-top:0.3rem">${data.error || 'Unknown error'}</div>`
+                + `<div style="opacity:0.4;margin-top:0.8rem;font-size:0.85rem;cursor:pointer" onclick="this.parentElement.remove()">Click to dismiss</div>`;
+            }
+          })
+          .catch((err) => {
+            overlay.innerHTML = `<div style="font-size:1.5rem;color:#f44">Network error</div>`
+              + `<div style="opacity:0.7;margin-top:0.3rem">${err.message}</div>`
+              + `<div style="opacity:0.4;margin-top:0.8rem;font-size:0.85rem;cursor:pointer" onclick="this.parentElement.remove()">Click to dismiss</div>`;
+          });
+      },
     };
     presetFolder.add(presetActions, 'loadLive').name('Load Live Settings');
     presetFolder.add(presetActions, 'save').name('Save to localStorage');
     presetFolder.add(presetActions, 'load').name('Load from localStorage');
     presetFolder.add(presetActions, 'importJSON').name('Import JSON (paste)');
     presetFolder.add(presetActions, 'exportJSON').name('Export JSON (clipboard)');
+    presetFolder.add(presetActions, 'pushToLive').name('⬆ Push to Live');
 
     function applyPreset(data) {
       for (const [key, val] of Object.entries(data)) {
