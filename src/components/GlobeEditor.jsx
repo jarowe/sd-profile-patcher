@@ -19,7 +19,7 @@ function hexToRgb(hex) {
   return [r, g, b];
 }
 
-export default function GlobeEditor({ editorParams, globeRef, globeShaderMaterial }) {
+export default function GlobeEditor({ editorParams, globeRef, globeShaderMaterial, setOverlayParams }) {
   const guiRef = useRef(null);
 
   useEffect(() => {
@@ -29,11 +29,9 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
 
     // Build proxy: scalars direct, colors as hex, booleans as-is
     const proxy = {};
-    const colorKeys = new Set();
     for (const [key, val] of Object.entries(p)) {
       if (Array.isArray(val)) {
         proxy[key] = rgbToHex(val);
-        colorKeys.add(key);
       } else {
         proxy[key] = val;
       }
@@ -77,6 +75,7 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     const getHaloMat = () => globeRef.current?.atmosShell?.halo?.material;
     const getParticleMat = () => globeRef.current?.particleSystem?.material;
     const getAuroraMat = () => globeRef.current?.auroraMesh?.material;
+    const getPrismGlowMat = () => globeRef.current?.prismGlowMesh?.material;
 
     // ══════════════════════════════════════════
     // CONTROLS / TIME
@@ -87,7 +86,6 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
       .listen();
     controlsFolder.add(proxy, 'globeOverflowTop', 0, 200, 1).name('Globe Overflow Top (px)').onChange((v) => {
       p.globeOverflowTop = v;
-      // Force re-render by touching a state — the className/style binding reads editorParams directly
       const cell = document.querySelector('.cell-map');
       if (cell) {
         if (v > 0) {
@@ -103,6 +101,7 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     const visFolder = controlsFolder.addFolder('Visibility');
     visFolder.add(proxy, 'cloudsVisible').name('Clouds').onChange(updateParam('cloudsVisible'));
     visFolder.add(proxy, 'auroraEnabled').name('Aurora').onChange(updateParam('auroraEnabled'));
+    visFolder.add(proxy, 'prismGlowEnabled').name('Prismatic Glow').onChange(updateParam('prismGlowEnabled'));
     visFolder.add(proxy, 'lensFlareVisible').name('Lens Flare').onChange(updateParam('lensFlareVisible'));
     visFolder.add(proxy, 'starsVisible').name('Stars').onChange(updateParam('starsVisible'));
     visFolder.add(proxy, 'dustVisible').name('Dust').onChange(updateParam('dustVisible'));
@@ -112,7 +111,7 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     visFolder.add(proxy, 'wispsVisible').name('Wisps').onChange(updateParam('wispsVisible'));
 
     // ══════════════════════════════════════════
-    // SHADER LIGHTING (actually affects ShaderMaterial)
+    // SHADER LIGHTING
     // ══════════════════════════════════════════
     const lightFolder = gui.addFolder('Lighting');
     lightFolder.add(proxy, 'shaderAmbient', 0.0, 0.5, 0.005).name('Shader Ambient').onChange(updateSurfaceUniform('shaderAmbient'));
@@ -215,7 +214,22 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     auroraFolder.add(proxy, 'auroraWidth', 5, 40, 1).name('Width (deg)').onChange(updateShaderUniform(getAuroraMat, 'auroraWidth'));
     auroraFolder.add(proxy, 'auroraNoiseScale', 0.5, 10.0, 0.1).name('Noise Scale').onChange(updateShaderUniform(getAuroraMat, 'auroraNoiseScale'));
     auroraFolder.add(proxy, 'auroraCurtainPow', 0.5, 5.0, 0.1).name('Curtain Power').onChange(updateShaderUniform(getAuroraMat, 'auroraCurtainPow'));
+    auroraFolder.add(proxy, 'auroraEvolution', 0.0, 2.0, 0.05).name('Evolution Speed').onChange(updateShaderUniform(getAuroraMat, 'auroraEvolution'));
+    auroraFolder.add(proxy, 'auroraWaveSpeed', 0.0, 3.0, 0.05).name('Wave Speed').onChange(updateShaderUniform(getAuroraMat, 'auroraWaveSpeed'));
     auroraFolder.close();
+
+    // ══════════════════════════════════════════
+    // PRISMATIC GLOW LAYER
+    // ══════════════════════════════════════════
+    const prismFolder = gui.addFolder('Prismatic Glow');
+    prismFolder.addColor(proxy, 'prismGlowColor1').name('Color 1 (Blue)').onChange(updateShaderColor(getPrismGlowMat, 'prismGlowColor1'));
+    prismFolder.addColor(proxy, 'prismGlowColor2').name('Color 2 (Purple)').onChange(updateShaderColor(getPrismGlowMat, 'prismGlowColor2'));
+    prismFolder.addColor(proxy, 'prismGlowColor3').name('Color 3 (Green)').onChange(updateShaderColor(getPrismGlowMat, 'prismGlowColor3'));
+    prismFolder.add(proxy, 'prismGlowIntensity', 0.0, 2.0, 0.01).name('Intensity').onChange(updateShaderUniform(getPrismGlowMat, 'prismGlowIntensity'));
+    prismFolder.add(proxy, 'prismGlowSpeed', 0.0, 3.0, 0.05).name('Speed').onChange(updateShaderUniform(getPrismGlowMat, 'prismGlowSpeed'));
+    prismFolder.add(proxy, 'prismGlowNoiseScale', 0.5, 10.0, 0.1).name('Noise Scale').onChange(updateShaderUniform(getPrismGlowMat, 'prismGlowNoiseScale'));
+    prismFolder.add(proxy, 'prismGlowFresnelPow', 0.5, 8.0, 0.1).name('Fresnel Power').onChange(updateShaderUniform(getPrismGlowMat, 'prismGlowFresnelPow'));
+    prismFolder.close();
 
     // ══════════════════════════════════════════
     // ATMOSPHERE RIM
@@ -282,6 +296,31 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     objectsFolder.close();
 
     // ══════════════════════════════════════════
+    // OVERLAY GRAPHICS (arcs, rings, labels)
+    // ══════════════════════════════════════════
+    const overlayFolder = gui.addFolder('Overlay Graphics');
+    const overlayKeys = ['arcStroke', 'arcDashLength', 'arcDashGap', 'arcDashAnimateTime',
+      'ringMaxRadius', 'ringPropagationSpeed', 'ringRepeatPeriod', 'labelSize', 'labelDotRadius'];
+    const updateOverlay = (key) => (v) => {
+      p[key] = v;
+      if (setOverlayParams) {
+        const update = {};
+        overlayKeys.forEach(k => { update[k] = p[k]; });
+        setOverlayParams(update);
+      }
+    };
+    overlayFolder.add(proxy, 'arcStroke', 0.0, 3.0, 0.1).name('Arc Stroke').onChange(updateOverlay('arcStroke'));
+    overlayFolder.add(proxy, 'arcDashLength', 0.0, 2.0, 0.05).name('Dash Length').onChange(updateOverlay('arcDashLength'));
+    overlayFolder.add(proxy, 'arcDashGap', 0.0, 2.0, 0.05).name('Dash Gap').onChange(updateOverlay('arcDashGap'));
+    overlayFolder.add(proxy, 'arcDashAnimateTime', 0, 10000, 100).name('Dash Animate (ms)').onChange(updateOverlay('arcDashAnimateTime'));
+    overlayFolder.add(proxy, 'ringMaxRadius', 0.0, 10.0, 0.1).name('Ring Max Radius').onChange(updateOverlay('ringMaxRadius'));
+    overlayFolder.add(proxy, 'ringPropagationSpeed', 0.0, 5.0, 0.1).name('Ring Speed').onChange(updateOverlay('ringPropagationSpeed'));
+    overlayFolder.add(proxy, 'ringRepeatPeriod', 0, 5000, 50).name('Ring Period (ms)').onChange(updateOverlay('ringRepeatPeriod'));
+    overlayFolder.add(proxy, 'labelSize', 0.1, 5.0, 0.1).name('Label Size').onChange(updateOverlay('labelSize'));
+    overlayFolder.add(proxy, 'labelDotRadius', 0.0, 2.0, 0.05).name('Label Dot Radius').onChange(updateOverlay('labelDotRadius'));
+    overlayFolder.close();
+
+    // ══════════════════════════════════════════
     // PRESETS
     // ══════════════════════════════════════════
     const presetFolder = gui.addFolder('Presets');
@@ -327,7 +366,8 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
       // Push to all shader uniforms
       const mats = [
         globeShaderMaterial,
-        getCloudMat(), getRimMat(), getHaloMat(), getParticleMat(), getAuroraMat()
+        getCloudMat(), getRimMat(), getHaloMat(), getParticleMat(),
+        getAuroraMat(), getPrismGlowMat()
       ].filter(Boolean);
       for (const [key, val] of Object.entries(data)) {
         for (const mat of mats) {
@@ -341,6 +381,12 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
         globeRef.current._ambientLight.intensity = data.ambientIntensity;
       if (data.sunIntensity != null && globeRef.current?._sunLight)
         globeRef.current._sunLight.intensity = data.sunIntensity;
+      // Overlay graphics (triggers React re-render)
+      if (setOverlayParams) {
+        const update = {};
+        overlayKeys.forEach(k => { update[k] = p[k]; });
+        setOverlayParams(update);
+      }
       gui.controllersRecursive().forEach(c => c.updateDisplay());
     }
 
@@ -354,7 +400,7 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     }
 
     return () => { gui.destroy(); guiRef.current = null; };
-  }, [editorParams, globeRef, globeShaderMaterial]);
+  }, [editorParams, globeRef, globeShaderMaterial, setOverlayParams]);
 
   return null;
 }

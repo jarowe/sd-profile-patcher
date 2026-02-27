@@ -126,6 +126,19 @@ export default function Home() {
   const [globeMounted, setGlobeMounted] = useState(false);
   const [globeReady, setGlobeReady] = useState(false);
 
+  // Overlay graphics params (state so Globe component re-renders on change)
+  const [overlayParams, setOverlayParams] = useState({
+    arcStroke: GLOBE_DEFAULTS.arcStroke,
+    arcDashLength: GLOBE_DEFAULTS.arcDashLength,
+    arcDashGap: GLOBE_DEFAULTS.arcDashGap,
+    arcDashAnimateTime: GLOBE_DEFAULTS.arcDashAnimateTime,
+    ringMaxRadius: GLOBE_DEFAULTS.ringMaxRadius,
+    ringPropagationSpeed: GLOBE_DEFAULTS.ringPropagationSpeed,
+    ringRepeatPeriod: GLOBE_DEFAULTS.ringRepeatPeriod,
+    labelSize: GLOBE_DEFAULTS.labelSize,
+    labelDotRadius: GLOBE_DEFAULTS.labelDotRadius,
+  });
+
   useEffect(() => {
     const observer = new ResizeObserver((entries) => {
       if (entries[0]) {
@@ -712,14 +725,14 @@ export default function Home() {
               auroraWidth: { value: ap.auroraWidth },
               auroraNoiseScale: { value: ap.auroraNoiseScale },
               auroraCurtainPow: { value: ap.auroraCurtainPow },
+              auroraEvolution: { value: ap.auroraEvolution },
+              auroraWaveSpeed: { value: ap.auroraWaveSpeed },
             },
             vertexShader: `
-              varying vec2 vUv;
               varying vec3 vWorldNormal;
               varying vec3 vWorldPos;
               varying vec3 vViewPos;
               void main() {
-                vUv = uv;
                 vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
                 vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
                 vViewPos = (modelViewMatrix * vec4(position, 1.0)).xyz;
@@ -738,12 +751,13 @@ export default function Home() {
               uniform float auroraWidth;
               uniform float auroraNoiseScale;
               uniform float auroraCurtainPow;
-              varying vec2 vUv;
+              uniform float auroraEvolution;
+              uniform float auroraWaveSpeed;
               varying vec3 vWorldNormal;
               varying vec3 vWorldPos;
               varying vec3 vViewPos;
 
-              // Simple noise for aurora curtains
+              // 3D noise for seamless spherical aurora (no UV seam)
               float hash(vec2 p) {
                 p = fract(p * vec2(234.34, 435.345));
                 p += dot(p, p + 34.23);
@@ -759,17 +773,21 @@ export default function Home() {
               }
               float fbm3(vec2 p) {
                 float v = 0.0; float a = 0.5;
-                for (int i = 0; i < 4; i++) {
+                mat2 rot = mat2(0.8, 0.6, -0.6, 0.8);
+                for (int i = 0; i < 5; i++) {
                   v += a * noise(p);
-                  p = p * 2.1 + vec2(0.7, -0.4);
+                  p = rot * p * 2.1;
                   a *= 0.5;
                 }
                 return v;
               }
 
               void main() {
-                // Latitude from UV: 0=south pole, 0.5=equator, 1=north pole
-                float latDeg = (vUv.y - 0.5) * 180.0;
+                // Seamless spherical coordinates from world position (NO UV seam!)
+                vec3 nPos = normalize(vWorldPos);
+                float lng = atan(nPos.z, nPos.x); // -PI to PI, seamless
+                float lat = asin(clamp(nPos.y, -1.0, 1.0)); // -PI/2 to PI/2
+                float latDeg = lat * 57.2958; // radians to degrees
                 float absLat = abs(latDeg);
 
                 // Aurora band: concentrated near auroraLatitude degrees
@@ -780,15 +798,33 @@ export default function Home() {
                 float NdotL = dot(vWorldNormal, sunDir);
                 float nightMask = smoothstep(0.1, -0.2, NdotL);
 
-                // Curtain pattern: flowing noise bands
+                // Time variables for evolution
                 float t = time * auroraSpeed;
-                float lng = vUv.x * 6.28318;
-                vec2 curtainUv = vec2(lng * auroraNoiseScale + t * 0.3, absLat * 0.1 + t * 0.1);
+                float evolve = time * auroraEvolution;
+                float wave = time * auroraWaveSpeed;
+
+                // Curtain pattern using seamless longitude (no seam at atan2 boundary)
+                // Use sin/cos of longitude for seamless noise input
+                vec2 curtainUv = vec2(
+                  lng * auroraNoiseScale + wave * 0.3,
+                  absLat * 0.1 + t * 0.1 + evolve * 0.2
+                );
                 float curtain = fbm3(curtainUv);
+
+                // Evolution: time-morphing noise that makes the curtain shape shift
+                vec2 evolveUv = vec2(
+                  lng * auroraNoiseScale * 0.7 + evolve * 0.5,
+                  absLat * 0.08 - evolve * 0.3
+                );
+                float evolution = fbm3(evolveUv);
+                curtain = curtain * 0.6 + evolution * 0.4;
                 curtain = pow(curtain, auroraCurtainPow);
 
-                // Secondary swirl layer
-                vec2 swirlUv = vec2(lng * auroraNoiseScale * 0.5 - t * 0.2, absLat * 0.15 + t * 0.05);
+                // Secondary swirl layer with lateral wave propagation
+                vec2 swirlUv = vec2(
+                  lng * auroraNoiseScale * 0.5 - wave * 0.2 + sin(evolve) * 0.3,
+                  absLat * 0.15 + t * 0.05 + cos(evolve * 0.7) * 0.2
+                );
                 float swirl = fbm3(swirlUv + vec2(curtain * 0.5));
 
                 // Color: blend between green, blue, purple based on altitude in curtain
@@ -819,6 +855,122 @@ export default function Home() {
           auroraMesh.renderOrder = 1;
           scene.add(auroraMesh);
           globe.auroraMesh = auroraMesh;
+        }
+
+        // --- C2. Prismatic Iridescent Glow Layer (magical fresnel noise aurora) ---
+        if (!globe.prismGlowMesh && editorParams.current.prismGlowEnabled) {
+          const pg = editorParams.current;
+          const prismGlowMat = new THREE.ShaderMaterial({
+            uniforms: {
+              sunDir: globe.customUniforms.sunDir,
+              time: globe.customUniforms.time,
+              prismPulse: globe.customUniforms.prismPulse,
+              prismGlowColor1: { value: new THREE.Vector3(...pg.prismGlowColor1) },
+              prismGlowColor2: { value: new THREE.Vector3(...pg.prismGlowColor2) },
+              prismGlowColor3: { value: new THREE.Vector3(...pg.prismGlowColor3) },
+              prismGlowIntensity: { value: pg.prismGlowIntensity },
+              prismGlowSpeed: { value: pg.prismGlowSpeed },
+              prismGlowNoiseScale: { value: pg.prismGlowNoiseScale },
+              prismGlowFresnelPow: { value: pg.prismGlowFresnelPow },
+            },
+            vertexShader: `
+              varying vec3 vWorldNormal;
+              varying vec3 vWorldPos;
+              varying vec3 vViewPos;
+              void main() {
+                vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+                vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+                vViewPos = (modelViewMatrix * vec4(position, 1.0)).xyz;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+              }
+            `,
+            fragmentShader: `
+              uniform vec3 sunDir;
+              uniform float time;
+              uniform float prismPulse;
+              uniform vec3 prismGlowColor1;
+              uniform vec3 prismGlowColor2;
+              uniform vec3 prismGlowColor3;
+              uniform float prismGlowIntensity;
+              uniform float prismGlowSpeed;
+              uniform float prismGlowNoiseScale;
+              uniform float prismGlowFresnelPow;
+              varying vec3 vWorldNormal;
+              varying vec3 vWorldPos;
+              varying vec3 vViewPos;
+
+              float hash(vec2 p) {
+                p = fract(p * vec2(234.34, 435.345));
+                p += dot(p, p + 34.23);
+                return fract(p.x * p.y);
+              }
+              float noise(vec2 p) {
+                vec2 i = floor(p);
+                vec2 f = fract(p);
+                f = f * f * (3.0 - 2.0 * f);
+                return mix(
+                  mix(hash(i), hash(i + vec2(1,0)), f.x),
+                  mix(hash(i + vec2(0,1)), hash(i + vec2(1,1)), f.x), f.y);
+              }
+              float fbm(vec2 p) {
+                float v = 0.0; float a = 0.5;
+                mat2 rot = mat2(0.8, 0.6, -0.6, 0.8);
+                for (int i = 0; i < 4; i++) {
+                  v += a * noise(p);
+                  p = rot * p * 2.0;
+                  a *= 0.5;
+                }
+                return v;
+              }
+
+              void main() {
+                // Fresnel: strongest at edges, gives the iridescent rim look
+                vec3 viewDir = normalize(-vViewPos);
+                float fresnel = pow(1.0 - abs(dot(viewDir, normalize(vWorldNormal))), prismGlowFresnelPow);
+
+                // Seamless spherical noise from world position
+                vec3 nPos = normalize(vWorldPos);
+                float lng = atan(nPos.z, nPos.x);
+                float lat = asin(clamp(nPos.y, -1.0, 1.0));
+                float t = time * prismGlowSpeed;
+
+                // Multi-octave flowing noise for iridescent pattern
+                vec2 noiseUv = vec2(lng * prismGlowNoiseScale + t * 0.4, lat * prismGlowNoiseScale + t * 0.2);
+                float n1 = fbm(noiseUv);
+                float n2 = fbm(noiseUv * 1.5 + vec2(t * 0.3, -t * 0.1) + n1 * 0.5);
+
+                // Rainbow color cycling: shifts through all 3 prism colors
+                float phase = n1 * 3.0 + n2 * 2.0 + t * 1.5;
+                vec3 col = prismGlowColor1 * (0.5 + 0.5 * sin(phase));
+                col += prismGlowColor2 * (0.5 + 0.5 * sin(phase + 2.094));
+                col += prismGlowColor3 * (0.5 + 0.5 * sin(phase + 4.189));
+                col = normalize(col) * length(col) * 0.5;
+
+                // Base intensity: always subtly visible, boosted massively by prism pulse
+                float baseIntensity = prismGlowIntensity * 0.3;
+                float pulseBoost = prismPulse * prismGlowIntensity * 3.0;
+                float intensity = (baseIntensity + pulseBoost) * fresnel * (0.5 + n2 * 0.5);
+
+                // Thin band of maximum iridescence near the limb
+                float bandMask = smoothstep(0.2, 0.5, fresnel) * smoothstep(1.0, 0.7, fresnel);
+                intensity *= (0.5 + bandMask * 1.5);
+
+                float alpha = clamp(intensity, 0.0, 1.0);
+                gl_FragColor = vec4(col * intensity, alpha);
+              }
+            `,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            side: THREE.FrontSide,
+          });
+          const prismGlowMesh = new THREE.Mesh(
+            new THREE.SphereGeometry(pg.prismGlowHeight, 64, 64),
+            prismGlowMat
+          );
+          prismGlowMesh.renderOrder = 1;
+          scene.add(prismGlowMesh);
+          globe.prismGlowMesh = prismGlowMesh;
         }
 
         // --- D. Atmospheric Glow (tight rim + soft feathered halo) ---
@@ -1462,6 +1614,7 @@ export default function Home() {
               // Visibility toggles
               if (globe.cloudMesh) globe.cloudMesh.visible = ep.cloudsVisible;
               if (globe.auroraMesh) globe.auroraMesh.visible = ep.auroraEnabled;
+              if (globe.prismGlowMesh) globe.prismGlowMesh.visible = ep.prismGlowEnabled;
               if (globe.lensFlare) {
                 const lfVis = ep.lensFlareVisible;
                 if (globe.lensFlare.main) globe.lensFlare.main.visible = lfVis;
@@ -1980,21 +2133,21 @@ export default function Home() {
 
                     arcsData={arcsData}
                     arcColor="color"
-                    arcDashLength={0.4}
-                    arcDashGap={0.2}
-                    arcDashAnimateTime={2000}
-                    arcStroke={0.5}
+                    arcDashLength={overlayParams.arcDashLength}
+                    arcDashGap={overlayParams.arcDashGap}
+                    arcDashAnimateTime={overlayParams.arcDashAnimateTime}
+                    arcStroke={overlayParams.arcStroke}
                     ringsData={expeditions}
                     ringColor={(d) => d.color}
-                    ringMaxRadius={2}
-                    ringPropagationSpeed={1}
-                    ringRepeatPeriod={1000}
+                    ringMaxRadius={overlayParams.ringMaxRadius}
+                    ringPropagationSpeed={overlayParams.ringPropagationSpeed}
+                    ringRepeatPeriod={overlayParams.ringRepeatPeriod}
                     labelsData={expeditions}
                     labelLat="lat"
                     labelLng="lng"
                     labelText={(d) => (d === hoveredMarker || expeditions.indexOf(d) === activeExpedition) ? d.name : ''}
-                    labelSize={1.2}
-                    labelDotRadius={0.3}
+                    labelSize={overlayParams.labelSize}
+                    labelDotRadius={overlayParams.labelDotRadius}
                     labelColor={() => 'rgba(255, 255, 255, 0.9)'}
                     labelResolution={2}
                     onLabelHover={(label) => setHoveredMarker(label)}
@@ -2460,6 +2613,7 @@ export default function Home() {
             editorParams={editorParams}
             globeRef={globeRef}
             globeShaderMaterial={globeShaderMaterial}
+            setOverlayParams={setOverlayParams}
           />
         </Suspense>
       )}
