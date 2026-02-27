@@ -3,9 +3,11 @@ import { Canvas } from '@react-three/fiber';
 import { OrbitControls, useDetectGPU } from '@react-three/drei';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import { useConstellationStore } from '../store';
-import { computeHelixLayout, getHelixCenter } from '../layout/helixLayout';
+import { computeHelixLayout, getHelixCenter, getHelixBounds } from '../layout/helixLayout';
 import mockData from '../data/mock-constellation.json';
 import NodeCloud from './NodeCloud';
+import HoverLabel from './HoverLabel';
+import CameraController from './CameraController';
 import Starfield from './Starfield';
 import NebulaFog from './NebulaFog';
 
@@ -61,51 +63,7 @@ function GPUDetector({ onDetect }) {
   return null;
 }
 
-/**
- * Auto-orbit controller with pause on interaction, resume after idle.
- */
-function CameraController({ controlsRef }) {
-  const autoRotateTimer = useRef(null);
-  const rampInterval = useRef(null);
-
-  useEffect(() => {
-    const controls = controlsRef.current;
-    if (!controls) return;
-
-    const handleStart = () => {
-      controls.autoRotate = false;
-      if (autoRotateTimer.current) clearTimeout(autoRotateTimer.current);
-      if (rampInterval.current) clearInterval(rampInterval.current);
-    };
-
-    const handleEnd = () => {
-      autoRotateTimer.current = setTimeout(() => {
-        controls.autoRotate = true;
-        controls.autoRotateSpeed = 0;
-        rampInterval.current = setInterval(() => {
-          if (controls.autoRotateSpeed < 0.5) {
-            controls.autoRotateSpeed += 0.02;
-          } else {
-            controls.autoRotateSpeed = 0.5;
-            clearInterval(rampInterval.current);
-          }
-        }, 50);
-      }, 5000);
-    };
-
-    controls.addEventListener('start', handleStart);
-    controls.addEventListener('end', handleEnd);
-
-    return () => {
-      controls.removeEventListener('start', handleStart);
-      controls.removeEventListener('end', handleEnd);
-      if (autoRotateTimer.current) clearTimeout(autoRotateTimer.current);
-      if (rampInterval.current) clearInterval(rampInterval.current);
-    };
-  }, [controlsRef]);
-
-  return null;
-}
+/* CameraController now imported from ./CameraController.jsx */
 
 /**
  * Main R3F Canvas for the constellation scene.
@@ -124,6 +82,9 @@ export default function ConstellationCanvas() {
 
   // Helix center for camera target
   const center = useMemo(() => getHelixCenter(layoutNodes), [layoutNodes]);
+
+  // Helix vertical bounds for timeline scrubber
+  const helixBounds = useMemo(() => getHelixBounds(layoutNodes), [layoutNodes]);
 
   // Epoch centers for nebula fog
   const epochCenters = useMemo(() => {
@@ -199,7 +160,13 @@ export default function ConstellationCanvas() {
         target={[center.x, center.y, center.z]}
       />
 
-      <CameraController controlsRef={controlsRef} />
+      <CameraController
+        controlsRef={controlsRef}
+        positions={layoutNodes}
+        helixBounds={helixBounds}
+      />
+
+      <HoverLabel />
 
       <ambientLight intensity={0.15} />
 

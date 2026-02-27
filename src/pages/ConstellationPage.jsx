@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useConstellationStore } from '../constellation/store';
 import ConstellationCanvas from '../constellation/scene/ConstellationCanvas';
+import Toolbar from '../constellation/ui/Toolbar';
+import TimelineScrubber from '../constellation/ui/TimelineScrubber';
 import './ConstellationPage.css';
 
 export default function ConstellationPage() {
@@ -23,6 +25,8 @@ export default function ConstellationPage() {
             </div>
           )}
           <ConstellationCanvas />
+          <Toolbar />
+          <TimelineScrubber />
         </>
       ) : (
         <div className="constellation-loading">
