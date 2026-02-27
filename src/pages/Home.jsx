@@ -2348,9 +2348,11 @@ export default function Home() {
                   // Dome circle SDF
                   float dCircle = length(pixel - domeCenter) - (domeRadius + domePad);
 
-                  // Separate masks: hard card edge (CSS glass handles visuals) + soft dome edge
-                  float cardMask = 1.0 - smoothstep(-1.5, 1.5, dRect);
-                  float domeMask = 1.0 - smoothstep(-breakoutFeather * 0.3, breakoutFeather, dCircle);
+                  // Card mask: crisp edge aligned with CSS glass border (0.5px AA only)
+                  float cardMask = 1.0 - smoothstep(-0.5, 0.5, dRect);
+                  // Dome mask: soft feathered edge for the protruding sphere
+                  float domeMask = 1.0 - smoothstep(-breakoutFeather * 0.2, breakoutFeather, dCircle);
+                  // Union: visible if inside card OR inside dome
                   float maskAlpha = max(cardMask, domeMask);
 
                   col *= maskAlpha;

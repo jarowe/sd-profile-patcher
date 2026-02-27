@@ -1137,11 +1137,15 @@
 .bento-cell.cell-map.globe-breakout:hover {
     transform: none;
 }
-/* Extend canvas above card — PP shader handles all masking */
+/* Extend canvas equally above AND below — globe stays centered in card.
+   PP shader SDF mask handles clipping: card rect + dome circle above. */
 .bento-cell.cell-map.globe-breakout .map-container {
     top: calc(-1 * var(--globe-breakout-px, 60px));
-    height: calc(100% + var(--globe-breakout-px, 60px) + 10px);
-    /* NO clip-path — PP shader SDF mask handles clipping */
+    bottom: calc(-1 * var(--globe-breakout-px, 60px));
+    left: -10px;
+    right: -10px;
+    width: auto;
+    height: auto;
 }
 /* CSS glass edge stays visible in breakout mode — PP shader only does alpha masking */
 /* Hide cell-map pseudo overlays in breakout mode (they can't extend above card) */

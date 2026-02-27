@@ -298,7 +298,7 @@ export const GLOBE_DEFAULTS = {
 
   // ── Sun Rays (3D volumetric beams from sun) ──
   sunRaysEnabled: true,
-  sunRaysIntensity: 0.07,
+  sunRaysIntensity: 0.04,
   sunRaysLength: 3.4,
   sunRaysCount: 12,
   sunRaysColor: [1.0, 0.95, 0.8],
