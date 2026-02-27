@@ -6,6 +6,7 @@ import BeamyProject from './pages/BeamyProject';
 import React, { Suspense } from 'react';
 import StarseedProject from './pages/StarseedProject';
 const UniversePage = React.lazy(() => import('./pages/UniversePage'));
+const ConstellationPage = React.lazy(() => import('./pages/ConstellationPage'));
 import GameOverlay from './components/GameOverlay';
 import Garden from './pages/Garden';
 import Now from './pages/Now';
@@ -37,6 +38,11 @@ function App() {
               <Route path="/now" element={<Now />} />
               <Route path="/favorites" element={<Favorites />} />
               <Route path="/vault" element={<Vault />} />
+              <Route path="/constellation" element={
+                <Suspense fallback={<div style={{ color: 'white', padding: '2rem', textAlign: 'center' }}>Loading Constellation...</div>}>
+                  <ConstellationPage />
+                </Suspense>
+              } />
             </Routes>
             <GameOverlay />
             <GlobalPlayer />
