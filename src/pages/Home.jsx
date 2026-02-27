@@ -289,10 +289,14 @@ export default function Home() {
             vertexShader: `
               varying vec2 vUv;
               varying vec3 vNormal;
+              varying vec3 vWorldNormal;
+              varying vec3 vWorldPos;
               varying vec3 vViewPos;
               void main() {
                 vUv = uv;
                 vNormal = normalize(normalMatrix * normal);
+                vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+                vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
                 vViewPos = (modelViewMatrix * vec4(position, 1.0)).xyz;
                 gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
               }
@@ -308,6 +312,8 @@ export default function Home() {
               uniform vec3 sunDir;
               varying vec2 vUv;
               varying vec3 vNormal;
+              varying vec3 vWorldNormal;
+              varying vec3 vWorldPos;
               varying vec3 vViewPos;
 
               float hash21(vec2 p) {
@@ -343,12 +349,13 @@ export default function Home() {
                 float isWater = smoothstep(0.3, 0.7, waterVal);
                 vec3 packed = texture2D(packedTex, vUv).rgb;
 
-                vec3 viewDir = normalize(-vViewPos);
-                float NdotL = dot(vNormal, sunDir);
+                // All lighting in WORLD space so sun stays fixed as camera orbits
+                vec3 worldViewDir = normalize(cameraPosition - vWorldPos);
+                float NdotL = dot(vWorldNormal, sunDir);
                 float dayStrength = smoothstep(-0.25, 0.5, NdotL);
                 float dayLight = 0.08 + max(NdotL, 0.0) * 0.92;
-                float rawFresnel = clamp(1.0 - dot(viewDir, vNormal), 0.0, 1.0);
-                vec3 halfDir = normalize(sunDir + viewDir);
+                float rawFresnel = clamp(1.0 - dot(worldViewDir, vWorldNormal), 0.0, 1.0);
+                vec3 halfDir = normalize(sunDir + worldViewDir);
 
                 // --- LAND: matte terrain + bump detail + night lights ---
                 float landFresnel = pow(rawFresnel, 3.5);
@@ -356,7 +363,7 @@ export default function Home() {
                 float bumpLight = 1.0 + (bumpVal - 0.5) * 0.35 * dayStrength;
                 vec3 landDay = dayCol.rgb * dayLight * bumpLight + dayCol.rgb * landFresnel * 0.10;
                 float roughness = packed.g;
-                float landSpec = (1.0 - roughness) * pow(max(dot(vNormal, halfDir), 0.0), 60.0) * 0.12;
+                float landSpec = (1.0 - roughness) * pow(max(dot(vWorldNormal, halfDir), 0.0), 60.0) * 0.12;
                 landDay += vec3(0.7, 0.75, 0.8) * landSpec;
                 // City lights: warm golden glow with exponential peak brightness
                 float lightPeak = max(max(nightCol.r, nightCol.g), nightCol.b);
@@ -397,11 +404,11 @@ export default function Home() {
                 float dy = fbm(waveUv + vec2(0.0, 0.01) + vec2(t, t*0.7)) - w1;
                 float bdx = fbm(bigWaveUv + vec2(0.02, 0.0) + vec2(t*0.8, t*0.5)) - bigW1;
                 float bdy = fbm(bigWaveUv + vec2(0.0, 0.02) + vec2(t*0.8, t*0.5)) - bigW1;
-                vec3 waveN = normalize(vNormal + vec3(dx + bdx * 2.0, dy + bdy * 2.0, 0.0) * 8.0);
+                vec3 waveN = normalize(vWorldNormal + vec3(dx + bdx * 2.0, dy + bdy * 2.0, 0.0) * 8.0);
 
                 float spec = pow(max(dot(waveN, halfDir), 0.0), 120.0);
                 float glare = pow(max(dot(waveN, halfDir), 0.0), 12.0);
-                float wFresnel = pow(1.0 - max(dot(viewDir, waveN), 0.0), 4.0);
+                float wFresnel = pow(1.0 - max(dot(worldViewDir, waveN), 0.0), 4.0);
 
                 // Ocean color with depth variation + subsurface glow
                 vec3 deepSea = vec3(0.005, 0.02, 0.08);
