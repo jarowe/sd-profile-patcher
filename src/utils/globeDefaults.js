@@ -178,6 +178,17 @@ export const GLOBE_DEFAULTS = {
   // ── Particles: Mouse ──
   mouseRippleRadius: 14.5,
 
+  // ── Particles: Wind (interactive fluid physics) ──
+  windParticlesVisible: true,
+  windGravity: 6.5,
+  windInfluenceRadius: 15,
+  windDamping: 0.985,
+  windEscapeVelocity: 0.35,
+  windColorSpeed: 0.02,
+  windTrailEffect: 0.95,
+  windParticleSize: 0.35,
+  windParticleOpacity: 0.8,
+
   // ── Cloud Mesh ──
   cloudMeshRadius: 100.8,
   cloudRotationSpeed: 0.012,
@@ -193,6 +204,11 @@ export const GLOBE_DEFAULTS = {
   globeBreakoutPx: 60,
   globeBreakoutClipPad: 4,
   globeBreakoutFeather: 8,
+
+  // ── Glass Border (PP shader liquid glass) ──
+  glassThickness: 30,
+  glassIntensity: 0.8,
+  glassTintColor: [0.4, 0.6, 1.0],
 
   // ── Expedition Photo Card ──
   photoCardTop: 12,
@@ -215,7 +231,7 @@ export const GLOBE_DEFAULTS = {
 
   // ── CSS Overlay Layers ──
   fogLayerEnabled: true,
-  particlesLayerEnabled: true,
+  particlesLayerEnabled: false,
   innerGlowEnabled: true,
 
   // ── Glass Edge Effect ──

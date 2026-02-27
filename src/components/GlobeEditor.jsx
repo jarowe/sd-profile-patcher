@@ -124,6 +124,11 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
         if (v) cell.style.setProperty('--globe-breakout-px', `${p.globeBreakoutPx}px`);
       }
     });
+    controlsFolder.add(proxy, 'globeBreakoutPx', 0, 400, 10).name('Breakout Height (px)').onChange((v) => {
+      p.globeBreakoutPx = v;
+      const cell = document.querySelector('.cell-map');
+      if (cell && p.globeBreakout) cell.style.setProperty('--globe-breakout-px', `${v}px`);
+    });
     controlsFolder.add(proxy, 'globeBreakoutClipPad', 0, 30, 1).name('Clip Padding').onChange((v) => {
       p.globeBreakoutClipPad = v;
     });
@@ -153,6 +158,7 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     visFolder.add(proxy, 'lensFlareVisible').name('Lens Flare').onChange(updateParam('lensFlareVisible'));
     visFolder.add(proxy, 'starsVisible').name('Stars').onChange(updateParam('starsVisible'));
     visFolder.add(proxy, 'dustVisible').name('Dust').onChange(updateParam('dustVisible'));
+    visFolder.add(proxy, 'windParticlesVisible').name('Wind Particles').onChange(updateParam('windParticlesVisible'));
     visFolder.add(proxy, 'satellitesVisible').name('Satellites').onChange(updateParam('satellitesVisible'));
     visFolder.add(proxy, 'planesVisible').name('Planes').onChange(updateParam('planesVisible'));
     visFolder.add(proxy, 'carsVisible').name('Cars').onChange(updateParam('carsVisible'));
@@ -432,6 +438,24 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     dustFolder2.add(proxy, 'dustAmplitude', 0.0, 10.0, 0.1).name('Amplitude').onChange(updateShaderUniform(getParticleMat, 'dustAmplitude'));
     const mouseFolder = particleFolder.addFolder('Mouse');
     mouseFolder.add(proxy, 'mouseRippleRadius', 1.0, 30.0, 0.5).name('Ripple Radius').onChange(updateShaderUniform(getParticleMat, 'mouseRippleRadius'));
+    const windFolder = particleFolder.addFolder('Wind Particles');
+    windFolder.add(proxy, 'windParticlesVisible').name('Enabled').onChange(updateParam('windParticlesVisible'));
+    windFolder.add(proxy, 'windGravity', 0, 15, 0.1).name('Gravity').onChange(updateParam('windGravity'));
+    windFolder.add(proxy, 'windInfluenceRadius', 1, 30, 0.5).name('Influence Radius').onChange(updateParam('windInfluenceRadius'));
+    windFolder.add(proxy, 'windDamping', 0.95, 0.999, 0.001).name('Damping').onChange(updateParam('windDamping'));
+    windFolder.add(proxy, 'windEscapeVelocity', 0.05, 1.0, 0.01).name('Escape Velocity').onChange(updateParam('windEscapeVelocity'));
+    windFolder.add(proxy, 'windColorSpeed', 0, 0.1, 0.001).name('Color Cycle').onChange(updateParam('windColorSpeed'));
+    windFolder.add(proxy, 'windTrailEffect', 0.8, 0.999, 0.001).name('Trail Effect').onChange(updateParam('windTrailEffect'));
+    windFolder.add(proxy, 'windParticleSize', 0.05, 2.0, 0.05).name('Particle Size').onChange((v) => {
+      p.windParticleSize = v;
+      const wm = globeRef.current?.windParticles?.material;
+      if (wm) wm.size = v;
+    });
+    windFolder.add(proxy, 'windParticleOpacity', 0.1, 1.0, 0.05).name('Opacity').onChange((v) => {
+      p.windParticleOpacity = v;
+      const wm = globeRef.current?.windParticles?.material;
+      if (wm) wm.opacity = v;
+    });
     particleFolder.close();
 
     // ══════════════════════════════════════════

@@ -1911,6 +1911,63 @@ export default function Home() {
           globe.particleSystem = pts;
         }
 
+        // --- E2. Wind Particles (interactive fluid physics around globe) ---
+        if (!globe.windParticles) {
+          const windCount = 6000;
+          const windPos = new Float32Array(windCount * 3);
+          const windVel = new Float32Array(windCount * 3);
+          const windCol = new Float32Array(windCount * 3);
+          const windOrigPos = new Float32Array(windCount * 3);
+
+          // Distribute in spherical shell (radius 101.5–108)
+          for (let i = 0; i < windCount; i++) {
+            const idx = i * 3;
+            const r = 101.5 + Math.random() * 6.5;
+            const theta = Math.PI * 2 * Math.random();
+            const phi = Math.acos(2 * Math.random() - 1);
+            windPos[idx]     = r * Math.sin(phi) * Math.cos(theta);
+            windPos[idx + 1] = r * Math.sin(phi) * Math.sin(theta);
+            windPos[idx + 2] = r * Math.cos(phi);
+            windOrigPos[idx]     = windPos[idx];
+            windOrigPos[idx + 1] = windPos[idx + 1];
+            windOrigPos[idx + 2] = windPos[idx + 2];
+            // Slight initial orbital velocity (tangent to sphere)
+            const normal = new THREE.Vector3(windPos[idx], windPos[idx+1], windPos[idx+2]).normalize();
+            const up = new THREE.Vector3(0, 1, 0);
+            const tangent = new THREE.Vector3().crossVectors(normal, up).normalize();
+            windVel[idx]     = tangent.x * 0.02;
+            windVel[idx + 1] = tangent.y * 0.02;
+            windVel[idx + 2] = tangent.z * 0.02;
+            // HSL spectrum initial color
+            const hue = i / windCount;
+            const color = new THREE.Color().setHSL(hue, 0.6, 0.5);
+            windCol[idx]     = color.r;
+            windCol[idx + 1] = color.g;
+            windCol[idx + 2] = color.b;
+          }
+
+          const windGeo = new THREE.BufferGeometry();
+          windGeo.setAttribute('position', new THREE.BufferAttribute(windPos, 3));
+          windGeo.setAttribute('color', new THREE.BufferAttribute(windCol, 3));
+
+          const windMat = new THREE.PointsMaterial({
+            size: 0.35,
+            blending: THREE.AdditiveBlending,
+            transparent: true,
+            sizeAttenuation: true,
+            vertexColors: true,
+            depthWrite: false,
+            opacity: 0.8,
+          });
+
+          const windPts = new THREE.Points(windGeo, windMat);
+          scene.add(windPts);
+          globe.windParticles = windPts;
+          globe._windVel = windVel;
+          globe._windOrigPos = windOrigPos;
+          globe._windCount = windCount;
+        }
+
         // --- F. Orbiting Objects + Micro Hidden Gems ---
         if (!globe.satellitesGroup) {
           globe.satellitesGroup = new THREE.Group();
@@ -2347,6 +2404,27 @@ export default function Home() {
         }
 
         // --- G. Animation loop for shaders & motion ---
+        // HSL→RGB helper for wind particle color (zero-allocation)
+        function _hsl2rgb(h, s, l) {
+          let r, g, b;
+          if (s === 0) { r = g = b = l; }
+          else {
+            const hue2rgb = (p, q, t) => {
+              if (t < 0) t += 1; if (t > 1) t -= 1;
+              if (t < 1/6) return p + (q - p) * 6 * t;
+              if (t < 1/2) return q;
+              if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+              return p;
+            };
+            const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+            const p = 2 * l - q;
+            r = hue2rgb(p, q, h + 1/3);
+            g = hue2rgb(p, q, h);
+            b = hue2rgb(p, q, h - 1/3);
+          }
+          return [r, g, b];
+        }
+
         const clock = new THREE.Clock();
         if (!globe.animateTick) {
           globe.animateTick = true;
@@ -2393,6 +2471,7 @@ export default function Home() {
                 if (globe.lensFlare.artifacts) globe.lensFlare.artifacts.forEach(a => { a.visible = lfVis && ep.flareArtifactsVisible; });
               }
               if (globe.particleSystem) globe.particleSystem.visible = ep.starsVisible || ep.dustVisible;
+              if (globe.windParticles) globe.windParticles.visible = ep.windParticlesVisible !== false;
               if (globe.satellitesGroup) {
                 globe.satellitesGroup.children.forEach(m => {
                   const ud = m.userData;
@@ -2635,6 +2714,112 @@ export default function Home() {
                     m.lookAt(0, 0, 0);
                   }
                 });
+              }
+
+              // Wind particle physics (CPU-side fluid simulation)
+              if (globe.windParticles && globe.windParticles.visible) {
+                const wp = editorParams.current;
+                const windGravity = wp.windGravity || 6.5;
+                const windInfluenceRadius = wp.windInfluenceRadius || 15;
+                const windDamping = wp.windDamping || 0.985;
+                const windEscapeVel = wp.windEscapeVelocity || 0.35;
+                const windColorSpeed = wp.windColorSpeed || 0.02;
+                const windTrail = wp.windTrailEffect || 0.95;
+                const windShellInner = 101.0;
+                const windShellOuter = 110.0;
+
+                const wPos = globe.windParticles.geometry.attributes.position.array;
+                const wCol = globe.windParticles.geometry.attributes.color.array;
+                const wVel = globe._windVel;
+                const wOrig = globe._windOrigPos;
+                const wCount = globe._windCount;
+                const mouseHit = globe._particleMousePos;
+                const mouseValid = mouseHit && mouseHit.lengthSq() > 1.0;
+
+                for (let i = 0; i < wCount; i++) {
+                  const idx = i * 3;
+                  const x = wPos[idx], y = wPos[idx+1], z = wPos[idx+2];
+
+                  if (mouseValid) {
+                    const dx = x - mouseHit.x;
+                    const dy = y - mouseHit.y;
+                    const dz = z - mouseHit.z;
+                    const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+
+                    if (dist < windInfluenceRadius && dist > 0.5) {
+                      // Gravitational pull toward mouse (inverse square, clamped)
+                      const force = windGravity / (dist * dist + 0.5);
+                      const acc = force * dt;
+
+                      // Radial direction (toward mouse)
+                      const invDist = 1.0 / dist;
+                      const rx = -dx * invDist, ry = -dy * invDist, rz = -dz * invDist;
+
+                      // Tangential direction (perpendicular, creates swirl)
+                      const nLen = Math.sqrt(x*x + y*y + z*z);
+                      const nnx = x/nLen, nny = y/nLen, nnz = z/nLen;
+                      let tx = ry * nnz - rz * nny;
+                      let ty = rz * nnx - rx * nnz;
+                      let tz = rx * nny - ry * nnx;
+                      const tLen = Math.sqrt(tx*tx + ty*ty + tz*tz) || 1;
+                      tx /= tLen; ty /= tLen; tz /= tLen;
+
+                      // Apply radial (0.7) + tangential (1.2) forces
+                      wVel[idx]     += rx * acc * 0.7 + tx * acc * 1.2;
+                      wVel[idx + 1] += ry * acc * 0.7 + ty * acc * 1.2;
+                      wVel[idx + 2] += rz * acc * 0.7 + tz * acc * 1.2;
+
+                      // Dynamic color: HSL based on speed + distance + time
+                      const speed = Math.sqrt(wVel[idx]*wVel[idx] + wVel[idx+1]*wVel[idx+1] + wVel[idx+2]*wVel[idx+2]);
+                      const speedIntensity = Math.min(speed / windEscapeVel, 1.0);
+                      const distIntensity = 1.0 - dist / windInfluenceRadius;
+                      const timeHue = (elTs * windColorSpeed + i * 0.001) % 1.0;
+                      const hue = (timeHue + speedIntensity * 0.3) % 1.0;
+                      const sat = Math.min(0.8 + distIntensity * 0.2, 1.0);
+                      const lit = Math.min(0.4 + speedIntensity * 0.6, 1.0);
+                      const c = _hsl2rgb(hue, sat, lit);
+                      wCol[idx]     = Math.min(c[0] * (1 + speedIntensity), 1.0);
+                      wCol[idx + 1] = Math.min(c[1] * (1 + distIntensity), 1.0);
+                      wCol[idx + 2] = Math.min(c[2] * (1 + speedIntensity * distIntensity), 1.0);
+                    } else {
+                      // Ambient: gradual color fade + subtle drift
+                      const ambHue = (elTs * windColorSpeed * 0.3 + i * 0.0005) % 1.0;
+                      const ac = _hsl2rgb(ambHue, 0.4, 0.3);
+                      wCol[idx]     = wCol[idx] * windTrail + ac[0] * (1 - windTrail);
+                      wCol[idx + 1] = wCol[idx+1] * windTrail + ac[1] * (1 - windTrail);
+                      wCol[idx + 2] = wCol[idx+2] * windTrail + ac[2] * (1 - windTrail);
+                      // Subtle ambient drift
+                      wVel[idx] += Math.sin(elTs * 0.5 + wOrig[idx] * 0.1) * 0.001;
+                      wVel[idx+1] += Math.cos(elTs * 0.3 + wOrig[idx+1] * 0.1) * 0.001;
+                    }
+                  }
+
+                  // Integrate velocity → position
+                  wPos[idx]     += wVel[idx] * dt * 60;
+                  wPos[idx + 1] += wVel[idx+1] * dt * 60;
+                  wPos[idx + 2] += wVel[idx+2] * dt * 60;
+
+                  // Adaptive damping (faster at edges)
+                  const cDist = Math.sqrt(wPos[idx]*wPos[idx] + wPos[idx+1]*wPos[idx+1] + wPos[idx+2]*wPos[idx+2]);
+                  const adaptDamp = windDamping + (1 - windDamping) * Math.min(cDist / windShellOuter, 0.5);
+                  wVel[idx] *= adaptDamp;
+                  wVel[idx+1] *= adaptDamp;
+                  wVel[idx+2] *= adaptDamp;
+
+                  // Shell constraint: keep particles between inner/outer radius
+                  if (cDist > windShellOuter) {
+                    const scale = windShellOuter / cDist * 0.95;
+                    wPos[idx] *= scale; wPos[idx+1] *= scale; wPos[idx+2] *= scale;
+                    wVel[idx] *= -0.3; wVel[idx+1] *= -0.3; wVel[idx+2] *= -0.3;
+                  } else if (cDist < windShellInner) {
+                    const scale = windShellInner / cDist * 1.05;
+                    wPos[idx] *= scale; wPos[idx+1] *= scale; wPos[idx+2] *= scale;
+                    wVel[idx] *= -0.3; wVel[idx+1] *= -0.3; wVel[idx+2] *= -0.3;
+                  }
+                }
+
+                globe.windParticles.geometry.attributes.position.needsUpdate = true;
+                globe.windParticles.geometry.attributes.color.needsUpdate = true;
               }
 
               // Globe breakout: update PP shader breakout uniforms
