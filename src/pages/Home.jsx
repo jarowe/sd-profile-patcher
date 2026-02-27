@@ -19,6 +19,7 @@ const Globe = lazy(() => import('react-globe.gl'));
 const GlobeEditor = lazy(() => import('../components/GlobeEditor'));
 
 // Real-time sun position based on UTC time (solar declination + hour angle)
+// Uses three-globe's coordinate system: theta = (90 - lng), so lng=0 → +Z
 // overrideHour: -1 = real time, 0-24 = manual UTC hour
 function getSunDirection(overrideHour) {
   const now = new Date();
@@ -33,10 +34,11 @@ function getSunDirection(overrideHour) {
   const solarLongitude = -((utcHours - 12) * 15);
   const latRad = declination * (Math.PI / 180);
   const lngRad = solarLongitude * (Math.PI / 180);
+  // Must match three-globe polar2Cartesian: x=cos(lat)*sin(lng), y=sin(lat), z=cos(lat)*cos(lng)
   return new THREE.Vector3(
-    Math.cos(latRad) * Math.cos(lngRad),
+    Math.cos(latRad) * Math.sin(lngRad),
     Math.sin(latRad),
-    -Math.cos(latRad) * Math.sin(lngRad)
+    Math.cos(latRad) * Math.cos(lngRad)
   ).normalize();
 }
 
