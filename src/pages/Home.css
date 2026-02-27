@@ -1141,13 +1141,9 @@
 .bento-cell.cell-map.globe-breakout .map-container {
     top: calc(-1 * var(--globe-breakout-px, 60px));
     height: calc(100% + var(--globe-breakout-px, 60px) + 10px);
-    /* NO clip-path — PP shader SDF mask handles it */
-    /* NO z-index override — glass is rendered in PP shader, not CSS */
+    /* NO clip-path — PP shader SDF mask handles clipping */
 }
-/* Hide CSS glass edge in breakout mode (PP shader renders it instead) */
-.bento-cell.cell-map.globe-breakout .liquid-glass-edge {
-    display: none;
-}
+/* CSS glass edge stays visible in breakout mode — PP shader only does alpha masking */
 /* Hide cell-map pseudo overlays in breakout mode (they can't extend above card) */
 .bento-cell.cell-map.globe-breakout::before,
 .bento-cell.cell-map.globe-breakout::after {

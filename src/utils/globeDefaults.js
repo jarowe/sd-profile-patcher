@@ -213,8 +213,8 @@ export const GLOBE_DEFAULTS = {
   // ── Globe Breakout (sphere pokes above bento card) ──
   globeBreakout: false,
   globeBreakoutPx: 60,
-  globeBreakoutClipPad: 4,
-  globeBreakoutFeather: 8,
+  globeBreakoutClipPad: 10,
+  globeBreakoutFeather: 12,
 
   // ── Glass Border (PP shader liquid glass) ──
   glassThickness: 30,

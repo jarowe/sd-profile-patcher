@@ -2182,12 +2182,8 @@ export default function Home() {
               cardRadius: { value: 28.0 },
               domeCenter: { value: new THREE.Vector2(0, 0) },
               domeRadius: { value: 0.0 },
-              domePad: { value: 4.0 },
-              glassThickness: { value: 30.0 },
-              glassIntensity: { value: 0.8 },
-              glassTint: { value: new THREE.Vector3(0.4, 0.6, 1.0) },
-              glassSweepAngle: { value: 0.0 },
-              breakoutFeather: { value: 3.0 },
+              domePad: { value: 10.0 },
+              breakoutFeather: { value: 12.0 },
             },
             vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
             fragmentShader: `
@@ -2224,10 +2220,6 @@ export default function Home() {
               uniform vec2 domeCenter;
               uniform float domeRadius;
               uniform float domePad;
-              uniform float glassThickness;
-              uniform float glassIntensity;
-              uniform vec3 glassTint;
-              uniform float glassSweepAngle;
               uniform float breakoutFeather;
               varying vec2 vUv;
 
@@ -2343,7 +2335,7 @@ export default function Home() {
                   col = mix(col, vec3(noise), staticNoise * 0.3);
                 }
 
-                // ── Breakout mask + liquid glass border ──
+                // ── Breakout alpha mask (CSS handles glass border) ──
                 if (breakoutEnabled > 0.5) {
                   // DOM coords are top-down (y=0 at top), GL UVs are bottom-up — flip Y
                   vec2 pixel = vec2(vUv.x * resolution.x, (1.0 - vUv.y) * resolution.y);
@@ -2356,55 +2348,11 @@ export default function Home() {
                   // Dome circle SDF
                   float dCircle = length(pixel - domeCenter) - (domeRadius + domePad);
 
-                  // Union: inside if either shape contains pixel
-                  float dUnion = min(dRect, dCircle);
+                  // Separate masks: hard card edge (CSS glass handles visuals) + soft dome edge
+                  float cardMask = 1.0 - smoothstep(-1.5, 1.5, dRect);
+                  float domeMask = 1.0 - smoothstep(-breakoutFeather * 0.3, breakoutFeather, dCircle);
+                  float maskAlpha = max(cardMask, domeMask);
 
-                  // Alpha mask: hide everything outside the card+dome area
-                  float maskAlpha = 1.0 - smoothstep(-breakoutFeather, 0.0, dUnion);
-
-                  // ── Liquid glass border on CARD edges (not dome) ──
-                  bool nearCard = (dRect < dCircle + 5.0);
-                  float borderDist = -dRect;
-
-                  if (nearCard && borderDist > 0.0 && borderDist < glassThickness && glassIntensity > 0.01) {
-                    float borderFactor = 1.0 - (borderDist / glassThickness);
-                    borderFactor = pow(borderFactor, 0.7);
-
-                    // Glass refraction: offset UV inward from edge
-                    vec2 edgeNormal = normalize(pixel - cardCenter) * borderFactor;
-                    vec2 refractedUV = vUv + edgeNormal * 0.003 * glassIntensity;
-                    vec3 refracted = texture2D(tDiffuse, clamp(refractedUV, 0.0, 1.0)).rgb;
-
-                    // Chromatic split at glass edge
-                    float chromaSplit = borderFactor * 0.008 * glassIntensity;
-                    vec3 glassCol;
-                    glassCol.r = texture2D(tDiffuse, clamp(refractedUV + chromaSplit, 0.0, 1.0)).r;
-                    glassCol.g = refracted.g;
-                    glassCol.b = texture2D(tDiffuse, clamp(refractedUV - chromaSplit, 0.0, 1.0)).b;
-
-                    // Specular highlight: bright edge catch light
-                    float specular = pow(borderFactor, 4.0) * 0.4 * glassIntensity;
-
-                    // Animated sweep highlight
-                    vec2 toPixel = pixel - cardCenter;
-                    float angle = atan(toPixel.y, toPixel.x);
-                    float sweep = smoothstep(0.3, 0.0, abs(mod(angle - glassSweepAngle + 3.14159, 6.28318) - 3.14159)) * borderFactor;
-                    specular += sweep * 0.3 * glassIntensity;
-
-                    // Iridescent tint at edge
-                    vec3 tintColor = glassTint * borderFactor * 0.15 * glassIntensity;
-
-                    // Darken inner shadow for depth
-                    float innerShadow = borderFactor * 0.2 * glassIntensity;
-
-                    // Compose glass effect
-                    col = mix(col, glassCol, borderFactor * 0.5 * glassIntensity);
-                    col += tintColor;
-                    col += specular;
-                    col *= (1.0 - innerShadow);
-                  }
-
-                  // Apply mask
                   col *= maskAlpha;
                   gl_FragColor = vec4(clamp(col, 0.0, 1.0), maskAlpha);
                 } else {
@@ -3082,20 +3030,16 @@ export default function Home() {
                     const screenX = (center.x + 1) * 0.5 * canvasW;
                     const screenY = (1 - center.y) * 0.5 * canvasH;
                     const distance = cam.position.length();
-                    const angularRadius = Math.asin(Math.min(100 / distance, 1.0));
+                    // Use outermost atmosphere layer radius so dome mask doesn't clip glow
+                    const atmosRadius = Math.max(ep.haloRadius || 108, ep.rimRadius || 103, 100);
+                    const angularRadius = Math.asin(Math.min(atmosRadius / distance, 1.0));
                     const fovRad = cam.fov * Math.PI / 180;
                     const screenRadius = Math.tan(angularRadius) / Math.tan(fovRad / 2) * (canvasH / 2);
 
                     ppu2.domeCenter.value.set(screenX, screenY);
                     ppu2.domeRadius.value = screenRadius;
-                    ppu2.domePad.value = (ep.globeBreakoutClipPad || 4) * scaleX;
-                    ppu2.breakoutFeather.value = (ep.globeBreakoutFeather || 3) * scaleX;
-
-                    // Glass border params
-                    ppu2.glassThickness.value = 30 * scaleX;
-                    ppu2.glassIntensity.value = 0.8;
-                    // Animate sweep angle (~8s rotation)
-                    ppu2.glassSweepAngle.value = elTs * 0.785;
+                    ppu2.domePad.value = (ep.globeBreakoutClipPad ?? 10) * scaleX;
+                    ppu2.breakoutFeather.value = (ep.globeBreakoutFeather ?? 12) * scaleX;
                   }
                 } else {
                   ppu2.breakoutEnabled.value = 0.0;
