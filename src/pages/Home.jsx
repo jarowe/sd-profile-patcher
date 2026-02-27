@@ -2859,6 +2859,8 @@ export default function Home() {
                 <ChevronRight size={14} />
               </button>
             </div>
+            {/* Liquid glass edge overlay */}
+            <div className="liquid-glass-edge" />
           </div>
 
           <div className="bento-cell cell-music">

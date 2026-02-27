@@ -1101,6 +1101,126 @@
     margin-top: calc(-1 * var(--globe-overflow-top, 0px));
 }
 
+/* ── Liquid Glass Edge Effect ── */
+.liquid-glass-edge {
+    position: absolute;
+    inset: 0;
+    border-radius: 28px;
+    pointer-events: none;
+    z-index: 6;
+    /* Thick glass inner border — layered inset shadows with chromatic tint */
+    box-shadow:
+        /* outer bright rim */
+        inset 0 0 1px 0 rgba(255, 255, 255, 0.25),
+        /* glass thickness — blue channel shift */
+        inset 0 0 30px 0 rgba(100, 140, 255, 0.04),
+        /* glass thickness — red channel shift */
+        inset 0 0 25px 0 rgba(255, 120, 200, 0.03),
+        /* deep inner shadow for depth */
+        inset 0 0 80px 0 rgba(0, 0, 0, 0.15),
+        /* bottom edge catch light */
+        inset 0 -1px 1px 0 rgba(255, 255, 255, 0.08),
+        /* top edge catch light */
+        inset 0 1px 1px 0 rgba(255, 255, 255, 0.12);
+    /* Thin bright border for glass edge */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Animated highlight sweep via pseudo-element */
+.liquid-glass-edge::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: 28px;
+    padding: 1.5px;
+    /* Conic gradient creates the sweeping highlight */
+    background: conic-gradient(
+        from var(--glass-sweep-angle, 0deg),
+        transparent 0deg,
+        transparent 80deg,
+        rgba(255, 255, 255, 0.2) 120deg,
+        rgba(180, 200, 255, 0.35) 150deg,
+        rgba(255, 180, 240, 0.2) 180deg,
+        transparent 220deg,
+        transparent 360deg
+    );
+    /* Mask trick: show only border ring */
+    -webkit-mask:
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    animation: glass-sweep 8s linear infinite;
+    opacity: 0.7;
+}
+
+/* Iridescent shimmer layer */
+.liquid-glass-edge::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 28px;
+    background:
+        /* Moving prismatic highlight — top-left to bottom-right */
+        linear-gradient(
+            var(--glass-shimmer-angle, 135deg),
+            transparent 0%,
+            rgba(120, 80, 255, 0.04) 20%,
+            rgba(80, 200, 255, 0.06) 35%,
+            transparent 50%,
+            rgba(255, 120, 200, 0.04) 65%,
+            rgba(80, 255, 180, 0.05) 80%,
+            transparent 100%
+        );
+    animation: glass-shimmer 12s ease-in-out infinite;
+    opacity: 0.8;
+}
+
+@keyframes glass-sweep {
+    from { --glass-sweep-angle: 0deg; }
+    to { --glass-sweep-angle: 360deg; }
+}
+
+@keyframes glass-shimmer {
+    0%, 100% { --glass-shimmer-angle: 135deg; opacity: 0.6; }
+    25% { --glass-shimmer-angle: 180deg; opacity: 1; }
+    50% { --glass-shimmer-angle: 225deg; opacity: 0.8; }
+    75% { --glass-shimmer-angle: 160deg; opacity: 1; }
+}
+
+/* Register custom properties for animation */
+@property --glass-sweep-angle {
+    syntax: '<angle>';
+    initial-value: 0deg;
+    inherits: false;
+}
+
+@property --glass-shimmer-angle {
+    syntax: '<angle>';
+    initial-value: 135deg;
+    inherits: false;
+}
+
+/* On hover, intensify the glass edge */
+.cell-map:hover .liquid-glass-edge {
+    box-shadow:
+        inset 0 0 1px 0 rgba(255, 255, 255, 0.35),
+        inset 0 0 35px 0 rgba(100, 140, 255, 0.07),
+        inset 0 0 30px 0 rgba(255, 120, 200, 0.05),
+        inset 0 0 80px 0 rgba(0, 0, 0, 0.12),
+        inset 0 -1px 1px 0 rgba(255, 255, 255, 0.12),
+        inset 0 1px 1px 0 rgba(255, 255, 255, 0.18);
+    border-color: rgba(255, 255, 255, 0.18);
+    transition: box-shadow 0.5s ease, border-color 0.5s ease;
+}
+
+.cell-map:hover .liquid-glass-edge::before {
+    opacity: 1;
+}
+
 /* lil-gui Globe Editor theme */
 .lil-gui.root {
     --background-color: rgba(10, 10, 20, 0.92);
