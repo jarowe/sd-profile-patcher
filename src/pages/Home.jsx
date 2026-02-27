@@ -633,7 +633,9 @@ export default function Home() {
                 float dayStrength = smoothstep(-0.5, 0.5, sunOrientation);
                 hazeColor = mix(vec3(0.06, 0.03, 0.15), hazeColor, dayStrength);
 
-                float alpha = rawFresnel * fogPattern * 0.12;
+                // Mask haze by sun orientation: disappears on dark side
+                float dayAlpha = smoothstep(-0.5, 0.0, sunOrientation);
+                float alpha = rawFresnel * fogPattern * 0.12 * dayAlpha;
                 gl_FragColor = vec4(hazeColor, alpha);
               }
             `,
@@ -832,7 +834,10 @@ export default function Home() {
                 float sweepMask = pow(sin(vWorldNormal.x * 2.0 + vWorldNormal.z * 2.0 + sweepAngle) * 0.5 + 0.5, 3.0);
                 float introSweep = introIntensity * sweepMask * 0.4;
 
+                // Alpha masked by dayMask: atmosphere disappears on the dark side
+                float dayAlpha = smoothstep(-0.5, 0.0, sunOrientation);
                 float alpha = fresnel * (0.4 + introIntensity * 0.25) + introSweep;
+                alpha *= max(dayAlpha, introIntensity);
                 gl_FragColor = vec4(atmosColor * (1.2 + introIntensity * 0.4), alpha);
               }
             `,
@@ -1854,8 +1859,7 @@ export default function Home() {
                     globeImageUrl="//unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
                     bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
                     backgroundColor="rgba(0,0,0,0)"
-                    atmosphereColor="#7c3aed"
-                    atmosphereAltitude={0.25}
+                    showAtmosphere={false}
 
                     arcsData={arcsData}
                     arcColor="color"
