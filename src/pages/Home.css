@@ -1078,3 +1078,18 @@
         grid-row: span 2;
     }
 }
+
+/* lil-gui Globe Editor theme */
+.lil-gui.root {
+    --background-color: rgba(10, 10, 20, 0.92);
+    --font-size: 11px;
+    --widget-color: rgba(60, 60, 80, 0.6);
+    --focus-color: #7c3aed;
+    --number-color: #38bdf8;
+    --string-color: #f472b6;
+    --title-background-color: rgba(20, 20, 35, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}

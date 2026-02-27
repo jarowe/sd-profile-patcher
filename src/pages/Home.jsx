@@ -13,7 +13,9 @@ import SpeedPuzzle from '../components/SpeedPuzzle';
 import './Home.css';
 import { Howler } from 'howler';
 import * as THREE from 'three';
+import { GLOBE_DEFAULTS } from '../utils/globeDefaults';
 const Globe = lazy(() => import('react-globe.gl'));
+const GlobeEditor = lazy(() => import('../components/GlobeEditor'));
 
 // Real-time sun position based on UTC time (solar declination + hour angle)
 function getSunDirection() {
@@ -142,6 +144,12 @@ export default function Home() {
     if (el) setGlobeMounted(true);
   }, []);
 
+  // Check for editor mode via URL parameter
+  const showEditor = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    return new URLSearchParams(window.location.search).get('editor') === 'jarowe';
+  }, []);
+
   // Shared uniforms for all globe shaders (surface, clouds, atmosphere, particles)
   const sharedUniforms = useRef({
     time: { value: 0 },
@@ -151,10 +159,15 @@ export default function Home() {
     sunDir: { value: getSunDirection() }
   });
 
+  // All tunable parameters — defaults from globeDefaults.js, editor mutates these in-place
+  const editorParams = useRef({ ...GLOBE_DEFAULTS });
+
   // Create globe surface ShaderMaterial once (passed via globeMaterial prop)
   // This is the CORRECT way to apply custom materials - via the official API,
   // NOT via scene.traverse() material replacement which can silently fail.
+  // All tunable values are uniforms driven by editorParams for real-time tweaking.
   const globeShaderMaterial = useMemo(() => {
+    const p = editorParams.current;
     const texLoader = new THREE.TextureLoader();
     const earthTex = texLoader.load('//unpkg.com/three-globe/example/img/earth-blue-marble.jpg');
     const nightTex = texLoader.load('//cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/textures/planets/earth_lights_2048.png');
@@ -170,7 +183,46 @@ export default function Home() {
         time: sharedUniforms.current.time,
         audioPulse: sharedUniforms.current.audioPulse,
         prismPulse: sharedUniforms.current.prismPulse,
-        sunDir: sharedUniforms.current.sunDir
+        sunDir: sharedUniforms.current.sunDir,
+        // Surface Day/Night
+        dayStrengthMin: { value: p.dayStrengthMin },
+        dayStrengthMax: { value: p.dayStrengthMax },
+        // City Lights
+        cityGateMin: { value: p.cityGateMin },
+        cityGateMax: { value: p.cityGateMax },
+        cityLightColor: { value: new THREE.Vector3(...p.cityLightColor) },
+        cityLightBoost: { value: new THREE.Vector3(...p.cityLightBoost) },
+        cityGlowPow: { value: p.cityGlowPow },
+        cityGlowMult: { value: p.cityGlowMult },
+        // Land Material
+        landFresnelPow: { value: p.landFresnelPow },
+        landFresnelMult: { value: p.landFresnelMult },
+        landSpecPow: { value: p.landSpecPow },
+        landSpecMult: { value: p.landSpecMult },
+        bumpStrength: { value: p.bumpStrength },
+        // Water
+        waterThresholdMin: { value: p.waterThresholdMin },
+        waterThresholdMax: { value: p.waterThresholdMax },
+        deepSeaColor: { value: new THREE.Vector3(...p.deepSeaColor) },
+        midSeaColor: { value: new THREE.Vector3(...p.midSeaColor) },
+        shallowSeaColor: { value: new THREE.Vector3(...p.shallowSeaColor) },
+        waterSpecPow: { value: p.waterSpecPow },
+        waterSpecMult: { value: p.waterSpecMult },
+        waterGlarePow: { value: p.waterGlarePow },
+        waterGlareMult: { value: p.waterGlareMult },
+        waterFresnelPow: { value: p.waterFresnelPow },
+        // Surface Atmosphere
+        atmosDayColor: { value: new THREE.Vector3(...p.atmosDayColor) },
+        atmosTwilightColor: { value: new THREE.Vector3(...p.atmosTwilightColor) },
+        atmosBlendMin: { value: p.atmosBlendMin },
+        atmosBlendMax: { value: p.atmosBlendMax },
+        atmosMixMin: { value: p.atmosMixMin },
+        atmosMixMax: { value: p.atmosMixMax },
+        atmosFresnelPow: { value: p.atmosFresnelPow },
+        atmosStrength: { value: p.atmosStrength },
+        // Sunset
+        sunsetColor: { value: new THREE.Vector3(...p.sunsetColor) },
+        sunsetStrength: { value: p.sunsetStrength },
       },
       vertexShader: `
         varying vec2 vUv;
@@ -196,6 +248,44 @@ export default function Home() {
         uniform float audioPulse;
         uniform float prismPulse;
         uniform vec3 sunDir;
+        // Surface uniforms
+        uniform float dayStrengthMin;
+        uniform float dayStrengthMax;
+        uniform float cityGateMin;
+        uniform float cityGateMax;
+        uniform vec3 cityLightColor;
+        uniform vec3 cityLightBoost;
+        uniform float cityGlowPow;
+        uniform float cityGlowMult;
+        uniform float landFresnelPow;
+        uniform float landFresnelMult;
+        uniform float landSpecPow;
+        uniform float landSpecMult;
+        uniform float bumpStrength;
+        // Water uniforms
+        uniform float waterThresholdMin;
+        uniform float waterThresholdMax;
+        uniform vec3 deepSeaColor;
+        uniform vec3 midSeaColor;
+        uniform vec3 shallowSeaColor;
+        uniform float waterSpecPow;
+        uniform float waterSpecMult;
+        uniform float waterGlarePow;
+        uniform float waterGlareMult;
+        uniform float waterFresnelPow;
+        // Atmosphere uniforms
+        uniform vec3 atmosDayColor;
+        uniform vec3 atmosTwilightColor;
+        uniform float atmosBlendMin;
+        uniform float atmosBlendMax;
+        uniform float atmosMixMin;
+        uniform float atmosMixMax;
+        uniform float atmosFresnelPow;
+        uniform float atmosStrength;
+        // Sunset uniforms
+        uniform vec3 sunsetColor;
+        uniform float sunsetStrength;
+
         varying vec2 vUv;
         varying vec3 vNormal;
         varying vec3 vWorldNormal;
@@ -232,30 +322,30 @@ export default function Home() {
           vec4 dayCol = texture2D(earthMap, vUv);
           vec3 nightCol = texture2D(nightMap, vUv).rgb;
           float waterVal = texture2D(waterMask, vUv).r;
-          float isWater = smoothstep(0.3, 0.7, waterVal);
+          float isWater = smoothstep(waterThresholdMin, waterThresholdMax, waterVal);
           vec3 packed = texture2D(packedTex, vUv).rgb;
 
           // All lighting in WORLD space so sun stays fixed as camera orbits
           vec3 worldViewDir = normalize(cameraPosition - vWorldPos);
           float NdotL = dot(vWorldNormal, sunDir);
-          float dayStrength = smoothstep(-0.25, 0.5, NdotL);
+          float dayStrength = smoothstep(dayStrengthMin, dayStrengthMax, NdotL);
           float dayLight = max(NdotL, 0.0);
           float rawFresnel = clamp(1.0 - dot(worldViewDir, vWorldNormal), 0.0, 1.0);
           vec3 halfDir = normalize(sunDir + worldViewDir);
 
           // --- LAND: matte terrain + bump detail + night lights ---
-          float landFresnel = pow(rawFresnel, 3.5);
+          float landFresnel = pow(rawFresnel, landFresnelPow);
           float bumpVal = packed.r;
-          float bumpLight = 1.0 + (bumpVal - 0.5) * 0.35 * dayStrength;
-          vec3 landDay = dayCol.rgb * dayLight * bumpLight + dayCol.rgb * landFresnel * 0.10 * dayStrength;
+          float bumpLight = 1.0 + (bumpVal - 0.5) * bumpStrength * dayStrength;
+          vec3 landDay = dayCol.rgb * dayLight * bumpLight + dayCol.rgb * landFresnel * landFresnelMult * dayStrength;
           float roughness = packed.g;
-          float landSpec = (1.0 - roughness) * pow(max(dot(vWorldNormal, halfDir), 0.0), 60.0) * 0.12;
+          float landSpec = (1.0 - roughness) * pow(max(dot(vWorldNormal, halfDir), 0.0), landSpecPow) * landSpecMult;
           landDay += vec3(0.7, 0.75, 0.8) * landSpec;
           // City lights: only real city pixels visible, noise below threshold = pure black
           float lightPeak = max(max(nightCol.r, nightCol.g), nightCol.b);
-          float cityGate = smoothstep(0.06, 0.2, lightPeak);
-          vec3 landNight = nightCol * vec3(2.0, 1.8, 1.3) * cityGate;
-          landNight += vec3(1.0, 0.8, 0.4) * pow(lightPeak, 2.0) * cityGate * 2.0;
+          float cityGate = smoothstep(cityGateMin, cityGateMax, lightPeak);
+          vec3 landNight = nightCol * cityLightBoost * cityGate;
+          landNight += cityLightColor * pow(lightPeak, cityGlowPow) * cityGate * cityGlowMult;
           vec3 landColor = mix(landNight, landDay, dayStrength);
 
           // --- WATER: animated ocean + tidal currents + specular + Fresnel ---
@@ -287,15 +377,12 @@ export default function Home() {
           float bdy = fbm(bigWaveUv + vec2(0.0, 0.02) + vec2(t*0.8, t*0.5)) - bigW1;
           vec3 waveN = normalize(vWorldNormal + vec3(dx + bdx * 2.0, dy + bdy * 2.0, 0.0) * 8.0);
 
-          float spec = pow(max(dot(waveN, halfDir), 0.0), 120.0);
-          float glare = pow(max(dot(waveN, halfDir), 0.0), 12.0);
-          float wFresnel = pow(1.0 - max(dot(worldViewDir, waveN), 0.0), 4.0);
+          float spec = pow(max(dot(waveN, halfDir), 0.0), waterSpecPow);
+          float glare = pow(max(dot(waveN, halfDir), 0.0), waterGlarePow);
+          float wFresnel = pow(1.0 - max(dot(worldViewDir, waveN), 0.0), waterFresnelPow);
 
-          vec3 deepSea = vec3(0.005, 0.02, 0.08);
-          vec3 midSea = vec3(0.02, 0.08, 0.22);
-          vec3 shallowSea = vec3(0.06, 0.18, 0.38);
-          vec3 oceanBase = mix(deepSea, midSea, waves);
-          oceanBase = mix(oceanBase, shallowSea, bigWaves * 0.4);
+          vec3 oceanBase = mix(deepSeaColor, midSeaColor, waves);
+          oceanBase = mix(oceanBase, shallowSeaColor, bigWaves * 0.4);
           vec3 subsurface = vec3(0.0, 0.12, 0.25) * pow(max(NdotL, 0.0), 2.0) * bigWaves;
           oceanBase += subsurface;
           vec3 oceanCol = mix(dayCol.rgb * 0.35, oceanBase, 0.65);
@@ -303,8 +390,8 @@ export default function Home() {
           vec3 skyReflection = mix(vec3(0.15, 0.3, 0.6), vec3(0.5, 0.65, 0.85), wFresnel);
 
           vec3 waterDay = oceanCol * dayLight
-            + vec3(1.0, 0.95, 0.85) * spec * 2.5
-            + vec3(0.9, 0.85, 0.7) * glare * 0.5
+            + vec3(1.0, 0.95, 0.85) * spec * waterSpecMult
+            + vec3(0.9, 0.85, 0.7) * glare * waterGlareMult
             + skyReflection * wFresnel * 0.5
             + vec3(0.3, 0.5, 0.8) * waves * audioPulse * 0.3;
           float cityGlow = max(max(nightCol.r, nightCol.g), nightCol.b);
@@ -325,15 +412,13 @@ export default function Home() {
           finalColor *= (1.0 - cloudDensity * 0.3 * dayStrength);
 
           // --- TSL-style atmospheric blending on surface ---
-          vec3 atmosphereDayColor = vec3(0.3, 0.7, 1.0);
-          vec3 atmosphereTwilightColor = vec3(0.74, 0.29, 0.04);
-          vec3 atmosphereColor = mix(atmosphereTwilightColor, atmosphereDayColor, smoothstep(-0.25, 0.75, NdotL));
-          float atmosphereMix = clamp(smoothstep(-0.5, 1.0, NdotL) * pow(rawFresnel, 2.0), 0.0, 1.0);
-          finalColor = mix(finalColor, atmosphereColor, atmosphereMix * 0.45);
+          vec3 atmosphereColor = mix(atmosTwilightColor, atmosDayColor, smoothstep(atmosBlendMin, atmosBlendMax, NdotL));
+          float atmosphereMix = clamp(smoothstep(atmosMixMin, atmosMixMax, NdotL) * pow(rawFresnel, atmosFresnelPow), 0.0, 1.0);
+          finalColor = mix(finalColor, atmosphereColor, atmosphereMix * atmosStrength);
 
           // Sunset glow at terminator
           float sunsetGlow = smoothstep(-0.05, 0.3, NdotL) * smoothstep(0.5, 0.05, max(NdotL, 0.0));
-          finalColor += vec3(1.0, 0.35, 0.12) * sunsetGlow * 0.15;
+          finalColor += sunsetColor * sunsetGlow * sunsetStrength;
 
           gl_FragColor = vec4(finalColor, 1.0);
         }
@@ -444,8 +529,9 @@ export default function Home() {
         // --- A. Cinematic Lighting Setup ---
         // Clean out default lights to own the scene fully
         scene.children.filter(c => c.type === 'DirectionalLight' || c.type === 'AmbientLight').forEach(l => scene.remove(l));
-        const ambient = new THREE.AmbientLight(0xffffff, 0.15);
-        const sunLight = new THREE.DirectionalLight(0xffffff, 2.0);
+        const lp = editorParams.current;
+        const ambient = new THREE.AmbientLight(0xffffff, lp.ambientIntensity);
+        const sunLight = new THREE.DirectionalLight(0xffffff, lp.sunIntensity);
         sunLight.position.set(200, 100, 200);
         scene.add(ambient, sunLight);
 
@@ -457,6 +543,7 @@ export default function Home() {
         const initSunPos = globe.customUniforms.sunDir.value.clone().multiplyScalar(200);
         sunLight.position.copy(initSunPos);
         globe._sunLight = sunLight;
+        globe._ambientLight = ambient;
 
         // Find the globe mesh for raycasting (lens flare occlusion)
         // Material is set via globeMaterial prop - no scene.traverse replacement needed
@@ -478,12 +565,26 @@ export default function Home() {
             '//cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/textures/planets/earth_bump_roughness_clouds_4096.jpg'
           );
 
+          const cp = editorParams.current;
           const cloudMat = new THREE.ShaderMaterial({
             uniforms: {
               cloudsMap: { value: cloud4KTex },
               sunDir: globe.customUniforms.sunDir,
               time: globe.customUniforms.time,
               audioPulse: globe.customUniforms.audioPulse,
+              cloudAlphaMin: { value: cp.cloudAlphaMin },
+              cloudAlphaMax: { value: cp.cloudAlphaMax },
+              cloudOpacity: { value: cp.cloudOpacity },
+              cloudLitColor: { value: new THREE.Vector3(...cp.cloudLitColor) },
+              cloudShadowColor: { value: new THREE.Vector3(...cp.cloudShadowColor) },
+              cloudDayFactorMin: { value: cp.cloudDayFactorMin },
+              cloudDayFactorMax: { value: cp.cloudDayFactorMax },
+              cloudTerminatorColor: { value: new THREE.Vector3(...cp.cloudTerminatorColor) },
+              cloudTerminatorMult: { value: cp.cloudTerminatorMult },
+              cloudRimPow: { value: cp.cloudRimPow },
+              cloudRimStrength: { value: cp.cloudRimStrength },
+              cloudSubsurfaceColor: { value: new THREE.Vector3(...cp.cloudSubsurfaceColor) },
+              cloudSilverLiningColor: { value: new THREE.Vector3(...cp.cloudSilverLiningColor) },
             },
             vertexShader: `
               varying vec2 vUv;
@@ -503,6 +604,19 @@ export default function Home() {
               uniform vec3 sunDir;
               uniform float time;
               uniform float audioPulse;
+              uniform float cloudAlphaMin;
+              uniform float cloudAlphaMax;
+              uniform float cloudOpacity;
+              uniform vec3 cloudLitColor;
+              uniform vec3 cloudShadowColor;
+              uniform float cloudDayFactorMin;
+              uniform float cloudDayFactorMax;
+              uniform vec3 cloudTerminatorColor;
+              uniform float cloudTerminatorMult;
+              uniform float cloudRimPow;
+              uniform float cloudRimStrength;
+              uniform vec3 cloudSubsurfaceColor;
+              uniform vec3 cloudSilverLiningColor;
               varying vec2 vUv;
               varying vec3 vNormal;
               varying vec3 vViewPos;
@@ -521,33 +635,31 @@ export default function Home() {
                 float cloudVal = texture2D(cloudsMap, cloudUv).b;
 
                 // Smooth threshold: only show actual clouds, not noise floor
-                float alpha = smoothstep(0.2, 0.8, cloudVal);
+                float alpha = smoothstep(cloudAlphaMin, cloudAlphaMax, cloudVal);
 
                 // Sun illumination
                 float NdotL = dot(vWorldNormal, sunDir);
-                float dayFactor = smoothstep(-0.15, 0.5, NdotL);
+                float dayFactor = smoothstep(cloudDayFactorMin, cloudDayFactorMax, NdotL);
                 float illumination = 0.02 + max(NdotL, 0.0) * 0.98;
 
                 // Lit clouds are bright white, shadow side is blue-gray
-                vec3 litCloud = vec3(1.0, 0.99, 0.96);
-                vec3 shadowCloud = vec3(0.15, 0.18, 0.25);
-                vec3 cloudColor = mix(shadowCloud, litCloud, dayFactor) * illumination;
+                vec3 cloudColor = mix(cloudShadowColor, cloudLitColor, dayFactor) * illumination;
 
                 // Self-shadowing: thicker cloud masses have darker cores
                 float thickness = cloudVal * cloudVal;
                 cloudColor *= (1.0 - thickness * 0.2);
 
                 // Subsurface scattering: thick clouds glow slightly warm on sun-facing side
-                cloudColor += vec3(0.15, 0.12, 0.08) * thickness * max(NdotL, 0.0);
+                cloudColor += cloudSubsurfaceColor * thickness * max(NdotL, 0.0);
 
                 // Sunset/terminator scattering - golden edge glow
                 float terminator = smoothstep(0.0, 0.1, max(NdotL, 0.0)) * smoothstep(0.22, 0.1, max(NdotL, 0.0));
-                cloudColor += vec3(1.0, 0.4, 0.1) * terminator * cloudVal * 2.0;
+                cloudColor += cloudTerminatorColor * terminator * cloudVal * cloudTerminatorMult;
 
                 // Silver lining: bright rim light on cloud edges facing camera
                 vec3 viewDir = normalize(-vViewPos);
-                float rim = pow(1.0 - max(dot(viewDir, vNormal), 0.0), 3.5);
-                cloudColor += vec3(1.0, 0.97, 0.93) * rim * 0.3 * illumination;
+                float rim = pow(1.0 - max(dot(viewDir, vNormal), 0.0), cloudRimPow);
+                cloudColor += cloudSilverLiningColor * rim * cloudRimStrength * illumination;
 
                 // Music-reactive cloud brightness
                 cloudColor += cloudColor * audioPulse * 0.15;
@@ -558,7 +670,7 @@ export default function Home() {
                 // Bump alpha based on cloud thickness for volumetric feel
                 alpha = alpha * (0.7 + thickness * 0.3);
 
-                gl_FragColor = vec4(cloudColor, alpha * 0.9);
+                gl_FragColor = vec4(cloudColor, alpha * cloudOpacity);
               }
             `,
             transparent: true,
@@ -592,12 +704,47 @@ export default function Home() {
             }
           `;
 
-          // Layer 1: Tight rim glow hugging the globe (BackSide, r103)
+          // Layer 1: Tight rim glow hugging the globe (BackSide)
+          const rp = editorParams.current;
           const rimMat = new THREE.ShaderMaterial({
-            uniforms: { sunDir: globe.customUniforms.sunDir },
+            uniforms: {
+              sunDir: globe.customUniforms.sunDir,
+              rimFresnelPow: { value: rp.rimFresnelPow },
+              rimGlowMult: { value: rp.rimGlowMult },
+              rimDayColor: { value: new THREE.Vector3(...rp.rimDayColor) },
+              rimTwilightColor: { value: new THREE.Vector3(...rp.rimTwilightColor) },
+              rimNightColor: { value: new THREE.Vector3(...rp.rimNightColor) },
+              rimNightToTwilightMin: { value: rp.rimNightToTwilightMin },
+              rimNightToTwilightMax: { value: rp.rimNightToTwilightMax },
+              rimTwilightToDayMin: { value: rp.rimTwilightToDayMin },
+              rimTwilightToDayMax: { value: rp.rimTwilightToDayMax },
+              rimSunMaskMin: { value: rp.rimSunMaskMin },
+              rimSunMaskMax: { value: rp.rimSunMaskMax },
+              rimBacklitMin: { value: rp.rimBacklitMin },
+              rimBacklitMax: { value: rp.rimBacklitMax },
+              rimBacklitFadeMin: { value: rp.rimBacklitFadeMin },
+              rimBacklitFadeMax: { value: rp.rimBacklitFadeMax },
+              rimBacklitWeight: { value: rp.rimBacklitWeight },
+            },
             vertexShader: atmosVert,
             fragmentShader: `
               uniform vec3 sunDir;
+              uniform float rimFresnelPow;
+              uniform float rimGlowMult;
+              uniform vec3 rimDayColor;
+              uniform vec3 rimTwilightColor;
+              uniform vec3 rimNightColor;
+              uniform float rimNightToTwilightMin;
+              uniform float rimNightToTwilightMax;
+              uniform float rimTwilightToDayMin;
+              uniform float rimTwilightToDayMax;
+              uniform float rimSunMaskMin;
+              uniform float rimSunMaskMax;
+              uniform float rimBacklitMin;
+              uniform float rimBacklitMax;
+              uniform float rimBacklitFadeMin;
+              uniform float rimBacklitFadeMax;
+              uniform float rimBacklitWeight;
               varying vec3 vWorldNormal;
               varying vec3 vWorldPos;
               void main() {
@@ -605,22 +752,19 @@ export default function Home() {
                 float fresnel = 1.0 - abs(dot(viewDir, vWorldNormal));
 
                 // Concentrated rim glow (Franky pow technique)
-                float rim = pow(fresnel, 4.0) * 5.0;
+                float rim = pow(fresnel, rimFresnelPow) * rimGlowMult;
 
                 // Atmosphere colors: blue day + warm orange twilight
                 float sunOri = dot(vWorldNormal, sunDir);
-                vec3 dayCol = vec3(0.3, 0.65, 1.0);
-                vec3 twilightCol = vec3(0.85, 0.35, 0.06);
-                vec3 nightCol = vec3(0.05, 0.08, 0.2);
                 // Blend through twilight band
-                vec3 color = mix(nightCol, twilightCol, smoothstep(-0.5, 0.0, sunOri));
-                color = mix(color, dayCol, smoothstep(0.0, 0.6, sunOri));
+                vec3 color = mix(rimNightColor, rimTwilightColor, smoothstep(rimNightToTwilightMin, rimNightToTwilightMax, sunOri));
+                color = mix(color, rimDayColor, smoothstep(rimTwilightToDayMin, rimTwilightToDayMax, sunOri));
 
                 // Sun mask: allows faint backlit rim on dark side edges
-                float sunMask = smoothstep(-0.8, 0.6, sunOri);
+                float sunMask = smoothstep(rimSunMaskMin, rimSunMaskMax, sunOri);
                 // Backlit edge: sun behind globe creates orange rim glow
-                float backlit = smoothstep(-0.3, -0.05, sunOri) * smoothstep(-0.8, -0.3, sunOri);
-                color += twilightCol * backlit * 0.5;
+                float backlit = smoothstep(rimBacklitMin, rimBacklitMax, sunOri) * smoothstep(rimBacklitFadeMin, rimBacklitFadeMax, sunOri);
+                color += rimTwilightColor * backlit * rimBacklitWeight;
 
                 float intensity = rim * max(sunMask, backlit * 0.4);
 
@@ -632,16 +776,34 @@ export default function Home() {
             depthWrite: false,
             side: THREE.BackSide
           });
-          const rimMesh = new THREE.Mesh(new THREE.SphereGeometry(103, 64, 64), rimMat);
+          const rimMesh = new THREE.Mesh(new THREE.SphereGeometry(rp.rimRadius, 64, 64), rimMat);
           rimMesh.renderOrder = 3;
           scene.add(rimMesh);
 
-          // Layer 2: Soft feathered outer glow (BackSide, r108)
+          // Layer 2: Soft feathered outer glow (BackSide)
           const haloMat = new THREE.ShaderMaterial({
-            uniforms: { sunDir: globe.customUniforms.sunDir },
+            uniforms: {
+              sunDir: globe.customUniforms.sunDir,
+              haloFresnelPow: { value: rp.haloFresnelPow },
+              haloGlowMult: { value: rp.haloGlowMult },
+              haloDayColor: { value: new THREE.Vector3(...rp.haloDayColor) },
+              haloTwilightColor: { value: new THREE.Vector3(...rp.haloTwilightColor) },
+              haloBlendMin: { value: rp.haloBlendMin },
+              haloBlendMax: { value: rp.haloBlendMax },
+              haloSunMaskMin: { value: rp.haloSunMaskMin },
+              haloSunMaskMax: { value: rp.haloSunMaskMax },
+            },
             vertexShader: atmosVert,
             fragmentShader: `
               uniform vec3 sunDir;
+              uniform float haloFresnelPow;
+              uniform float haloGlowMult;
+              uniform vec3 haloDayColor;
+              uniform vec3 haloTwilightColor;
+              uniform float haloBlendMin;
+              uniform float haloBlendMax;
+              uniform float haloSunMaskMin;
+              uniform float haloSunMaskMax;
               varying vec3 vWorldNormal;
               varying vec3 vWorldPos;
               void main() {
@@ -649,15 +811,13 @@ export default function Home() {
                 float fresnel = 1.0 - abs(dot(viewDir, vWorldNormal));
 
                 // Very soft feathered falloff (not a hard ring)
-                float glow = pow(fresnel, 1.5) * 0.35;
+                float glow = pow(fresnel, haloFresnelPow) * haloGlowMult;
 
                 float sunOri = dot(vWorldNormal, sunDir);
-                vec3 dayCol = vec3(0.2, 0.5, 0.9);
-                vec3 twilightCol = vec3(0.6, 0.25, 0.04);
-                vec3 color = mix(twilightCol, dayCol, smoothstep(-0.2, 0.7, sunOri));
+                vec3 color = mix(haloTwilightColor, haloDayColor, smoothstep(haloBlendMin, haloBlendMax, sunOri));
 
                 // Feathered sun mask with subtle dark-side backlit wrap
-                float sunMask = smoothstep(-0.6, 0.8, sunOri);
+                float sunMask = smoothstep(haloSunMaskMin, haloSunMaskMax, sunOri);
                 float intensity = glow * sunMask;
 
                 gl_FragColor = vec4(color * intensity, intensity);
@@ -668,7 +828,7 @@ export default function Home() {
             depthWrite: false,
             side: THREE.BackSide
           });
-          const haloMesh = new THREE.Mesh(new THREE.SphereGeometry(108, 48, 48), haloMat);
+          const haloMesh = new THREE.Mesh(new THREE.SphereGeometry(rp.haloRadius, 48, 48), haloMat);
           haloMesh.renderOrder = 2;
           scene.add(haloMesh);
 
@@ -923,37 +1083,53 @@ export default function Home() {
             globe._particleMouseCleanup = () => globeEl.removeEventListener('mousemove', onMouseMove);
           }
 
+          const pp = editorParams.current;
           const pMat = new THREE.ShaderMaterial({
             uniforms: {
               time: globe.customUniforms.time,
               audioPulse: globe.customUniforms.audioPulse,
               prismPulse: globe.customUniforms.prismPulse,
               pixelRatio: { value: window.devicePixelRatio || 1 },
-              mousePos: mouseUniforms
+              mousePos: mouseUniforms,
+              starTwinkleBase: { value: pp.starTwinkleBase },
+              starTwinkleDepth: { value: pp.starTwinkleDepth },
+              starTwinkleSpeed: { value: pp.starTwinkleSpeed },
+              starSize: { value: pp.starSize },
+              dustSize: { value: pp.dustSize },
+              dustSpeed: { value: pp.dustSpeed },
+              dustAmplitude: { value: pp.dustAmplitude },
+              mouseRippleRadius: { value: pp.mouseRippleRadius },
             },
             vertexShader: `
               uniform float time; uniform float audioPulse; uniform float prismPulse; uniform float pixelRatio;
               uniform vec3 mousePos;
+              uniform float starTwinkleBase;
+              uniform float starTwinkleDepth;
+              uniform float starTwinkleSpeed;
+              uniform float starSize;
+              uniform float dustSize;
+              uniform float dustSpeed;
+              uniform float dustAmplitude;
+              uniform float mouseRippleRadius;
               attribute float aScale; attribute vec3 customColor; attribute float pType; attribute vec3 burstOffset;
               varying vec3 vColor; varying float vType; varying float vMouseDist;
               void main() {
                 vColor = customColor; vType = pType;
                 vec3 pos = position;
                 if (pType > 0.5) {
-                  float speed = time * (0.8 + prismPulse * 0.3);
+                  float speed = time * (dustSpeed + prismPulse * 0.3);
                   // Gentle orbital drift
-                  pos.x += sin(speed*0.5+pos.y*0.05)*(1.5+audioPulse*4.0);
-                  pos.y += cos(speed*0.3+pos.x*0.05)*(1.5+audioPulse*4.0);
-                  pos.z += sin(speed*0.4+pos.z*0.05)*(1.5+audioPulse*4.0);
+                  pos.x += sin(speed*0.5+pos.y*0.05)*(dustAmplitude+audioPulse*4.0);
+                  pos.y += cos(speed*0.3+pos.x*0.05)*(dustAmplitude+audioPulse*4.0);
+                  pos.z += sin(speed*0.4+pos.z*0.05)*(dustAmplitude+audioPulse*4.0);
                   // Gentle breathing on bop, no explosion
                   pos += burstOffset * prismPulse * 0.05;
 
                   // Mouse ripple: particles near mouse get pushed outward like water
                   float mouseDist = distance(pos, mousePos);
-                  float rippleRadius = 8.0;
-                  if (mouseDist < rippleRadius && length(mousePos) > 1.0) {
+                  if (mouseDist < mouseRippleRadius && length(mousePos) > 1.0) {
                     vec3 pushDir = normalize(pos - mousePos);
-                    float rippleStr = (1.0 - mouseDist / rippleRadius);
+                    float rippleStr = (1.0 - mouseDist / mouseRippleRadius);
                     rippleStr = rippleStr * rippleStr * 3.0;
                     // Ripple wave - particles oscillate as the ripple passes through
                     float wave = sin(mouseDist * 0.5 - time * 4.0) * 0.5 + 0.5;
@@ -969,15 +1145,16 @@ export default function Home() {
                 float twinkle = 1.0;
                 if (pType < 0.5) {
                   float starId = position.x * 73.1 + position.y * 127.3 + position.z * 57.7;
-                  twinkle = 0.4 + 0.6 * (0.5 + 0.5 * sin(time * (1.5 + fract(starId) * 3.0) + starId));
+                  twinkle = starTwinkleBase + starTwinkleDepth * (0.5 + 0.5 * sin(time * (starTwinkleSpeed + fract(starId) * 3.0) + starId));
                 }
-                float baseSize = (pType>0.5) ? aScale*(1.0 + audioPulse*3.0 + prismPulse*1.2) : aScale*(1.8+audioPulse*2.0) * twinkle;
+                float baseSize = (pType>0.5) ? aScale*dustSize*(1.0 + audioPulse*3.0 + prismPulse*1.2) : aScale*starSize*(1.0+audioPulse*1.0) * twinkle;
                 gl_PointSize = baseSize * pixelRatio * (300.0 / -mv.z);
               }
             `,
             fragmentShader: `
               varying vec3 vColor; varying float vType; varying float vMouseDist;
               uniform float audioPulse; uniform float prismPulse; uniform float time;
+              uniform float mouseRippleRadius;
               void main() {
                 vec2 xy = gl_PointCoord.xy - vec2(0.5);
                 float ll = length(xy);
@@ -986,7 +1163,7 @@ export default function Home() {
                 float alpha = glow * (0.6 + audioPulse*0.4 + prismPulse*0.3);
 
                 // Mouse proximity glow - particles near cursor glow brighter
-                float mouseGlow = (vMouseDist < 8.0) ? (1.0 - vMouseDist / 8.0) * 0.5 : 0.0;
+                float mouseGlow = (vMouseDist < mouseRippleRadius) ? (1.0 - vMouseDist / mouseRippleRadius) * 0.5 : 0.0;
 
                 // Gentle prismatic color shift
                 vec3 prismatic = vec3(
@@ -1161,7 +1338,7 @@ export default function Home() {
 
               // Rotate cloud layer slowly (counter to globe rotation) + subtle tilt
               if (globe.cloudMesh) {
-                globe.cloudMesh.rotation.y += dt * 0.012;
+                globe.cloudMesh.rotation.y += dt * editorParams.current.cloudRotationSpeed;
                 globe.cloudMesh.rotation.x = Math.sin(elTs * 0.03) * 0.005;
               }
 
@@ -2105,6 +2282,17 @@ export default function Home() {
           )}
         </AnimatePresence>
       </section>
+
+      {/* Globe Debug Editor — hidden behind ?editor=jarowe */}
+      {showEditor && (
+        <Suspense fallback={null}>
+          <GlobeEditor
+            editorParams={editorParams}
+            globeRef={globeRef}
+            globeShaderMaterial={globeShaderMaterial}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }
