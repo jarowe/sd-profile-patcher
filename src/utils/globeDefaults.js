@@ -9,17 +9,17 @@ export const GLOBE_DEFAULTS = {
   // ── City Lights ──
   cityGateMin: 0.17,
   cityGateMax: 0.37,
-  cityLightColor: [0.643, 0.486, 0.357],
+  cityLightColor: [0.996, 0.706, 0.302],
   cityLightBoost: [0.0, 0.0, 0.0],
-  cityGlowPow: 1.9,
-  cityGlowMult: 2.4,
+  cityGlowPow: 0.9,
+  cityGlowMult: 1.5,
 
   // ── Land Material ──
-  landFresnelPow: 5.2,
-  landFresnelMult: 0.25,
-  landSpecPow: 44.0,
-  landSpecMult: 0.22,
-  bumpStrength: 0.85,
+  landFresnelPow: 5.9,
+  landFresnelMult: 0.42,
+  landSpecPow: 70.0,
+  landSpecMult: 0.23,
+  bumpStrength: 2.0,
 
   // ── Water ──
   waterThresholdMin: 0.3,
@@ -27,14 +27,14 @@ export const GLOBE_DEFAULTS = {
   deepSeaColor: [0.005, 0.02, 0.08],
   midSeaColor: [0.02, 0.08, 0.22],
   shallowSeaColor: [0.06, 0.18, 0.38],
-  waterSpecPow: 159.0,
-  waterSpecMult: 0.5,
+  waterSpecPow: 131.0,
+  waterSpecMult: 1.3,
   waterGlarePow: 12.5,
-  waterGlareMult: 0.55,
-  waterFresnelPow: 4.1,
-  waterWaveSpeed: 1.0,
-  waterWaveScale: 1.0,
-  waterCurrentStrength: 1.0,
+  waterGlareMult: 0.3,
+  waterFresnelPow: 8.5,
+  waterWaveSpeed: 0.95,
+  waterWaveScale: 3.0,
+  waterCurrentStrength: 3.0,
 
   // ── Surface Atmosphere ──
   atmosDayColor: [0.3, 0.7, 1.0],
@@ -142,16 +142,16 @@ export const GLOBE_DEFAULTS = {
   envGlowTiltZ: 0.0,
 
   // ── Lava Lamp Layer ──
-  lavaLampEnabled: false,
+  lavaLampEnabled: true,
   lavaLampColor1: [0.1, 0.8, 0.5],
   lavaLampColor2: [0.7, 0.1, 0.85],
   lavaLampColor3: [0.05, 0.3, 0.95],
-  lavaLampIntensity: 0.08,
+  lavaLampIntensity: 0.265,
   lavaLampSpeed: 0.12,
-  lavaLampScale: 1.5,
+  lavaLampScale: 2.3,
   lavaLampHeight: 102.5,
-  lavaLampBlobSize: 3.0,
-  lavaLampFeather: 0.6,
+  lavaLampBlobSize: 2.7,
+  lavaLampFeather: 1.0,
 
   // ── Shader Lighting ──
   shaderAmbient: 0.07,
@@ -205,9 +205,9 @@ export const GLOBE_DEFAULTS = {
 
   // ── Glass Edge Effect ──
   glassSweepEnabled: true,
-  glassShimmerEnabled: true,
-  glassSweepOpacity: 0.7,
-  glassShimmerOpacity: 0.8,
+  glassShimmerEnabled: false,
+  glassSweepOpacity: 1.0,
+  glassShimmerOpacity: 0.0,
 
   // ── Individual Lens Flare Components ──
   flareMainVisible: true,
@@ -221,9 +221,9 @@ export const GLOBE_DEFAULTS = {
   planeSpeed: 1.0,
   wispSpeed: 1.0,
   satelliteScale: 0.4,
-  planeScale: 3.5,
-  carScale: 4.0,
-  wispScale: 3.0,
+  planeScale: 1.0,
+  carScale: 1.0,
+  wispScale: 1.0,
 
   // ── Overlay Graphics ──
   arcStroke: 0.5,
@@ -236,29 +236,38 @@ export const GLOBE_DEFAULTS = {
   labelSize: 1.2,
   labelDotRadius: 0.3,
 
-  // ── Prism Bop Effector (tuned for subtle multi-effect pulse) ──
-  bopDecayRate: 0.12,
-  bopParticleBurst: 0.8,
-  bopColorShift: 0.25,
-  bopGlowBoost: 1.2,
-  bopAuroraBoost: 1.5,
-  bopCloudFlash: 0.08,
-  bopWaterRipple: 0.15,
-  bopStarBurst: 0.5,
-  bopEnvGlowBoost: 1.0,
-  bopLightShow: false,
+  // ── Prism Bop Effector ──
+  bopDecayRate: 0.325,
+  bopParticleBurst: 2.2,
+  bopColorShift: 0.28,
+  bopGlowBoost: 3.0,
+  bopAuroraBoost: 0.5,
+  bopCloudFlash: 0.2,
+  bopWaterRipple: 2.0,
+  bopStarBurst: 1.1,
+  bopEnvGlowBoost: 3.1,
+  bopLavaLampBoost: 2.0,
+  bopPrismGlowBoost: 1.5,
+  bopLightShow: true,
 
   // ── Advanced Lens Flare ──
   flareEdgeDiffraction: 0.5,
   flareStarburstStrength: 0.6,
   flareAnamorphicStrength: 0.45,
 
-  // ── God Rays ──
+  // ── Sun Rays (3D volumetric beams from sun) ──
+  sunRaysEnabled: true,
+  sunRaysIntensity: 0.4,
+  sunRaysLength: 3.0,
+  sunRaysCount: 12,
+  sunRaysColor: [1.0, 0.95, 0.8],
+
+  // ── God Rays (Screen-space PP radial blur) ──
   godRaysEnabled: true,
-  godRaysDensity: 0.8,
-  godRaysWeight: 0.5,
-  godRaysDecay: 0.97,
-  godRaysExposure: 0.25,
+  godRaysDensity: 0.1,
+  godRaysWeight: 0.05,
+  godRaysDecay: 0.9,
+  godRaysExposure: 0.26,
   godRaysSamples: 60,
 
   // ── Post-Processing ──
@@ -266,22 +275,22 @@ export const GLOBE_DEFAULTS = {
   ppChromaticAberration: 0.0015,
   ppVignetteStrength: 0.3,
   ppVignetteRadius: 0.85,
-  ppBrightness: 0.0,
-  ppContrast: 1.0,
-  ppSaturation: 1.05,
-  ppGamma: 1.0,
-  ppTint: [1.0, 1.0, 1.0],
+  ppBrightness: -0.135,
+  ppContrast: 0.88,
+  ppSaturation: 0.8,
+  ppGamma: 0.97,
+  ppTint: [0.867, 0.941, 0.976],
   ppFilmGrain: 0.02,
   ppScanLines: 0.0,
   ppScanLineSpeed: 1.0,
 
   // ── TV/Camera Effects ──
-  tvEnabled: false,
-  tvGlitch: 0.0,
-  tvGlitchSpeed: 1.0,
-  tvScanLineJitter: 0.0,
-  tvColorBleed: 0.0,
-  tvStaticNoise: 0.0,
-  tvBarrelDistortion: 0.0,
-  tvRGBShift: 0.0,
+  tvEnabled: true,
+  tvGlitch: 0.09,
+  tvGlitchSpeed: 0.2,
+  tvScanLineJitter: 0.06,
+  tvColorBleed: 0.12,
+  tvStaticNoise: 0.39,
+  tvBarrelDistortion: 0.03,
+  tvRGBShift: 0.29,
 };

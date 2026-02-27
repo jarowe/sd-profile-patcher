@@ -136,6 +136,7 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     visFolder.add(proxy, 'prismGlowEnabled').name('Prismatic Glow').onChange(updateParam('prismGlowEnabled'));
     visFolder.add(proxy, 'envGlowEnabled').name('Env Glow').onChange(updateParam('envGlowEnabled'));
     visFolder.add(proxy, 'lavaLampEnabled').name('Lava Lamp').onChange(updateParam('lavaLampEnabled'));
+    visFolder.add(proxy, 'sunRaysEnabled').name('Sun Rays').onChange(updateParam('sunRaysEnabled'));
     visFolder.add(proxy, 'lensFlareVisible').name('Lens Flare').onChange(updateParam('lensFlareVisible'));
     visFolder.add(proxy, 'starsVisible').name('Stars').onChange(updateParam('starsVisible'));
     visFolder.add(proxy, 'dustVisible').name('Dust').onChange(updateParam('dustVisible'));
@@ -332,7 +333,7 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     lavaFolder.add(proxy, 'lavaLampSpeed', 0.0, 1.0, 0.01).name('Speed').onChange(updateShaderUniform(getLavaLampMat, 'lavaLampSpeed'));
     lavaFolder.add(proxy, 'lavaLampScale', 0.5, 5.0, 0.1).name('Scale').onChange(updateShaderUniform(getLavaLampMat, 'lavaLampScale'));
     lavaFolder.add(proxy, 'lavaLampBlobSize', 0.5, 10.0, 0.1).name('Blob Size').onChange(updateShaderUniform(getLavaLampMat, 'lavaLampBlobSize'));
-    lavaFolder.add(proxy, 'lavaLampFeather', 0.0, 1.0, 0.01).name('Feather (Softness)').onChange(updateShaderUniform(getLavaLampMat, 'lavaLampFeather'));
+    lavaFolder.add(proxy, 'lavaLampFeather', 0.0, 5.0, 0.01).name('Feather (Softness)').onChange(updateShaderUniform(getLavaLampMat, 'lavaLampFeather'));
     lavaFolder.close();
 
     // ══════════════════════════════════════════
@@ -372,6 +373,18 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     haloFolder.add(proxy, 'haloSunMaskMin', -2.0, 1.0, 0.01).name('Sun Mask Min').onChange(updateShaderUniform(getHaloMat, 'haloSunMaskMin'));
     haloFolder.add(proxy, 'haloSunMaskMax', -1.0, 2.0, 0.01).name('Sun Mask Max').onChange(updateShaderUniform(getHaloMat, 'haloSunMaskMax'));
     haloFolder.close();
+
+    // ══════════════════════════════════════════
+    // SUN RAYS (3D volumetric light beams)
+    // ══════════════════════════════════════════
+    const sunRaysFolder = gui.addFolder('Sun Rays');
+    sunRaysFolder.add(proxy, 'sunRaysIntensity', 0.0, 2.0, 0.01).name('Intensity').onChange(updateParam('sunRaysIntensity'));
+    sunRaysFolder.add(proxy, 'sunRaysLength', 0.5, 10.0, 0.1).name('Ray Length').onChange(updateParam('sunRaysLength'));
+    sunRaysFolder.addColor(proxy, 'sunRaysColor').name('Ray Color').onChange((hex) => {
+      const rgb = hexToRgb(hex);
+      p.sunRaysColor = rgb;
+    });
+    sunRaysFolder.close();
 
     // ══════════════════════════════════════════
     // LENS FLARE
@@ -426,7 +439,8 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     bopFolder.add(proxy, 'bopParticleBurst', 0.0, 5.0, 0.1).name('Particle Burst').onChange(updateShaderUniform(getParticleMat, 'bopParticleBurst'));
     bopFolder.add(proxy, 'bopColorShift', 0.0, 1.0, 0.01).name('Color Shift').onChange(updateShaderUniform(getParticleMat, 'bopColorShift'));
     bopFolder.add(proxy, 'bopStarBurst', 0.0, 5.0, 0.1).name('Star Burst').onChange(updateShaderUniform(getParticleMat, 'bopStarBurst'));
-    bopFolder.add(proxy, 'bopGlowBoost', 0.0, 10.0, 0.1).name('Glow Boost').onChange(updateShaderUniform(getPrismGlowMat, 'bopGlowBoost'));
+    bopFolder.add(proxy, 'bopGlowBoost', 0.0, 10.0, 0.1).name('Prismatic Glow Boost').onChange(updateShaderUniform(getPrismGlowMat, 'bopGlowBoost'));
+    bopFolder.add(proxy, 'bopLavaLampBoost', 0.0, 10.0, 0.1).name('Lava Lamp Boost').onChange(updateShaderUniform(getLavaLampMat, 'bopLavaLampBoost'));
     bopFolder.add(proxy, 'bopAuroraBoost', 0.0, 5.0, 0.1).name('Aurora Boost').onChange(updateShaderUniform(getAuroraMat, 'bopAuroraBoost'));
     bopFolder.add(proxy, 'bopCloudFlash', 0.0, 1.0, 0.01).name('Cloud Flash').onChange(updateShaderUniform(getCloudMat, 'bopCloudFlash'));
     bopFolder.add(proxy, 'bopWaterRipple', 0.0, 2.0, 0.01).name('Water Ripple').onChange(updateSurfaceUniform('bopWaterRipple'));

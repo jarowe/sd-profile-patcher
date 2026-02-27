@@ -1163,6 +1163,7 @@ export default function Home() {
             uniforms: {
               time: globe.customUniforms.time,
               prismPulse: globe.customUniforms.prismPulse,
+              bopLavaLampBoost: { value: ll.bopLavaLampBoost },
               lavaLampColor1: { value: new THREE.Vector3(...ll.lavaLampColor1) },
               lavaLampColor2: { value: new THREE.Vector3(...ll.lavaLampColor2) },
               lavaLampColor3: { value: new THREE.Vector3(...ll.lavaLampColor3) },
@@ -1186,6 +1187,7 @@ export default function Home() {
             fragmentShader: `
               uniform float time;
               uniform float prismPulse;
+              uniform float bopLavaLampBoost;
               uniform vec3 lavaLampColor1;
               uniform vec3 lavaLampColor2;
               uniform vec3 lavaLampColor3;
@@ -1272,7 +1274,7 @@ export default function Home() {
                 col *= 0.5;
 
                 float intensity = lavaLampIntensity * blob * (0.3 + fresnel * 0.7);
-                intensity += prismPulse * lavaLampIntensity * 2.0 * blob;
+                intensity += prismPulse * lavaLampIntensity * bopLavaLampBoost * blob;
 
                 float alpha = clamp(intensity, 0.0, 1.0);
                 gl_FragColor = vec4(col * intensity, alpha);
@@ -1617,6 +1619,106 @@ export default function Home() {
           });
 
           globe.lensFlare = { main: mainFlare, rays, halo, anamorphic, artifacts };
+        }
+
+        // --- D3. Sun Rays (3D volumetric light beams from sun position) ---
+        if (!globe.sunRaysMesh) {
+          const srp = editorParams.current;
+          const sunRaysMat = new THREE.ShaderMaterial({
+            uniforms: {
+              time: globe.customUniforms.time,
+              rayIntensity: { value: srp.sunRaysIntensity },
+              rayLength: { value: srp.sunRaysLength },
+              rayColor: { value: new THREE.Vector3(...srp.sunRaysColor) },
+            },
+            vertexShader: `
+              varying vec2 vUv;
+              void main() {
+                vUv = uv;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+              }
+            `,
+            fragmentShader: `
+              uniform float time;
+              uniform float rayIntensity;
+              uniform float rayLength;
+              uniform vec3 rayColor;
+              varying vec2 vUv;
+              void main() {
+                vec2 centered = vUv - 0.5;
+                float dist = length(centered);
+                float angle = atan(centered.y, centered.x);
+                // Multi-layer radial rays
+                float rays = 0.0;
+                rays += pow(abs(cos(angle * 6.0 + time * 0.08)), 40.0);
+                rays += pow(abs(cos(angle * 12.0 - time * 0.04)), 80.0) * 0.4;
+                rays += pow(abs(cos(angle * 3.0 + time * 0.12 + 1.0)), 20.0) * 0.3;
+                // Radial falloff
+                float falloff = exp(-dist * rayLength);
+                // Core glow
+                float core = exp(-dist * 12.0) * 0.5;
+                float alpha = (rays * falloff + core) * rayIntensity;
+                alpha *= smoothstep(0.5, 0.0, dist);
+                gl_FragColor = vec4(rayColor * alpha, alpha);
+              }
+            `,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            depthTest: false,
+            side: THREE.DoubleSide,
+          });
+          const sunRaysMesh = new THREE.Sprite(new THREE.SpriteMaterial({
+            map: (() => {
+              // Create ray texture via offscreen render
+              const size = 512;
+              const c = document.createElement('canvas');
+              c.width = c.height = size;
+              const ctx = c.getContext('2d');
+              const cx = size / 2, cy = size / 2;
+              // Draw radial rays
+              for (let i = 0; i < 24; i++) {
+                const a = (Math.PI * 2 / 24) * i;
+                const len = size * 0.48;
+                const g = ctx.createLinearGradient(cx, cy, cx + Math.cos(a) * len, cy + Math.sin(a) * len);
+                g.addColorStop(0, 'rgba(255,245,220,0.4)');
+                g.addColorStop(0.2, 'rgba(255,230,180,0.15)');
+                g.addColorStop(0.5, 'rgba(255,220,160,0.04)');
+                g.addColorStop(1, 'rgba(255,200,100,0)');
+                ctx.save();
+                ctx.translate(cx, cy);
+                ctx.rotate(a);
+                ctx.fillStyle = g;
+                ctx.beginPath();
+                const w = (i % 3 === 0) ? 3 : 1.5;
+                ctx.moveTo(0, -w);
+                ctx.lineTo(len, -w * 0.3);
+                ctx.lineTo(len, w * 0.3);
+                ctx.lineTo(0, w);
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+              }
+              // Core glow
+              const cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.15);
+              cg.addColorStop(0, 'rgba(255,250,240,0.6)');
+              cg.addColorStop(0.5, 'rgba(255,240,200,0.2)');
+              cg.addColorStop(1, 'rgba(255,220,150,0)');
+              ctx.fillStyle = cg;
+              ctx.fillRect(0, 0, size, size);
+              return new THREE.CanvasTexture(c);
+            })(),
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            depthTest: false,
+            opacity: srp.sunRaysIntensity,
+          }));
+          const sunPos = globe.customUniforms.sunDir.value.clone().multiplyScalar(800);
+          sunRaysMesh.position.copy(sunPos);
+          sunRaysMesh.scale.set(600, 600, 1);
+          scene.add(sunRaysMesh);
+          globe.sunRaysMesh = sunRaysMesh;
         }
 
         // --- E. Tri-Layer Particles (TINY twinkling magic + deep stars + reaction bursts) ---
@@ -2268,6 +2370,16 @@ export default function Home() {
                 globe.cloudMesh.rotation.x = Math.sin(elTs * 0.03) * 0.005;
               }
 
+              // Animate sun rays (3D volumetric beams)
+              if (globe.sunRaysMesh) {
+                globe.sunRaysMesh.visible = ep.sunRaysEnabled;
+                globe.sunRaysMesh.position.copy(newSunDir.clone().multiplyScalar(800));
+                globe.sunRaysMesh.material.opacity = ep.sunRaysIntensity;
+                globe.sunRaysMesh.material.rotation = elTs * 0.01;
+                const breathe = 1.0 + Math.sin(elTs * 0.3) * 0.05;
+                globe.sunRaysMesh.scale.set(600 * breathe, 600 * breathe, 1);
+              }
+
               // Animate lens flare with occlusion (fades behind globe)
               if (globe.lensFlare) {
                 const lf = globe.lensFlare;
@@ -2811,7 +2923,8 @@ export default function Home() {
                     labelText={(d) => (d === hoveredMarker || expeditions.indexOf(d) === activeExpedition) ? d.name : ''}
                     labelSize={overlayParams.labelSize}
                     labelDotRadius={overlayParams.labelDotRadius}
-                    labelColor={() => 'rgba(255, 255, 255, 0.9)'}
+                    labelColor={() => '#ffffff'}
+                    labelAltitude={0.01}
                     labelResolution={2}
                     onLabelHover={(label) => setHoveredMarker(label)}
                     onRingHover={(ring) => setHoveredMarker(ring)}
