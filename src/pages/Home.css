@@ -1079,6 +1079,28 @@
     }
 }
 
+/* Globe overflow: let globe poke above bento card with feathered mask */
+.bento-cell.cell-map.globe-overflow {
+    overflow: visible;
+    -webkit-mask-image: linear-gradient(
+        to bottom,
+        transparent 0%,
+        black calc(var(--globe-overflow-top, 0px)),
+        black calc(100% - 20px),
+        transparent 100%
+    );
+    mask-image: linear-gradient(
+        to bottom,
+        transparent 0%,
+        black calc(var(--globe-overflow-top, 0px)),
+        black calc(100% - 20px),
+        transparent 100%
+    );
+}
+.bento-cell.cell-map.globe-overflow .map-container {
+    margin-top: calc(-1 * var(--globe-overflow-top, 0px));
+}
+
 /* lil-gui Globe Editor theme */
 .lil-gui.root {
     --background-color: rgba(10, 10, 20, 0.92);

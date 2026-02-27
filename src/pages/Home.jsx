@@ -18,16 +18,17 @@ const Globe = lazy(() => import('react-globe.gl'));
 const GlobeEditor = lazy(() => import('../components/GlobeEditor'));
 
 // Real-time sun position based on UTC time (solar declination + hour angle)
-function getSunDirection() {
+// overrideHour: -1 = real time, 0-24 = manual UTC hour
+function getSunDirection(overrideHour) {
   const now = new Date();
   const start = new Date(now.getFullYear(), 0, 0);
   const diff = now - start;
   const oneDay = 1000 * 60 * 60 * 24;
   const dayOfYear = Math.floor(diff / oneDay);
-  // Solar declination: axial tilt effect (-23.4° to +23.4°)
   const declination = -23.4397 * Math.cos((2 * Math.PI / 365) * (dayOfYear + 10));
-  // Hour angle from UTC
-  const utcHours = now.getUTCHours() + now.getUTCMinutes() / 60 + now.getUTCSeconds() / 3600;
+  const utcHours = (overrideHour >= 0)
+    ? overrideHour
+    : now.getUTCHours() + now.getUTCMinutes() / 60 + now.getUTCSeconds() / 3600;
   const solarLongitude = -((utcHours - 12) * 15);
   const latRad = declination * (Math.PI / 180);
   const lngRad = solarLongitude * (Math.PI / 180);
@@ -223,6 +224,9 @@ export default function Home() {
         // Sunset
         sunsetColor: { value: new THREE.Vector3(...p.sunsetColor) },
         sunsetStrength: { value: p.sunsetStrength },
+        // Shader lighting (affects ShaderMaterial directly)
+        shaderAmbient: { value: p.shaderAmbient },
+        shaderSunMult: { value: p.shaderSunMult },
       },
       vertexShader: `
         varying vec2 vUv;
@@ -285,6 +289,8 @@ export default function Home() {
         // Sunset uniforms
         uniform vec3 sunsetColor;
         uniform float sunsetStrength;
+        uniform float shaderAmbient;
+        uniform float shaderSunMult;
 
         varying vec2 vUv;
         varying vec3 vNormal;
@@ -329,7 +335,7 @@ export default function Home() {
           vec3 worldViewDir = normalize(cameraPosition - vWorldPos);
           float NdotL = dot(vWorldNormal, sunDir);
           float dayStrength = smoothstep(dayStrengthMin, dayStrengthMax, NdotL);
-          float dayLight = max(NdotL, 0.0);
+          float dayLight = max(NdotL, 0.0) * shaderSunMult + shaderAmbient;
           float rawFresnel = clamp(1.0 - dot(worldViewDir, vWorldNormal), 0.0, 1.0);
           vec3 halfDir = normalize(sunDir + worldViewDir);
 
@@ -690,7 +696,130 @@ export default function Home() {
 
         // (B3 haze shell removed - surface shader handles atmosphere tinting)
 
-        // (Aurora shell removed - was creating purple wash via additive blending over globe face)
+        // --- C. Aurora Borealis/Australis (dark-side polar curtain glow) ---
+        if (!globe.auroraMesh) {
+          const ap = editorParams.current;
+          const auroraMat = new THREE.ShaderMaterial({
+            uniforms: {
+              sunDir: globe.customUniforms.sunDir,
+              time: globe.customUniforms.time,
+              auroraColor1: { value: new THREE.Vector3(...ap.auroraColor1) },
+              auroraColor2: { value: new THREE.Vector3(...ap.auroraColor2) },
+              auroraColor3: { value: new THREE.Vector3(...ap.auroraColor3) },
+              auroraIntensity: { value: ap.auroraIntensity },
+              auroraSpeed: { value: ap.auroraSpeed },
+              auroraLatitude: { value: ap.auroraLatitude },
+              auroraWidth: { value: ap.auroraWidth },
+              auroraNoiseScale: { value: ap.auroraNoiseScale },
+              auroraCurtainPow: { value: ap.auroraCurtainPow },
+            },
+            vertexShader: `
+              varying vec2 vUv;
+              varying vec3 vWorldNormal;
+              varying vec3 vWorldPos;
+              varying vec3 vViewPos;
+              void main() {
+                vUv = uv;
+                vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+                vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+                vViewPos = (modelViewMatrix * vec4(position, 1.0)).xyz;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+              }
+            `,
+            fragmentShader: `
+              uniform vec3 sunDir;
+              uniform float time;
+              uniform vec3 auroraColor1;
+              uniform vec3 auroraColor2;
+              uniform vec3 auroraColor3;
+              uniform float auroraIntensity;
+              uniform float auroraSpeed;
+              uniform float auroraLatitude;
+              uniform float auroraWidth;
+              uniform float auroraNoiseScale;
+              uniform float auroraCurtainPow;
+              varying vec2 vUv;
+              varying vec3 vWorldNormal;
+              varying vec3 vWorldPos;
+              varying vec3 vViewPos;
+
+              // Simple noise for aurora curtains
+              float hash(vec2 p) {
+                p = fract(p * vec2(234.34, 435.345));
+                p += dot(p, p + 34.23);
+                return fract(p.x * p.y);
+              }
+              float noise(vec2 p) {
+                vec2 i = floor(p);
+                vec2 f = fract(p);
+                f = f * f * (3.0 - 2.0 * f);
+                return mix(
+                  mix(hash(i), hash(i + vec2(1,0)), f.x),
+                  mix(hash(i + vec2(0,1)), hash(i + vec2(1,1)), f.x), f.y);
+              }
+              float fbm3(vec2 p) {
+                float v = 0.0; float a = 0.5;
+                for (int i = 0; i < 4; i++) {
+                  v += a * noise(p);
+                  p = p * 2.1 + vec2(0.7, -0.4);
+                  a *= 0.5;
+                }
+                return v;
+              }
+
+              void main() {
+                // Latitude from UV: 0=south pole, 0.5=equator, 1=north pole
+                float latDeg = (vUv.y - 0.5) * 180.0;
+                float absLat = abs(latDeg);
+
+                // Aurora band: concentrated near auroraLatitude degrees
+                float latDist = abs(absLat - auroraLatitude);
+                float latMask = exp(-latDist * latDist / (auroraWidth * auroraWidth * 0.5));
+
+                // Dark side only: aurora is a night phenomenon
+                float NdotL = dot(vWorldNormal, sunDir);
+                float nightMask = smoothstep(0.1, -0.2, NdotL);
+
+                // Curtain pattern: flowing noise bands
+                float t = time * auroraSpeed;
+                float lng = vUv.x * 6.28318;
+                vec2 curtainUv = vec2(lng * auroraNoiseScale + t * 0.3, absLat * 0.1 + t * 0.1);
+                float curtain = fbm3(curtainUv);
+                curtain = pow(curtain, auroraCurtainPow);
+
+                // Secondary swirl layer
+                vec2 swirlUv = vec2(lng * auroraNoiseScale * 0.5 - t * 0.2, absLat * 0.15 + t * 0.05);
+                float swirl = fbm3(swirlUv + vec2(curtain * 0.5));
+
+                // Color: blend between green, blue, purple based on altitude in curtain
+                float colorMix = curtain * 0.6 + swirl * 0.4;
+                vec3 auroraCol = mix(auroraColor1, auroraColor2, smoothstep(0.3, 0.6, colorMix));
+                auroraCol = mix(auroraCol, auroraColor3, smoothstep(0.6, 0.9, colorMix));
+
+                // Fresnel edge glow (aurora more visible at limb)
+                vec3 viewDir = normalize(-vViewPos);
+                float fresnel = pow(1.0 - abs(dot(viewDir, normalize(vWorldNormal))), 1.5);
+                float edgeBoost = 0.6 + fresnel * 0.4;
+
+                float alpha = latMask * nightMask * curtain * auroraIntensity * edgeBoost;
+                alpha = clamp(alpha, 0.0, 1.0);
+
+                gl_FragColor = vec4(auroraCol * auroraIntensity, alpha);
+              }
+            `,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            side: THREE.FrontSide,
+          });
+          const auroraMesh = new THREE.Mesh(
+            new THREE.SphereGeometry(ap.auroraHeight, 96, 96),
+            auroraMat
+          );
+          auroraMesh.renderOrder = 1;
+          scene.add(auroraMesh);
+          globe.auroraMesh = auroraMesh;
+        }
 
         // --- D. Atmospheric Glow (tight rim + soft feathered halo) ---
         if (!globe.atmosShell) {
@@ -725,6 +854,7 @@ export default function Home() {
               rimBacklitFadeMin: { value: rp.rimBacklitFadeMin },
               rimBacklitFadeMax: { value: rp.rimBacklitFadeMax },
               rimBacklitWeight: { value: rp.rimBacklitWeight },
+              rimFadeout: { value: rp.rimFadeout },
             },
             vertexShader: atmosVert,
             fragmentShader: `
@@ -745,14 +875,18 @@ export default function Home() {
               uniform float rimBacklitFadeMin;
               uniform float rimBacklitFadeMax;
               uniform float rimBacklitWeight;
+              uniform float rimFadeout;
               varying vec3 vWorldNormal;
               varying vec3 vWorldPos;
               void main() {
                 vec3 viewDir = normalize(vWorldPos - cameraPosition);
                 float fresnel = 1.0 - abs(dot(viewDir, vWorldNormal));
 
+                // Soft outer edge fadeout (prevents hard stroke look)
+                float edgeFade = smoothstep(1.0, 1.0 - rimFadeout, fresnel);
+
                 // Concentrated rim glow (Franky pow technique)
-                float rim = pow(fresnel, rimFresnelPow) * rimGlowMult;
+                float rim = pow(fresnel, rimFresnelPow) * rimGlowMult * edgeFade;
 
                 // Atmosphere colors: blue day + warm orange twilight
                 float sunOri = dot(vWorldNormal, sunDir);
@@ -792,6 +926,7 @@ export default function Home() {
               haloBlendMax: { value: rp.haloBlendMax },
               haloSunMaskMin: { value: rp.haloSunMaskMin },
               haloSunMaskMax: { value: rp.haloSunMaskMax },
+              haloFadeout: { value: rp.haloFadeout },
             },
             vertexShader: atmosVert,
             fragmentShader: `
@@ -804,14 +939,18 @@ export default function Home() {
               uniform float haloBlendMax;
               uniform float haloSunMaskMin;
               uniform float haloSunMaskMax;
+              uniform float haloFadeout;
               varying vec3 vWorldNormal;
               varying vec3 vWorldPos;
               void main() {
                 vec3 viewDir = normalize(vWorldPos - cameraPosition);
                 float fresnel = 1.0 - abs(dot(viewDir, vWorldNormal));
 
+                // Soft outer edge fadeout
+                float edgeFade = smoothstep(1.0, 1.0 - haloFadeout, fresnel);
+
                 // Very soft feathered falloff (not a hard ring)
-                float glow = pow(fresnel, haloFresnelPow) * haloGlowMult;
+                float glow = pow(fresnel, haloFresnelPow) * haloGlowMult * edgeFade;
 
                 float sunOri = dot(vWorldNormal, sunDir);
                 vec3 color = mix(haloTwilightColor, haloDayColor, smoothstep(haloBlendMin, haloBlendMax, sunOri));
@@ -1306,15 +1445,41 @@ export default function Home() {
           globe.animateTick = true;
           const tick = () => {
             if (globeRef.current && globe.customUniforms) {
+              const ep = editorParams.current;
               const dt = clock.getDelta();
               const elTs = clock.getElapsedTime();
-              globe.customUniforms.time.value = elTs;
 
-              // Update real-time sun position (cheap computation, updates all shared sunDir uniforms)
-              const newSunDir = getSunDirection();
+              // Animation pause: freeze time uniform
+              if (!ep.animationPaused) {
+                globe.customUniforms.time.value = elTs;
+              }
+
+              // Update sun position (supports manual time override)
+              const newSunDir = getSunDirection(ep.timeOverrideHour);
               globe.customUniforms.sunDir.value.copy(newSunDir);
-              // Move directional lights to match sun
               if (globe._sunLight) globe._sunLight.position.copy(newSunDir.clone().multiplyScalar(200));
+
+              // Visibility toggles
+              if (globe.cloudMesh) globe.cloudMesh.visible = ep.cloudsVisible;
+              if (globe.auroraMesh) globe.auroraMesh.visible = ep.auroraEnabled;
+              if (globe.lensFlare) {
+                const lfVis = ep.lensFlareVisible;
+                if (globe.lensFlare.main) globe.lensFlare.main.visible = lfVis;
+                if (globe.lensFlare.rays) globe.lensFlare.rays.visible = lfVis;
+                if (globe.lensFlare.halo) globe.lensFlare.halo.visible = lfVis;
+                if (globe.lensFlare.anamorphic) globe.lensFlare.anamorphic.visible = lfVis;
+                if (globe.lensFlare.artifacts) globe.lensFlare.artifacts.forEach(a => { a.visible = lfVis; });
+              }
+              if (globe.particleSystem) globe.particleSystem.visible = ep.starsVisible || ep.dustVisible;
+              if (globe.satellitesGroup) {
+                globe.satellitesGroup.children.forEach(m => {
+                  const ud = m.userData;
+                  if (ud.type === 'plane') m.visible = ep.planesVisible;
+                  else if (ud.type === 'car') m.visible = ep.carsVisible;
+                  else if (ud.type === 'wisp') m.visible = ep.wispsVisible;
+                  else m.visible = ep.satellitesVisible;
+                });
+              }
 
 
               // Decay intro aurora (swirling orb fades over ~5 seconds)
@@ -1337,8 +1502,8 @@ export default function Home() {
               }
 
               // Rotate cloud layer slowly (counter to globe rotation) + subtle tilt
-              if (globe.cloudMesh) {
-                globe.cloudMesh.rotation.y += dt * editorParams.current.cloudRotationSpeed;
+              if (globe.cloudMesh && !ep.animationPaused) {
+                globe.cloudMesh.rotation.y += dt * ep.cloudRotationSpeed;
                 globe.cloudMesh.rotation.x = Math.sin(elTs * 0.03) * 0.005;
               }
 
@@ -1404,14 +1569,18 @@ export default function Home() {
                 }
               }
 
-              // Animate Satellites & Planes
-              if (globe.satellitesGroup) {
+              // Animate Satellites & Planes (respects speed multipliers + pause)
+              if (globe.satellitesGroup && !ep.animationPaused) {
                 const pp = globe.customUniforms.prismPulse.value;
                 const globalPrismMultiplier = 1.0 + pp * 1.5;
                 globe.satellitesGroup.children.forEach(m => {
+                  if (!m.visible) return;
                   const ud = m.userData;
-                  ud.lat += ud.speedLat * dt * globalPrismMultiplier;
-                  ud.lng += ud.speedLng * dt * globalPrismMultiplier;
+                  const speedMult = ud.type === 'plane' ? ep.planeSpeed
+                    : ud.type === 'wisp' ? ep.wispSpeed
+                    : ud.type === 'car' ? 1.0 : ep.satelliteSpeed;
+                  ud.lat += ud.speedLat * dt * globalPrismMultiplier * speedMult;
+                  ud.lng += ud.speedLng * dt * globalPrismMultiplier * speedMult;
 
                   const phi = Math.PI / 2 - ud.lat;
                   const theta = ud.lng;
@@ -1796,7 +1965,8 @@ export default function Home() {
           </div>
 
           {/* WORLD MAP CELL */}
-          <div className="bento-cell cell-map">
+          <div className={`bento-cell cell-map${showEditor && editorParams.current.globeOverflowTop > 0 ? ' globe-overflow' : ''}`}
+            style={showEditor && editorParams.current.globeOverflowTop > 0 ? { '--globe-overflow-top': `${editorParams.current.globeOverflowTop}px` } : undefined}>
             <div className="map-container" ref={mapContainerRef} style={{ opacity: globeReady ? 1 : 0, transition: 'opacity 1.5s ease-in' }}>
               <Suspense fallback={<div style={{ color: '#fff', padding: '2rem' }}>Loading globe...</div>}>
                 {globeSize.width > 0 && (

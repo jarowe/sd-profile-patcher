@@ -81,6 +81,7 @@ export const GLOBE_DEFAULTS = {
   rimBacklitFadeMin: -0.8,
   rimBacklitFadeMax: -0.3,
   rimBacklitWeight: 0.5,
+  rimFadeout: 0.3, // soft outer edge: 0=hard, 1=very soft
 
   // ── Atmosphere Halo (r108) ──
   haloRadius: 108,
@@ -92,8 +93,26 @@ export const GLOBE_DEFAULTS = {
   haloBlendMax: 0.7,
   haloSunMaskMin: -0.6,
   haloSunMaskMax: 0.8,
+  haloFadeout: 0.5, // soft outer edge: 0=hard, 1=very soft
 
-  // ── Lighting ──
+  // ── Aurora Borealis ──
+  auroraEnabled: true,
+  auroraColor1: [0.1, 0.95, 0.3],
+  auroraColor2: [0.2, 0.4, 0.95],
+  auroraColor3: [0.6, 0.1, 0.8],
+  auroraIntensity: 1.5,
+  auroraSpeed: 0.4,
+  auroraLatitude: 70.0,
+  auroraWidth: 18.0,
+  auroraNoiseScale: 3.0,
+  auroraHeight: 101.5,
+  auroraCurtainPow: 2.0,
+
+  // ── Shader Lighting (in-shader, affects ShaderMaterial) ──
+  shaderAmbient: 0.08,
+  shaderSunMult: 1.0,
+
+  // ── Scene Lights (THREE.js lights for non-shader objects) ──
   ambientIntensity: 0.15,
   sunIntensity: 2.0,
 
@@ -114,4 +133,28 @@ export const GLOBE_DEFAULTS = {
   // ── Cloud Mesh ──
   cloudMeshRadius: 100.8,
   cloudRotationSpeed: 0.012,
+
+  // ── Time Control ──
+  timeOverrideHour: -1, // -1 = real time, 0-24 = manual hour
+
+  // ── Animation ──
+  animationPaused: false,
+
+  // ── Globe Overflow (bento card) ──
+  globeOverflowTop: 0, // px the globe sticks out above the card
+
+  // ── Visibility Toggles ──
+  satellitesVisible: true,
+  planesVisible: true,
+  carsVisible: true,
+  wispsVisible: true,
+  cloudsVisible: true,
+  lensFlareVisible: true,
+  dustVisible: true,
+  starsVisible: true,
+
+  // ── Object Speeds ──
+  satelliteSpeed: 1.0,
+  planeSpeed: 1.0,
+  wispSpeed: 1.0,
 };
