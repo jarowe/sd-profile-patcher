@@ -71,7 +71,7 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     const updatePPColor = (key) => (hex) => {
       const rgb = hexToRgb(hex);
       p[key] = rgb;
-      const pp = globeRef.current?.postProcessing?.material;
+      const pp = globeRef.current?.ppPass;
       if (pp?.uniforms?.tint) pp.uniforms.tint.value.set(...rgb);
     };
 
@@ -489,7 +489,7 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
       }
       // Post-processing tint
       if (data.ppTint) {
-        const pp = globeRef.current?.postProcessing?.material;
+        const pp = globeRef.current?.ppPass;
         if (pp?.uniforms?.tint) pp.uniforms.tint.value.set(...data.ppTint);
       }
       // Scene lights

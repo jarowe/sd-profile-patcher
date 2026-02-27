@@ -13,6 +13,7 @@ import SpeedPuzzle from '../components/SpeedPuzzle';
 import './Home.css';
 import { Howler } from 'howler';
 import * as THREE from 'three';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { GLOBE_DEFAULTS } from '../utils/globeDefaults';
 const Globe = lazy(() => import('react-globe.gl'));
 const GlobeEditor = lazy(() => import('../components/GlobeEditor'));
@@ -1934,23 +1935,15 @@ export default function Home() {
           }, 200);
         }
 
-        // --- G0. Post-Processing Pipeline (monkey-patches renderer) ---
-        if (!globe.postProcessing) {
+        // --- G0. Post-Processing Pipeline (via library's EffectComposer) ---
+        if (!globe.ppPass) {
           const renderer = globe.renderer();
-          const ppWidth = renderer.domElement.width || 1024;
-          const ppHeight = renderer.domElement.height || 768;
-          const renderTarget = new THREE.WebGLRenderTarget(ppWidth, ppHeight, {
-            minFilter: THREE.LinearFilter,
-            magFilter: THREE.LinearFilter,
-            format: THREE.RGBAFormat,
-          });
-          const ppScene = new THREE.Scene();
-          const ppCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-          const ppMaterial = new THREE.ShaderMaterial({
+          const composer = globe.postProcessingComposer();
+          const ppShader = {
             uniforms: {
-              tDiffuse: { value: renderTarget.texture },
+              tDiffuse: { value: null }, // auto-set by ShaderPass from previous pass
               time: sharedUniforms.current.time,
-              resolution: { value: new THREE.Vector2(ppWidth, ppHeight) },
+              resolution: { value: new THREE.Vector2(renderer.domElement.width, renderer.domElement.height) },
               chromaticAberration: { value: editorParams.current.ppChromaticAberration },
               vignetteStrength: { value: editorParams.current.ppVignetteStrength },
               vignetteRadius: { value: editorParams.current.ppVignetteRadius },
@@ -1970,7 +1963,7 @@ export default function Home() {
               scanLineJitter: { value: editorParams.current.tvScanLineJitter },
               colorBleed: { value: editorParams.current.tvColorBleed },
             },
-            vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position, 1.0); }`,
+            vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
             fragmentShader: `
               uniform sampler2D tDiffuse;
               uniform float time;
@@ -2088,37 +2081,10 @@ export default function Home() {
                 gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
               }
             `,
-          });
-          const ppQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), ppMaterial);
-          ppScene.add(ppQuad);
-
-          // Monkey-patch renderer to intercept render calls
-          let _insidePost = false;
-          const origRender = renderer.render.bind(renderer);
-          renderer.render = function(s, c) {
-            const ep = editorParams.current;
-            if (_insidePost || !ep.ppEnabled) {
-              origRender(s, c);
-              return;
-            }
-            _insidePost = true;
-            // Resize render target if needed
-            const w = renderer.domElement.width;
-            const h = renderer.domElement.height;
-            if (renderTarget.width !== w || renderTarget.height !== h) {
-              renderTarget.setSize(w, h);
-              ppMaterial.uniforms.resolution.value.set(w, h);
-            }
-            // Render scene to texture
-            renderer.setRenderTarget(renderTarget);
-            origRender(s, c);
-            renderer.setRenderTarget(null);
-            // Render post-processing quad to screen
-            origRender(ppScene, ppCamera);
-            _insidePost = false;
           };
-
-          globe.postProcessing = { renderTarget, material: ppMaterial, scene: ppScene, camera: ppCamera };
+          const ppPass = new ShaderPass(ppShader);
+          composer.addPass(ppPass);
+          globe.ppPass = ppPass;
         }
 
         // --- G. Animation loop for shaders & motion ---
@@ -2185,8 +2151,12 @@ export default function Home() {
               }
 
               // Sync post-processing uniforms from editor params
-              if (globe.postProcessing) {
-                const ppu = globe.postProcessing.material.uniforms;
+              if (globe.ppPass) {
+                globe.ppPass.enabled = ep.ppEnabled;
+                const ppu = globe.ppPass.uniforms;
+                // Update resolution to match current canvas
+                const renderer = globe.renderer();
+                ppu.resolution.value.set(renderer.domElement.width, renderer.domElement.height);
                 ppu.chromaticAberration.value = ep.ppChromaticAberration;
                 ppu.vignetteStrength.value = ep.ppVignetteStrength;
                 ppu.vignetteRadius.value = ep.ppVignetteRadius;
