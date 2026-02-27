@@ -1913,7 +1913,7 @@ export default function Home() {
 
         // --- E2. Wind Particles (interactive fluid physics around globe) ---
         if (!globe.windParticles) {
-          const windCount = 12000;
+          const windCount = 30000;
           const windPos = new Float32Array(windCount * 3);
           const windVel = new Float32Array(windCount * 3);
           const windCol = new Float32Array(windCount * 3);
@@ -1960,13 +1960,13 @@ export default function Home() {
           windGeo.setAttribute('color', new THREE.BufferAttribute(windCol, 3));
 
           const windMat = new THREE.PointsMaterial({
-            size: 0.3,
+            size: 0.05,
             blending: THREE.AdditiveBlending,
             transparent: true,
             sizeAttenuation: true,
             vertexColors: true,
             depthWrite: false,
-            opacity: 0.7,
+            opacity: 0.5,
           });
 
           const windPts = new THREE.Points(windGeo, windMat);
@@ -2488,7 +2488,7 @@ export default function Home() {
               if (globe.windParticles) {
                 globe.windParticles.visible = ep.windParticlesVisible !== false;
                 // Rebuild if particle count changed
-                const targetCount = ep.windParticleCount ?? 12000;
+                const targetCount = ep.windParticleCount ?? 30000;
                 if (globe._windCount !== targetCount) {
                   const scene = globe.scene();
                   scene.remove(globe.windParticles);

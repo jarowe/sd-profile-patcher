@@ -101,6 +101,7 @@
 
 .cell-instagram:hover {
     transform: none;
+    box-shadow: none;
 }
 
 .insta-carousel {
