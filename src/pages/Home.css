@@ -1133,6 +1133,10 @@
     overflow: visible;
     z-index: 20;
 }
+/* Disable hover transform in breakout mode — shifts desync the PP mask */
+.bento-cell.cell-map.globe-breakout:hover {
+    transform: none;
+}
 /* Extend canvas above card — PP shader handles all masking */
 .bento-cell.cell-map.globe-breakout .map-container {
     top: calc(-1 * var(--globe-breakout-px, 60px));

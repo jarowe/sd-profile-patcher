@@ -2345,7 +2345,8 @@ export default function Home() {
 
                 // ── Breakout mask + liquid glass border ──
                 if (breakoutEnabled > 0.5) {
-                  vec2 pixel = vUv * resolution;
+                  // DOM coords are top-down (y=0 at top), GL UVs are bottom-up — flip Y
+                  vec2 pixel = vec2(vUv.x * resolution.x, (1.0 - vUv.y) * resolution.y);
 
                   // Card rectangle SDF (rounded corners)
                   vec2 cardCenter = vec2((cardRect.x + cardRect.z) * 0.5, (cardRect.y + cardRect.w) * 0.5);
