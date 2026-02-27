@@ -32,12 +32,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. User on a mobile device sees a simplified version (no ChromaticAberration, reduced effects, touch gestures work) without crashes or broken layout
   5. User can press ESC or browser back to cleanly exit the constellation with no broken state, and navigating away triggers proper GPU disposal (no memory leaks verified via renderer.info.memory)
   6. User who cannot use 3D (accessibility, old device) can switch to a 2D searchable node index with keyboard navigation
-**Plans**: TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 01-01: R3F scene setup, instanced mesh rendering, and disposal utilities
-- [ ] 01-02: Camera controls, hover/click interaction, detail panel, and timeline scrubber
-- [ ] 01-03: Connection lines, "Because..." lens, 2D fallback, mobile responsiveness, and navigation
+- [ ] 01-01-PLAN.md -- R3F scene setup, instanced mesh rendering, double-helix layout, starfield/nebula, GPU tier detection, and disposal utilities
+- [ ] 01-02-PLAN.md -- Camera fly-to, hover labels, detail panel, timeline scrubber, toolbar, media lightbox, entity chips, ESC/back navigation
+- [ ] 01-03-PLAN.md -- Connection lines with focus-aware opacity, "Because..." evidence lens, 2D accessible list fallback
 
 ### Phase 2: Data Pipeline & Privacy
 **Goal**: The constellation is populated with real life data from Instagram and Carbonmade exports, with privacy enforced at every layer -- the build fails if anything leaks. A thin admin slice validates the pipeline/curation workflow early.
