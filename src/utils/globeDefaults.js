@@ -198,6 +198,24 @@ export const GLOBE_DEFAULTS = {
   dustVisible: true,
   starsVisible: true,
 
+  // ── CSS Overlay Layers ──
+  fogLayerEnabled: true,
+  particlesLayerEnabled: true,
+  innerGlowEnabled: true,
+
+  // ── Glass Edge Effect ──
+  glassSweepEnabled: true,
+  glassShimmerEnabled: true,
+  glassSweepOpacity: 0.7,
+  glassShimmerOpacity: 0.8,
+
+  // ── Individual Lens Flare Components ──
+  flareMainVisible: true,
+  flareRaysVisible: true,
+  flareHaloVisible: true,
+  flareAnamorphicVisible: true,
+  flareArtifactsVisible: true,
+
   // ── Object Speeds & Scales ──
   satelliteSpeed: 1.0,
   planeSpeed: 1.0,
@@ -234,6 +252,14 @@ export const GLOBE_DEFAULTS = {
   flareEdgeDiffraction: 0.5,
   flareStarburstStrength: 0.6,
   flareAnamorphicStrength: 0.45,
+
+  // ── God Rays ──
+  godRaysEnabled: true,
+  godRaysDensity: 0.8,
+  godRaysWeight: 0.5,
+  godRaysDecay: 0.97,
+  godRaysExposure: 0.25,
+  godRaysSamples: 60,
 
   // ── Post-Processing ──
   ppEnabled: true,

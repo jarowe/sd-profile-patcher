@@ -144,6 +144,39 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     visFolder.add(proxy, 'carsVisible').name('Cars').onChange(updateParam('carsVisible'));
     visFolder.add(proxy, 'wispsVisible').name('Wisps').onChange(updateParam('wispsVisible'));
 
+    // ── CSS Overlay Layers (the mystery diagonal gradients!) ──
+    const overlayLayersFolder = visFolder.addFolder('CSS Overlay Layers');
+    overlayLayersFolder.add(proxy, 'fogLayerEnabled').name('Fog Gradient Layer').onChange(updateParam('fogLayerEnabled'));
+    overlayLayersFolder.add(proxy, 'particlesLayerEnabled').name('CSS Particles Layer').onChange(updateParam('particlesLayerEnabled'));
+    overlayLayersFolder.add(proxy, 'innerGlowEnabled').name('Inner Glow (::after)').onChange((v) => {
+      p.innerGlowEnabled = v;
+      const cell = document.querySelector('.cell-map');
+      if (cell) { cell.classList.toggle('inner-glow-off', !v); }
+    });
+
+    // ── Glass Edge Effect ──
+    const glassFolder = visFolder.addFolder('Glass Edge Effect');
+    glassFolder.add(proxy, 'glassSweepEnabled').name('Sweep (Rotating)').onChange((v) => {
+      p.glassSweepEnabled = v;
+      const cell = document.querySelector('.cell-map');
+      if (cell) { cell.classList.toggle('glass-sweep-off', !v); }
+    });
+    glassFolder.add(proxy, 'glassShimmerEnabled').name('Shimmer (Iridescent)').onChange((v) => {
+      p.glassShimmerEnabled = v;
+      const cell = document.querySelector('.cell-map');
+      if (cell) { cell.classList.toggle('glass-shimmer-off', !v); }
+    });
+    glassFolder.add(proxy, 'glassSweepOpacity', 0.0, 1.0, 0.01).name('Sweep Opacity').onChange((v) => {
+      p.glassSweepOpacity = v;
+      const cell = document.querySelector('.cell-map');
+      if (cell) cell.style.setProperty('--glass-sweep-opacity', v);
+    });
+    glassFolder.add(proxy, 'glassShimmerOpacity', 0.0, 1.0, 0.01).name('Shimmer Opacity').onChange((v) => {
+      p.glassShimmerOpacity = v;
+      const cell = document.querySelector('.cell-map');
+      if (cell) cell.style.setProperty('--glass-shimmer-opacity', v);
+    });
+
     // ══════════════════════════════════════════
     // SHADER LIGHTING
     // ══════════════════════════════════════════
@@ -347,6 +380,12 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     flareFolder.add(proxy, 'flareEdgeDiffraction', 0.0, 2.0, 0.01).name('Edge Diffraction').onChange(updateParam('flareEdgeDiffraction'));
     flareFolder.add(proxy, 'flareStarburstStrength', 0.0, 2.0, 0.01).name('Starburst').onChange(updateParam('flareStarburstStrength'));
     flareFolder.add(proxy, 'flareAnamorphicStrength', 0.0, 2.0, 0.01).name('Anamorphic').onChange(updateParam('flareAnamorphicStrength'));
+    const flareCompFolder = flareFolder.addFolder('Component Toggles');
+    flareCompFolder.add(proxy, 'flareMainVisible').name('Main Glow').onChange(updateParam('flareMainVisible'));
+    flareCompFolder.add(proxy, 'flareRaysVisible').name('Starburst Rays').onChange(updateParam('flareRaysVisible'));
+    flareCompFolder.add(proxy, 'flareHaloVisible').name('Halo').onChange(updateParam('flareHaloVisible'));
+    flareCompFolder.add(proxy, 'flareAnamorphicVisible').name('Anamorphic Streak').onChange(updateParam('flareAnamorphicVisible'));
+    flareCompFolder.add(proxy, 'flareArtifactsVisible').name('Artifacts').onChange(updateParam('flareArtifactsVisible'));
     flareFolder.close();
 
     // ══════════════════════════════════════════
@@ -404,6 +443,13 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     // ══════════════════════════════════════════
     const ppFolder = gui.addFolder('Post-Processing');
     ppFolder.add(proxy, 'ppEnabled').name('Enable').onChange(updateParam('ppEnabled'));
+
+    const godRaysFolder = ppFolder.addFolder('God Rays');
+    godRaysFolder.add(proxy, 'godRaysEnabled').name('Enable').onChange(updateParam('godRaysEnabled'));
+    godRaysFolder.add(proxy, 'godRaysDensity', 0.1, 2.0, 0.01).name('Density').onChange(updateParam('godRaysDensity'));
+    godRaysFolder.add(proxy, 'godRaysWeight', 0.05, 2.0, 0.01).name('Weight').onChange(updateParam('godRaysWeight'));
+    godRaysFolder.add(proxy, 'godRaysDecay', 0.9, 1.0, 0.001).name('Decay').onChange(updateParam('godRaysDecay'));
+    godRaysFolder.add(proxy, 'godRaysExposure', 0.01, 1.0, 0.005).name('Exposure').onChange(updateParam('godRaysExposure'));
 
     const colorFolder = ppFolder.addFolder('Color Grading');
     colorFolder.add(proxy, 'ppBrightness', -0.5, 0.5, 0.005).name('Brightness').onChange(updateParam('ppBrightness'));

@@ -365,13 +365,23 @@ export default function Home() {
           float rawFresnel = clamp(1.0 - dot(worldViewDir, vWorldNormal), 0.0, 1.0);
           vec3 halfDir = normalize(sunDir + worldViewDir);
 
-          // --- LAND: matte terrain + bump detail + night lights ---
+          // --- LAND: matte terrain + bump-to-normal detail + night lights ---
           float landFresnel = pow(rawFresnel, landFresnelPow);
+          // Proper bump-to-normal using texture derivatives for topographic shading
           float bumpVal = packed.r;
-          float bumpLight = 1.0 + (bumpVal - 0.5) * bumpStrength * dayStrength;
-          vec3 landDay = dayCol.rgb * dayLight * bumpLight + dayCol.rgb * landFresnel * landFresnelMult * dayStrength;
+          float bHx = texture2D(packedTex, vUv + vec2(1.0 / 4096.0, 0.0)).r;
+          float bHy = texture2D(packedTex, vUv + vec2(0.0, 1.0 / 4096.0)).r;
+          vec3 tangent = normalize(cross(vWorldNormal, vec3(0.0, 1.0, 0.0)));
+          vec3 bitangent = normalize(cross(vWorldNormal, tangent));
+          vec3 bumpNormal = normalize(
+            vWorldNormal +
+            tangent * (bHx - bumpVal) * bumpStrength * 8.0 +
+            bitangent * (bHy - bumpVal) * bumpStrength * 8.0
+          );
+          float bumpDiffuse = max(dot(bumpNormal, sunDir), 0.0) * shaderSunMult + shaderAmbient;
+          vec3 landDay = dayCol.rgb * bumpDiffuse + dayCol.rgb * landFresnel * landFresnelMult * dayStrength;
           float roughness = packed.g;
-          float landSpec = (1.0 - roughness) * pow(max(dot(vWorldNormal, halfDir), 0.0), landSpecPow) * landSpecMult;
+          float landSpec = (1.0 - roughness) * pow(max(dot(bumpNormal, halfDir), 0.0), landSpecPow) * landSpecMult;
           landDay += vec3(0.7, 0.75, 0.8) * landSpec;
           // City lights: only real city pixels visible, noise below threshold = pure black
           float lightPeak = max(max(nightCol.r, nightCol.g), nightCol.b);
@@ -834,17 +844,20 @@ export default function Home() {
                 float evolve = time * auroraEvolution;
                 float wave = time * auroraWaveSpeed;
 
-                // Curtain pattern using seamless longitude (no seam at atan2 boundary)
-                // Use sin/cos of longitude for seamless noise input
+                // Curtain pattern using TRULY seamless noise (sin/cos of longitude, not raw lng)
+                // Raw lng has a -PI/+PI discontinuity that creates a visible seam
+                float sinLng = sin(lng);
+                float cosLng = cos(lng);
+
                 vec2 curtainUv = vec2(
-                  lng * auroraNoiseScale + wave * 0.3,
+                  sinLng * auroraNoiseScale + cosLng * auroraNoiseScale * 0.7 + wave * 0.3,
                   absLat * 0.1 + t * 0.1 + evolve * 0.2
                 );
                 float curtain = fbm3(curtainUv);
 
                 // Evolution: time-morphing noise that makes the curtain shape shift
                 vec2 evolveUv = vec2(
-                  lng * auroraNoiseScale * 0.7 + evolve * 0.5,
+                  cosLng * auroraNoiseScale * 0.7 - sinLng * auroraNoiseScale * 0.5 + evolve * 0.5,
                   absLat * 0.08 - evolve * 0.3
                 );
                 float evolution = fbm3(evolveUv);
@@ -853,7 +866,7 @@ export default function Home() {
 
                 // Secondary swirl layer with lateral wave propagation
                 vec2 swirlUv = vec2(
-                  lng * auroraNoiseScale * 0.5 - wave * 0.2 + sin(evolve) * 0.3,
+                  sinLng * auroraNoiseScale * 0.5 + cosLng * auroraNoiseScale * 0.3 - wave * 0.2 + sin(evolve) * 0.3,
                   absLat * 0.15 + t * 0.05 + cos(evolve * 0.7) * 0.2
                 );
                 float swirl = fbm3(swirlUv + vec2(curtain * 0.5));
@@ -1975,6 +1988,13 @@ export default function Home() {
               rgbShift: { value: editorParams.current.tvRGBShift },
               scanLineJitter: { value: editorParams.current.tvScanLineJitter },
               colorBleed: { value: editorParams.current.tvColorBleed },
+              // God rays
+              sunScreenPos: { value: new THREE.Vector2(0.5, 0.5) },
+              godRaysEnabled: { value: editorParams.current.godRaysEnabled ? 1.0 : 0.0 },
+              godRaysDensity: { value: editorParams.current.godRaysDensity },
+              godRaysWeight: { value: editorParams.current.godRaysWeight },
+              godRaysDecay: { value: editorParams.current.godRaysDecay },
+              godRaysExposure: { value: editorParams.current.godRaysExposure },
             },
             vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
             fragmentShader: `
@@ -1999,6 +2019,12 @@ export default function Home() {
               uniform float rgbShift;
               uniform float scanLineJitter;
               uniform float colorBleed;
+              uniform vec2 sunScreenPos;
+              uniform float godRaysEnabled;
+              uniform float godRaysDensity;
+              uniform float godRaysWeight;
+              uniform float godRaysDecay;
+              uniform float godRaysExposure;
               varying vec2 vUv;
 
               float hash12(vec2 p) {
@@ -2056,6 +2082,22 @@ export default function Home() {
                 if (colorBleed > 0.001) {
                   vec3 bleed = texture2D(tDiffuse, uv + vec2(colorBleed * 0.01, 0.0)).rgb;
                   col = mix(col, bleed, colorBleed * 0.3);
+                }
+
+                // God rays: radial blur toward sun screen position
+                if (godRaysEnabled > 0.5) {
+                  vec2 delta = (uv - sunScreenPos) * (1.0 / 60.0 * godRaysDensity);
+                  vec2 tc = uv;
+                  float illumDecay = 1.0;
+                  vec3 godRayColor = vec3(0.0);
+                  for (int i = 0; i < 60; i++) {
+                    tc -= delta;
+                    vec3 s = texture2D(tDiffuse, clamp(tc, 0.0, 1.0)).rgb;
+                    s *= illumDecay * godRaysWeight;
+                    godRayColor += s;
+                    illumDecay *= godRaysDecay;
+                  }
+                  col += godRayColor * godRaysExposure;
                 }
 
                 // Color grading: brightness, contrast, saturation
@@ -2140,11 +2182,11 @@ export default function Home() {
               if (globe.lavaLampMesh) globe.lavaLampMesh.visible = ep.lavaLampEnabled;
               if (globe.lensFlare) {
                 const lfVis = ep.lensFlareVisible;
-                if (globe.lensFlare.main) globe.lensFlare.main.visible = lfVis;
-                if (globe.lensFlare.rays) globe.lensFlare.rays.visible = lfVis;
-                if (globe.lensFlare.halo) globe.lensFlare.halo.visible = lfVis;
-                if (globe.lensFlare.anamorphic) globe.lensFlare.anamorphic.visible = lfVis;
-                if (globe.lensFlare.artifacts) globe.lensFlare.artifacts.forEach(a => { a.visible = lfVis; });
+                if (globe.lensFlare.main) globe.lensFlare.main.visible = lfVis && ep.flareMainVisible;
+                if (globe.lensFlare.rays) globe.lensFlare.rays.visible = lfVis && ep.flareRaysVisible;
+                if (globe.lensFlare.halo) globe.lensFlare.halo.visible = lfVis && ep.flareHaloVisible;
+                if (globe.lensFlare.anamorphic) globe.lensFlare.anamorphic.visible = lfVis && ep.flareAnamorphicVisible;
+                if (globe.lensFlare.artifacts) globe.lensFlare.artifacts.forEach(a => { a.visible = lfVis && ep.flareArtifactsVisible; });
               }
               if (globe.particleSystem) globe.particleSystem.visible = ep.starsVisible || ep.dustVisible;
               if (globe.satellitesGroup) {
@@ -2188,6 +2230,22 @@ export default function Home() {
                 ppu.rgbShift.value = ep.tvEnabled ? ep.tvRGBShift : 0;
                 ppu.scanLineJitter.value = ep.tvEnabled ? ep.tvScanLineJitter : 0;
                 ppu.colorBleed.value = ep.tvEnabled ? ep.tvColorBleed : 0;
+                // God rays uniforms
+                ppu.godRaysEnabled.value = ep.godRaysEnabled ? 1.0 : 0.0;
+                ppu.godRaysDensity.value = ep.godRaysDensity;
+                ppu.godRaysWeight.value = ep.godRaysWeight;
+                ppu.godRaysDecay.value = ep.godRaysDecay;
+                ppu.godRaysExposure.value = ep.godRaysExposure;
+                // Project sun position to screen space for god rays
+                const cam = globe.camera();
+                if (cam) {
+                  const sunWorld = newSunDir.clone().multiplyScalar(800);
+                  const projected = sunWorld.clone().project(cam);
+                  ppu.sunScreenPos.value.set(
+                    (projected.x + 1) * 0.5,
+                    (projected.y + 1) * 0.5
+                  );
+                }
               }
 
               // Decay Prism Pulse (configurable via bopDecayRate)
@@ -2719,8 +2777,12 @@ export default function Home() {
           </div>
 
           {/* WORLD MAP CELL */}
-          <div className={`bento-cell cell-map${showEditor && editorParams.current.globeOverflowTop > 0 ? ' globe-overflow' : ''}`}
-            style={showEditor && editorParams.current.globeOverflowTop > 0 ? { '--globe-overflow-top': `${editorParams.current.globeOverflowTop}px` } : undefined}>
+          <div className={`bento-cell cell-map${showEditor && editorParams.current.globeOverflowTop > 0 ? ' globe-overflow' : ''}${!editorParams.current.glassSweepEnabled ? ' glass-sweep-off' : ''}${!editorParams.current.glassShimmerEnabled ? ' glass-shimmer-off' : ''}${!editorParams.current.innerGlowEnabled ? ' inner-glow-off' : ''}`}
+            style={{
+              ...(showEditor && editorParams.current.globeOverflowTop > 0 ? { '--globe-overflow-top': `${editorParams.current.globeOverflowTop}px` } : {}),
+              ...(editorParams.current.glassSweepOpacity !== undefined ? { '--glass-sweep-opacity': editorParams.current.glassSweepOpacity } : {}),
+              ...(editorParams.current.glassShimmerOpacity !== undefined ? { '--glass-shimmer-opacity': editorParams.current.glassShimmerOpacity } : {}),
+            }}>
             <div className="map-container" ref={mapContainerRef} style={{ opacity: globeReady ? 1 : 0, transition: 'opacity 1.5s ease-in' }}>
               <Suspense fallback={<div style={{ color: '#fff', padding: '2rem' }}>Loading globe...</div>}>
                 {globeSize.width > 0 && (
@@ -2796,9 +2858,9 @@ export default function Home() {
                 )}
               </AnimatePresence>
             </div>
-            {/* Fog / particle overlay */}
-            <div className="globe-fog-layer" />
-            <div className="globe-particles-layer" />
+            {/* Fog / particle overlay (controllable via editor) */}
+            {editorParams.current.fogLayerEnabled && <div className="globe-fog-layer" />}
+            {editorParams.current.particlesLayerEnabled && <div className="globe-particles-layer" />}
             {/* WORLDSCHOOLING FAMILY badge */}
             <div className="worldschool-badge">
               <span className="ws-dot" />
