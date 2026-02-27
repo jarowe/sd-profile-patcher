@@ -99,6 +99,10 @@
     padding: 0;
 }
 
+.cell-instagram:hover {
+    transform: none;
+}
+
 .insta-carousel {
     position: absolute;
     top: 0;
