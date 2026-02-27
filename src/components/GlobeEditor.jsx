@@ -68,6 +68,12 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
       if (mat?.uniforms?.[key]) mat.uniforms[key].value.set(...rgb);
     };
     const updateParam = (key) => (v) => { p[key] = v; };
+    const updatePPColor = (key) => (hex) => {
+      const rgb = hexToRgb(hex);
+      p[key] = rgb;
+      const pp = globeRef.current?.postProcessing?.material;
+      if (pp?.uniforms?.tint) pp.uniforms.tint.value.set(...rgb);
+    };
 
     // Material accessors
     const getCloudMat = () => globeRef.current?.cloudMesh?.material;
@@ -76,6 +82,8 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     const getParticleMat = () => globeRef.current?.particleSystem?.material;
     const getAuroraMat = () => globeRef.current?.auroraMesh?.material;
     const getPrismGlowMat = () => globeRef.current?.prismGlowMesh?.material;
+    const getEnvGlowMat = () => globeRef.current?.envGlowMesh?.material;
+    const getLavaLampMat = () => globeRef.current?.lavaLampMesh?.material;
 
     // ══════════════════════════════════════════
     // CONTROLS / TIME
@@ -103,6 +111,7 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     visFolder.add(proxy, 'auroraEnabled').name('Aurora').onChange(updateParam('auroraEnabled'));
     visFolder.add(proxy, 'prismGlowEnabled').name('Prismatic Glow').onChange(updateParam('prismGlowEnabled'));
     visFolder.add(proxy, 'envGlowEnabled').name('Env Glow').onChange(updateParam('envGlowEnabled'));
+    visFolder.add(proxy, 'lavaLampEnabled').name('Lava Lamp').onChange(updateParam('lavaLampEnabled'));
     visFolder.add(proxy, 'lensFlareVisible').name('Lens Flare').onChange(updateParam('lensFlareVisible'));
     visFolder.add(proxy, 'starsVisible').name('Stars').onChange(updateParam('starsVisible'));
     visFolder.add(proxy, 'dustVisible').name('Dust').onChange(updateParam('dustVisible'));
@@ -161,9 +170,11 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     surfAtmosFolder.add(proxy, 'atmosFresnelPow', 0.5, 8.0, 0.1).name('Fresnel Pow').onChange(updateSurfaceUniform('atmosFresnelPow'));
     surfAtmosFolder.add(proxy, 'atmosStrength', 0.0, 1.0, 0.01).name('Strength').onChange(updateSurfaceUniform('atmosStrength'));
 
-    const sunsetFolder = surfaceFolder.addFolder('Sunset');
+    const sunsetFolder = surfaceFolder.addFolder('Sunset / Terminator');
     sunsetFolder.addColor(proxy, 'sunsetColor').name('Color').onChange(updateSurfaceColor('sunsetColor'));
     sunsetFolder.add(proxy, 'sunsetStrength', 0.0, 1.0, 0.01).name('Strength').onChange(updateSurfaceUniform('sunsetStrength'));
+    sunsetFolder.add(proxy, 'terminatorSoftness', 0.0, 1.0, 0.01).name('Softness').onChange(updateSurfaceUniform('terminatorSoftness'));
+    sunsetFolder.add(proxy, 'terminatorGlow', 0.0, 1.0, 0.01).name('Glow Band').onChange(updateSurfaceUniform('terminatorGlow'));
     surfaceFolder.close();
 
     // ══════════════════════════════════════════
@@ -234,12 +245,13 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     prismFolder.add(proxy, 'prismGlowNoiseScale', 0.5, 10.0, 0.1).name('Noise Scale').onChange(updateShaderUniform(getPrismGlowMat, 'prismGlowNoiseScale'));
     prismFolder.add(proxy, 'prismGlowFresnelPow', 0.5, 8.0, 0.1).name('Fresnel Power').onChange(updateShaderUniform(getPrismGlowMat, 'prismGlowFresnelPow'));
     prismFolder.add(proxy, 'prismGlowRotSpeed', -0.5, 0.5, 0.005).name('Rotation Speed').onChange(updateParam('prismGlowRotSpeed'));
+    prismFolder.add(proxy, 'prismGlowTiltX', -3.14, 3.14, 0.01).name('Tilt X').onChange(updateParam('prismGlowTiltX'));
+    prismFolder.add(proxy, 'prismGlowTiltZ', -3.14, 3.14, 0.01).name('Tilt Z').onChange(updateParam('prismGlowTiltZ'));
     prismFolder.close();
 
     // ══════════════════════════════════════════
     // ENVIRONMENT GLOW LAYER
     // ══════════════════════════════════════════
-    const getEnvGlowMat = () => globeRef.current?.envGlowMesh?.material;
     const envFolder = gui.addFolder('Environment Glow');
     envFolder.addColor(proxy, 'envGlowColor1').name('Color 1').onChange(updateShaderColor(getEnvGlowMat, 'envGlowColor1'));
     envFolder.addColor(proxy, 'envGlowColor2').name('Color 2').onChange(updateShaderColor(getEnvGlowMat, 'envGlowColor2'));
@@ -248,7 +260,22 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     envFolder.add(proxy, 'envGlowSpeed', 0.0, 2.0, 0.01).name('Speed').onChange(updateShaderUniform(getEnvGlowMat, 'envGlowSpeed'));
     envFolder.add(proxy, 'envGlowNoiseScale', 0.5, 10.0, 0.1).name('Noise Scale').onChange(updateShaderUniform(getEnvGlowMat, 'envGlowNoiseScale'));
     envFolder.add(proxy, 'envGlowCoverage', 0.0, 1.0, 0.01).name('Coverage').onChange(updateShaderUniform(getEnvGlowMat, 'envGlowCoverage'));
+    envFolder.add(proxy, 'envGlowTiltX', -3.14, 3.14, 0.01).name('Tilt X').onChange(updateParam('envGlowTiltX'));
+    envFolder.add(proxy, 'envGlowTiltZ', -3.14, 3.14, 0.01).name('Tilt Z').onChange(updateParam('envGlowTiltZ'));
     envFolder.close();
+
+    // ══════════════════════════════════════════
+    // LAVA LAMP LAYER
+    // ══════════════════════════════════════════
+    const lavaFolder = gui.addFolder('Lava Lamp');
+    lavaFolder.addColor(proxy, 'lavaLampColor1').name('Color 1').onChange(updateShaderColor(getLavaLampMat, 'lavaLampColor1'));
+    lavaFolder.addColor(proxy, 'lavaLampColor2').name('Color 2').onChange(updateShaderColor(getLavaLampMat, 'lavaLampColor2'));
+    lavaFolder.addColor(proxy, 'lavaLampColor3').name('Color 3').onChange(updateShaderColor(getLavaLampMat, 'lavaLampColor3'));
+    lavaFolder.add(proxy, 'lavaLampIntensity', 0.0, 0.5, 0.005).name('Intensity').onChange(updateShaderUniform(getLavaLampMat, 'lavaLampIntensity'));
+    lavaFolder.add(proxy, 'lavaLampSpeed', 0.0, 1.0, 0.01).name('Speed').onChange(updateShaderUniform(getLavaLampMat, 'lavaLampSpeed'));
+    lavaFolder.add(proxy, 'lavaLampScale', 0.5, 5.0, 0.1).name('Scale').onChange(updateShaderUniform(getLavaLampMat, 'lavaLampScale'));
+    lavaFolder.add(proxy, 'lavaLampBlobSize', 0.5, 10.0, 0.1).name('Blob Size').onChange(updateShaderUniform(getLavaLampMat, 'lavaLampBlobSize'));
+    lavaFolder.close();
 
     // ══════════════════════════════════════════
     // ATMOSPHERE RIM
@@ -287,6 +314,15 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     haloFolder.add(proxy, 'haloSunMaskMin', -2.0, 1.0, 0.01).name('Sun Mask Min').onChange(updateShaderUniform(getHaloMat, 'haloSunMaskMin'));
     haloFolder.add(proxy, 'haloSunMaskMax', -1.0, 2.0, 0.01).name('Sun Mask Max').onChange(updateShaderUniform(getHaloMat, 'haloSunMaskMax'));
     haloFolder.close();
+
+    // ══════════════════════════════════════════
+    // LENS FLARE
+    // ══════════════════════════════════════════
+    const flareFolder = gui.addFolder('Lens Flare');
+    flareFolder.add(proxy, 'flareEdgeDiffraction', 0.0, 2.0, 0.01).name('Edge Diffraction').onChange(updateParam('flareEdgeDiffraction'));
+    flareFolder.add(proxy, 'flareStarburstStrength', 0.0, 2.0, 0.01).name('Starburst').onChange(updateParam('flareStarburstStrength'));
+    flareFolder.add(proxy, 'flareAnamorphicStrength', 0.0, 2.0, 0.01).name('Anamorphic').onChange(updateParam('flareAnamorphicStrength'));
+    flareFolder.close();
 
     // ══════════════════════════════════════════
     // PARTICLES
@@ -333,6 +369,42 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     bopFolder.add(proxy, 'bopEnvGlowBoost', 0.0, 10.0, 0.1).name('Env Glow Boost').onChange(updateShaderUniform(getEnvGlowMat, 'bopEnvGlowBoost'));
     bopFolder.add(proxy, 'bopLightShow').name('Light Show Mode').onChange(updateParam('bopLightShow'));
     bopFolder.close();
+
+    // ══════════════════════════════════════════
+    // POST-PROCESSING (Cinematic VFX)
+    // ══════════════════════════════════════════
+    const ppFolder = gui.addFolder('Post-Processing');
+    ppFolder.add(proxy, 'ppEnabled').name('Enable').onChange(updateParam('ppEnabled'));
+
+    const colorFolder = ppFolder.addFolder('Color Grading');
+    colorFolder.add(proxy, 'ppBrightness', -0.5, 0.5, 0.005).name('Brightness').onChange(updateParam('ppBrightness'));
+    colorFolder.add(proxy, 'ppContrast', 0.5, 2.0, 0.01).name('Contrast').onChange(updateParam('ppContrast'));
+    colorFolder.add(proxy, 'ppSaturation', 0.0, 2.0, 0.01).name('Saturation').onChange(updateParam('ppSaturation'));
+    colorFolder.add(proxy, 'ppGamma', 0.5, 2.0, 0.01).name('Gamma').onChange(updateParam('ppGamma'));
+    colorFolder.addColor(proxy, 'ppTint').name('Color Tint').onChange(updatePPColor('ppTint'));
+
+    const lensFolder = ppFolder.addFolder('Lens Effects');
+    lensFolder.add(proxy, 'ppChromaticAberration', 0.0, 0.02, 0.0005).name('Chromatic Aberr.').onChange(updateParam('ppChromaticAberration'));
+    lensFolder.add(proxy, 'ppVignetteStrength', 0.0, 1.0, 0.01).name('Vignette Strength').onChange(updateParam('ppVignetteStrength'));
+    lensFolder.add(proxy, 'ppVignetteRadius', 0.3, 1.0, 0.01).name('Vignette Radius').onChange(updateParam('ppVignetteRadius'));
+    lensFolder.add(proxy, 'ppFilmGrain', 0.0, 0.15, 0.001).name('Film Grain').onChange(updateParam('ppFilmGrain'));
+    lensFolder.add(proxy, 'ppScanLines', 0.0, 1.0, 0.01).name('Scan Lines').onChange(updateParam('ppScanLines'));
+    lensFolder.add(proxy, 'ppScanLineSpeed', 0.0, 5.0, 0.1).name('Scan Speed').onChange(updateParam('ppScanLineSpeed'));
+    ppFolder.close();
+
+    // ══════════════════════════════════════════
+    // TV / CAMERA EFFECTS
+    // ══════════════════════════════════════════
+    const tvFolder = gui.addFolder('TV / Camera FX');
+    tvFolder.add(proxy, 'tvEnabled').name('Enable TV Mode').onChange(updateParam('tvEnabled'));
+    tvFolder.add(proxy, 'tvGlitch', 0.0, 1.0, 0.01).name('Glitch').onChange(updateParam('tvGlitch'));
+    tvFolder.add(proxy, 'tvGlitchSpeed', 0.0, 5.0, 0.1).name('Glitch Speed').onChange(updateParam('tvGlitchSpeed'));
+    tvFolder.add(proxy, 'tvScanLineJitter', 0.0, 1.0, 0.01).name('Scan Jitter').onChange(updateParam('tvScanLineJitter'));
+    tvFolder.add(proxy, 'tvColorBleed', 0.0, 1.0, 0.01).name('Color Bleed').onChange(updateParam('tvColorBleed'));
+    tvFolder.add(proxy, 'tvStaticNoise', 0.0, 1.0, 0.01).name('Static Noise').onChange(updateParam('tvStaticNoise'));
+    tvFolder.add(proxy, 'tvBarrelDistortion', 0.0, 0.5, 0.005).name('Barrel Distort').onChange(updateParam('tvBarrelDistortion'));
+    tvFolder.add(proxy, 'tvRGBShift', 0.0, 1.0, 0.01).name('RGB Shift').onChange(updateParam('tvRGBShift'));
+    tvFolder.close();
 
     // ══════════════════════════════════════════
     // OVERLAY GRAPHICS (arcs, rings, labels)
@@ -406,7 +478,7 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
       const mats = [
         globeShaderMaterial,
         getCloudMat(), getRimMat(), getHaloMat(), getParticleMat(),
-        getAuroraMat(), getPrismGlowMat(), getEnvGlowMat()
+        getAuroraMat(), getPrismGlowMat(), getEnvGlowMat(), getLavaLampMat()
       ].filter(Boolean);
       for (const [key, val] of Object.entries(data)) {
         for (const mat of mats) {
@@ -414,6 +486,11 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
           if (Array.isArray(val)) mat.uniforms[key].value.set(...val);
           else mat.uniforms[key].value = val;
         }
+      }
+      // Post-processing tint
+      if (data.ppTint) {
+        const pp = globeRef.current?.postProcessing?.material;
+        if (pp?.uniforms?.tint) pp.uniforms.tint.value.set(...data.ppTint);
       }
       // Scene lights
       if (data.ambientIntensity != null && globeRef.current?._ambientLight)

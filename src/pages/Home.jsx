@@ -241,6 +241,8 @@ export default function Home() {
         // Sunset
         sunsetColor: { value: new THREE.Vector3(...p.sunsetColor) },
         sunsetStrength: { value: p.sunsetStrength },
+        terminatorSoftness: { value: p.terminatorSoftness },
+        terminatorGlow: { value: p.terminatorGlow },
         // Shader lighting (affects ShaderMaterial directly)
         shaderAmbient: { value: p.shaderAmbient },
         shaderSunMult: { value: p.shaderSunMult },
@@ -310,6 +312,8 @@ export default function Home() {
         // Sunset uniforms
         uniform vec3 sunsetColor;
         uniform float sunsetStrength;
+        uniform float terminatorSoftness;
+        uniform float terminatorGlow;
         uniform float shaderAmbient;
         uniform float shaderSunMult;
 
@@ -443,9 +447,15 @@ export default function Home() {
           float atmosphereMix = clamp(smoothstep(atmosMixMin, atmosMixMax, NdotL) * pow(rawFresnel, atmosFresnelPow), 0.0, 1.0);
           finalColor = mix(finalColor, atmosphereColor, atmosphereMix * atmosStrength);
 
-          // Sunset glow at terminator
-          float sunsetGlow = smoothstep(-0.05, 0.3, NdotL) * smoothstep(0.5, 0.05, max(NdotL, 0.0));
+          // Sunset glow at terminator (soft natural falloff)
+          float termLow = -0.05 - terminatorSoftness * 0.3;
+          float termHi = 0.3 + terminatorSoftness * 0.4;
+          float termFade = 0.5 + terminatorSoftness * 0.5;
+          float sunsetGlow = smoothstep(termLow, termHi, NdotL) * smoothstep(termFade, 0.05, max(NdotL, 0.0));
           finalColor += sunsetColor * sunsetGlow * sunsetStrength;
+          // Extra warm terminator glow band
+          float warmBand = exp(-pow((NdotL + 0.05) / (terminatorSoftness + 0.1), 2.0)) * terminatorGlow;
+          finalColor += sunsetColor * warmBand * 0.5;
 
           gl_FragColor = vec4(finalColor, 1.0);
         }
@@ -810,6 +820,9 @@ export default function Home() {
                 // Aurora band: concentrated near auroraLatitude degrees
                 float latDist = abs(absLat - auroraLatitude);
                 float latMask = exp(-latDist * latDist / (auroraWidth * auroraWidth * 0.5));
+                // Fix pole pinch: fade out within 12 degrees of poles
+                float polarFade = smoothstep(0.0, 12.0, 90.0 - absLat);
+                latMask *= polarFade;
 
                 // Dark side only: aurora is a night phenomenon
                 float NdotL = dot(vWorldNormal, sunDir);
@@ -1119,6 +1132,138 @@ export default function Home() {
           envGlowMesh.renderOrder = 1;
           scene.add(envGlowMesh);
           globe.envGlowMesh = envGlowMesh;
+        }
+
+        // --- C4. Lava Lamp Layer (smooth morphing blob overlay) ---
+        if (!globe.lavaLampMesh && editorParams.current.lavaLampEnabled) {
+          const ll = editorParams.current;
+          const lavaLampMat = new THREE.ShaderMaterial({
+            uniforms: {
+              time: globe.customUniforms.time,
+              prismPulse: globe.customUniforms.prismPulse,
+              lavaLampColor1: { value: new THREE.Vector3(...ll.lavaLampColor1) },
+              lavaLampColor2: { value: new THREE.Vector3(...ll.lavaLampColor2) },
+              lavaLampColor3: { value: new THREE.Vector3(...ll.lavaLampColor3) },
+              lavaLampIntensity: { value: ll.lavaLampIntensity },
+              lavaLampSpeed: { value: ll.lavaLampSpeed },
+              lavaLampScale: { value: ll.lavaLampScale },
+              lavaLampBlobSize: { value: ll.lavaLampBlobSize },
+            },
+            vertexShader: `
+              varying vec3 vWorldNormal;
+              varying vec3 vWorldPos;
+              varying vec3 vViewPos;
+              void main() {
+                vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+                vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+                vViewPos = (modelViewMatrix * vec4(position, 1.0)).xyz;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+              }
+            `,
+            fragmentShader: `
+              uniform float time;
+              uniform float prismPulse;
+              uniform vec3 lavaLampColor1;
+              uniform vec3 lavaLampColor2;
+              uniform vec3 lavaLampColor3;
+              uniform float lavaLampIntensity;
+              uniform float lavaLampSpeed;
+              uniform float lavaLampScale;
+              uniform float lavaLampBlobSize;
+              varying vec3 vWorldNormal;
+              varying vec3 vWorldPos;
+              varying vec3 vViewPos;
+
+              // 3D simplex-like noise for smooth blobs
+              vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+              vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+              vec4 permute(vec4 x) { return mod289(((x*34.0)+1.0)*x); }
+              vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
+              float snoise(vec3 v) {
+                const vec2 C = vec2(1.0/6.0, 1.0/3.0);
+                const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+                vec3 i = floor(v + dot(v, C.yyy));
+                vec3 x0 = v - i + dot(i, C.xxx);
+                vec3 g = step(x0.yzx, x0.xyz);
+                vec3 l = 1.0 - g;
+                vec3 i1 = min(g.xyz, l.zxy);
+                vec3 i2 = max(g.xyz, l.zxy);
+                vec3 x1 = x0 - i1 + C.xxx;
+                vec3 x2 = x0 - i2 + C.yyy;
+                vec3 x3 = x0 - D.yyy;
+                i = mod289(i);
+                vec4 p = permute(permute(permute(
+                  i.z + vec4(0.0, i1.z, i2.z, 1.0))
+                  + i.y + vec4(0.0, i1.y, i2.y, 1.0))
+                  + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+                float n_ = 0.142857142857;
+                vec3 ns = n_ * D.wyz - D.xzx;
+                vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+                vec4 x_ = floor(j * ns.z);
+                vec4 y_ = floor(j - 7.0 * x_);
+                vec4 x = x_ * ns.x + ns.yyyy;
+                vec4 y = y_ * ns.x + ns.yyyy;
+                vec4 h = 1.0 - abs(x) - abs(y);
+                vec4 b0 = vec4(x.xy, y.xy);
+                vec4 b1 = vec4(x.zw, y.zw);
+                vec4 s0 = floor(b0)*2.0 + 1.0;
+                vec4 s1 = floor(b1)*2.0 + 1.0;
+                vec4 sh = -step(h, vec4(0.0));
+                vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy;
+                vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww;
+                vec3 p0 = vec3(a0.xy, h.x);
+                vec3 p1 = vec3(a0.zw, h.y);
+                vec3 p2 = vec3(a1.xy, h.z);
+                vec3 p3 = vec3(a1.zw, h.w);
+                vec4 norm = taylorInvSqrt(vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3)));
+                p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
+                vec4 m = max(0.6 - vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)), 0.0);
+                m = m * m;
+                return 42.0 * dot(m*m, vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));
+              }
+
+              void main() {
+                vec3 viewDir = normalize(-vViewPos);
+                float fresnel = 1.0 - abs(dot(viewDir, normalize(vWorldNormal)));
+
+                vec3 nPos = normalize(vWorldPos);
+                float t = time * lavaLampSpeed;
+
+                // Large smooth 3D blobs using simplex noise
+                float n1 = snoise(nPos * lavaLampScale + vec3(t * 0.3, t * 0.2, t * 0.1));
+                float n2 = snoise(nPos * lavaLampScale * 0.7 + vec3(-t * 0.15, t * 0.25, -t * 0.1));
+                float n3 = snoise(nPos * lavaLampScale * 1.4 + vec3(t * 0.1, -t * 0.15, t * 0.2));
+
+                // Create blob shapes
+                float blob = smoothstep(0.0, 0.5 / lavaLampBlobSize, n1 * 0.5 + n2 * 0.3 + n3 * 0.2);
+                blob *= blob;
+
+                // Tri-color cycling through blobs
+                float phase = n1 * 2.0 + t;
+                vec3 col = lavaLampColor1 * (0.5 + 0.5 * sin(phase));
+                col += lavaLampColor2 * (0.5 + 0.5 * sin(phase + 2.094));
+                col += lavaLampColor3 * (0.5 + 0.5 * sin(phase + 4.189));
+                col *= 0.5;
+
+                float intensity = lavaLampIntensity * blob * (0.3 + fresnel * 0.7);
+                intensity += prismPulse * lavaLampIntensity * 2.0 * blob;
+
+                float alpha = clamp(intensity, 0.0, 1.0);
+                gl_FragColor = vec4(col * intensity, alpha);
+              }
+            `,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            side: THREE.FrontSide,
+          });
+          const lavaLampMesh = new THREE.Mesh(
+            new THREE.SphereGeometry(ll.lavaLampHeight, 64, 64),
+            lavaLampMat
+          );
+          lavaLampMesh.renderOrder = 1;
+          scene.add(lavaLampMesh);
+          globe.lavaLampMesh = lavaLampMesh;
         }
 
         // --- D. Atmospheric Glow (tight rim + soft feathered halo) ---
@@ -1789,6 +1934,193 @@ export default function Home() {
           }, 200);
         }
 
+        // --- G0. Post-Processing Pipeline (monkey-patches renderer) ---
+        if (!globe.postProcessing) {
+          const renderer = globe.renderer();
+          const ppWidth = renderer.domElement.width || 1024;
+          const ppHeight = renderer.domElement.height || 768;
+          const renderTarget = new THREE.WebGLRenderTarget(ppWidth, ppHeight, {
+            minFilter: THREE.LinearFilter,
+            magFilter: THREE.LinearFilter,
+            format: THREE.RGBAFormat,
+          });
+          const ppScene = new THREE.Scene();
+          const ppCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+          const ppMaterial = new THREE.ShaderMaterial({
+            uniforms: {
+              tDiffuse: { value: renderTarget.texture },
+              time: sharedUniforms.current.time,
+              resolution: { value: new THREE.Vector2(ppWidth, ppHeight) },
+              chromaticAberration: { value: editorParams.current.ppChromaticAberration },
+              vignetteStrength: { value: editorParams.current.ppVignetteStrength },
+              vignetteRadius: { value: editorParams.current.ppVignetteRadius },
+              brightness: { value: editorParams.current.ppBrightness },
+              contrast: { value: editorParams.current.ppContrast },
+              saturation: { value: editorParams.current.ppSaturation },
+              gamma: { value: editorParams.current.ppGamma },
+              tint: { value: new THREE.Vector3(...editorParams.current.ppTint) },
+              filmGrain: { value: editorParams.current.ppFilmGrain },
+              scanLines: { value: editorParams.current.ppScanLines },
+              scanLineSpeed: { value: editorParams.current.ppScanLineSpeed },
+              glitch: { value: editorParams.current.tvGlitch },
+              glitchSpeed: { value: editorParams.current.tvGlitchSpeed },
+              staticNoise: { value: editorParams.current.tvStaticNoise },
+              barrelDistortion: { value: editorParams.current.tvBarrelDistortion },
+              rgbShift: { value: editorParams.current.tvRGBShift },
+              scanLineJitter: { value: editorParams.current.tvScanLineJitter },
+              colorBleed: { value: editorParams.current.tvColorBleed },
+            },
+            vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position, 1.0); }`,
+            fragmentShader: `
+              uniform sampler2D tDiffuse;
+              uniform float time;
+              uniform vec2 resolution;
+              uniform float chromaticAberration;
+              uniform float vignetteStrength;
+              uniform float vignetteRadius;
+              uniform float brightness;
+              uniform float contrast;
+              uniform float saturation;
+              uniform float gamma;
+              uniform vec3 tint;
+              uniform float filmGrain;
+              uniform float scanLines;
+              uniform float scanLineSpeed;
+              uniform float glitch;
+              uniform float glitchSpeed;
+              uniform float staticNoise;
+              uniform float barrelDistortion;
+              uniform float rgbShift;
+              uniform float scanLineJitter;
+              uniform float colorBleed;
+              varying vec2 vUv;
+
+              float hash12(vec2 p) {
+                p = fract(p * vec2(234.34, 435.345));
+                p += dot(p, p + 34.23);
+                return fract(p.x * p.y);
+              }
+
+              vec2 barrelDistort(vec2 uv, float amount) {
+                vec2 c = uv * 2.0 - 1.0;
+                float r2 = dot(c, c);
+                c *= 1.0 + amount * r2;
+                return c * 0.5 + 0.5;
+              }
+
+              void main() {
+                vec2 uv = vUv;
+
+                // Barrel distortion (CRT/lens curve)
+                if (barrelDistortion > 0.001) {
+                  uv = barrelDistort(uv, barrelDistortion);
+                  if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+                    gl_FragColor = vec4(0.0); return;
+                  }
+                }
+
+                // Glitch horizontal displacement
+                float glitchOffset = 0.0;
+                if (glitch > 0.001) {
+                  float gt = time * glitchSpeed;
+                  float glitchBlock = floor(uv.y * 20.0 + gt * 3.0);
+                  float r = hash12(vec2(glitchBlock, floor(gt * 10.0)));
+                  if (r > (1.0 - glitch * 0.3)) {
+                    glitchOffset = (hash12(vec2(glitchBlock * 0.3, gt)) - 0.5) * glitch * 0.1;
+                  }
+                  uv.x += glitchOffset;
+                }
+
+                // Scan line jitter (TV wobble)
+                if (scanLineJitter > 0.001) {
+                  float jLine = floor(uv.y * resolution.y * 0.5);
+                  float jitter = (hash12(vec2(jLine, floor(time * 30.0))) - 0.5) * scanLineJitter * 0.01;
+                  uv.x += jitter;
+                }
+
+                // Chromatic aberration + RGB shift
+                vec2 dir = (uv - 0.5) * chromaticAberration;
+                vec2 rgbOff = vec2(rgbShift * 0.01, 0.0);
+                vec3 col;
+                col.r = texture2D(tDiffuse, uv + dir + rgbOff).r;
+                col.g = texture2D(tDiffuse, uv).g;
+                col.b = texture2D(tDiffuse, uv - dir - rgbOff).b;
+
+                // Color bleed (TV ghosting)
+                if (colorBleed > 0.001) {
+                  vec3 bleed = texture2D(tDiffuse, uv + vec2(colorBleed * 0.01, 0.0)).rgb;
+                  col = mix(col, bleed, colorBleed * 0.3);
+                }
+
+                // Color grading: brightness, contrast, saturation
+                col += brightness;
+                col = (col - 0.5) * contrast + 0.5;
+                float luma = dot(col, vec3(0.299, 0.587, 0.114));
+                col = mix(vec3(luma), col, saturation);
+                col *= tint;
+
+                // Gamma
+                col = pow(max(col, 0.0), vec3(1.0 / gamma));
+
+                // Vignette
+                float dist = distance(uv, vec2(0.5));
+                float vig = smoothstep(vignetteRadius, vignetteRadius - vignetteStrength, dist);
+                col *= vig;
+
+                // Film grain
+                if (filmGrain > 0.001) {
+                  float grain = hash12(uv * resolution + time * 1000.0) * 2.0 - 1.0;
+                  col += grain * filmGrain;
+                }
+
+                // Scan lines
+                if (scanLines > 0.001) {
+                  float scanLine = sin((uv.y * resolution.y + time * scanLineSpeed * 100.0) * 3.14159) * 0.5 + 0.5;
+                  col *= 1.0 - scanLines * scanLine * 0.15;
+                }
+
+                // Static noise (TV snow)
+                if (staticNoise > 0.001) {
+                  float noise = hash12(uv * resolution + fract(time * 43.7));
+                  col = mix(col, vec3(noise), staticNoise * 0.3);
+                }
+
+                gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+              }
+            `,
+          });
+          const ppQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), ppMaterial);
+          ppScene.add(ppQuad);
+
+          // Monkey-patch renderer to intercept render calls
+          let _insidePost = false;
+          const origRender = renderer.render.bind(renderer);
+          renderer.render = function(s, c) {
+            const ep = editorParams.current;
+            if (_insidePost || !ep.ppEnabled) {
+              origRender(s, c);
+              return;
+            }
+            _insidePost = true;
+            // Resize render target if needed
+            const w = renderer.domElement.width;
+            const h = renderer.domElement.height;
+            if (renderTarget.width !== w || renderTarget.height !== h) {
+              renderTarget.setSize(w, h);
+              ppMaterial.uniforms.resolution.value.set(w, h);
+            }
+            // Render scene to texture
+            renderer.setRenderTarget(renderTarget);
+            origRender(s, c);
+            renderer.setRenderTarget(null);
+            // Render post-processing quad to screen
+            origRender(ppScene, ppCamera);
+            _insidePost = false;
+          };
+
+          globe.postProcessing = { renderTarget, material: ppMaterial, scene: ppScene, camera: ppCamera };
+        }
+
         // --- G. Animation loop for shaders & motion ---
         const clock = new THREE.Clock();
         if (!globe.animateTick) {
@@ -1814,13 +2146,19 @@ export default function Home() {
               if (globe.auroraMesh) globe.auroraMesh.visible = ep.auroraEnabled;
               if (globe.prismGlowMesh) {
                 globe.prismGlowMesh.visible = ep.prismGlowEnabled;
-                // Rotate prismatic glow layer slowly
                 if (!ep.animationPaused && ep.prismGlowRotSpeed) {
                   globe.prismGlowMesh.rotation.y += dt * ep.prismGlowRotSpeed;
-                  globe.prismGlowMesh.rotation.x = Math.sin(elTs * 0.05) * 0.1;
                 }
+                // Apply tilt alignment from editor
+                globe.prismGlowMesh.rotation.x = ep.prismGlowTiltX + Math.sin(elTs * 0.05) * 0.05;
+                globe.prismGlowMesh.rotation.z = ep.prismGlowTiltZ;
               }
-              if (globe.envGlowMesh) globe.envGlowMesh.visible = ep.envGlowEnabled;
+              if (globe.envGlowMesh) {
+                globe.envGlowMesh.visible = ep.envGlowEnabled;
+                globe.envGlowMesh.rotation.x = ep.envGlowTiltX;
+                globe.envGlowMesh.rotation.z = ep.envGlowTiltZ;
+              }
+              if (globe.lavaLampMesh) globe.lavaLampMesh.visible = ep.lavaLampEnabled;
               if (globe.lensFlare) {
                 const lfVis = ep.lensFlareVisible;
                 if (globe.lensFlare.main) globe.lensFlare.main.visible = lfVis;
@@ -1844,6 +2182,28 @@ export default function Home() {
               // Decay intro aurora (swirling orb fades over ~5 seconds)
               if (globe.customUniforms.introIntensity.value > 0) {
                 globe.customUniforms.introIntensity.value = Math.max(0, globe.customUniforms.introIntensity.value - dt * 0.5);
+              }
+
+              // Sync post-processing uniforms from editor params
+              if (globe.postProcessing) {
+                const ppu = globe.postProcessing.material.uniforms;
+                ppu.chromaticAberration.value = ep.ppChromaticAberration;
+                ppu.vignetteStrength.value = ep.ppVignetteStrength;
+                ppu.vignetteRadius.value = ep.ppVignetteRadius;
+                ppu.brightness.value = ep.ppBrightness;
+                ppu.contrast.value = ep.ppContrast;
+                ppu.saturation.value = ep.ppSaturation;
+                ppu.gamma.value = ep.ppGamma;
+                ppu.filmGrain.value = ep.ppFilmGrain;
+                ppu.scanLines.value = ep.ppScanLines;
+                ppu.scanLineSpeed.value = ep.ppScanLineSpeed;
+                ppu.glitch.value = ep.tvEnabled ? ep.tvGlitch : 0;
+                ppu.glitchSpeed.value = ep.tvGlitchSpeed;
+                ppu.staticNoise.value = ep.tvEnabled ? ep.tvStaticNoise : 0;
+                ppu.barrelDistortion.value = ep.tvEnabled ? ep.tvBarrelDistortion : 0;
+                ppu.rgbShift.value = ep.tvEnabled ? ep.tvRGBShift : 0;
+                ppu.scanLineJitter.value = ep.tvEnabled ? ep.tvScanLineJitter : 0;
+                ppu.colorBleed.value = ep.tvEnabled ? ep.tvColorBleed : 0;
               }
 
               // Decay Prism Pulse (configurable via bopDecayRate)
@@ -1892,38 +2252,82 @@ export default function Home() {
                   globe._flareOcclusion = 0;
                 }
                 if (globe._flareRaycaster && camera) {
-                  const dir = flareWorldPos.clone().sub(camera.position).normalize();
-                  globe._flareRaycaster.set(camera.position, dir);
+                  // Multi-ray occlusion for softer, more realistic eclipse
+                  const sunDir = flareWorldPos.clone().sub(camera.position).normalize();
+                  globe._flareRaycaster.set(camera.position, sunDir);
                   const hits = globe._globeMesh ? globe._flareRaycaster.intersectObjects([globe._globeMesh], false) : [];
                   const sunDist = camera.position.distanceTo(flareWorldPos);
                   occlusionTarget = (hits.length > 0 && hits[0].distance < sunDist) ? 1.0 : 0.0;
-                  // Sharp clip at earth edge
-                  globe._flareOcclusion += (occlusionTarget - globe._flareOcclusion) * Math.min(dt * 15.0, 1.0);
+
+                  // Soft edge detection: check neighboring rays for partial occlusion
+                  let edgeRays = 0;
+                  const edgeOffsets = [0.015, -0.015, 0.008, -0.008];
+                  const camRight = new THREE.Vector3().crossVectors(sunDir, camera.up).normalize();
+                  const camUp = new THREE.Vector3().crossVectors(camRight, sunDir).normalize();
+                  for (const off of edgeOffsets) {
+                    const offsetDir = sunDir.clone().add(camRight.clone().multiplyScalar(off)).normalize();
+                    globe._flareRaycaster.set(camera.position, offsetDir);
+                    const h = globe._globeMesh ? globe._flareRaycaster.intersectObjects([globe._globeMesh], false) : [];
+                    if (h.length > 0 && h[0].distance < sunDist) edgeRays++;
+                  }
+                  const partialOcclusion = edgeRays / edgeOffsets.length;
+                  const isEdge = occlusionTarget > 0.5 && partialOcclusion < 0.8;
+
+                  // Slower, more cinematic occlusion transition
+                  globe._flareOcclusion += (occlusionTarget - globe._flareOcclusion) * Math.min(dt * 6.0, 1.0);
+                  globe._flareEdge = isEdge ? Math.min((globe._flareEdge || 0) + dt * 3.0, 1.0)
+                    : Math.max((globe._flareEdge || 0) - dt * 2.0, 0.0);
                 }
                 const flareVis = 1.0 - (globe._flareOcclusion || 0);
+                const edgeEffect = globe._flareEdge || 0;
+                const edgeDiff = ep.flareEdgeDiffraction * edgeEffect;
 
                 if (lf.rays) {
                   lf.rays.material.rotation = elTs * 0.04;
-                  lf.rays.material.opacity = (0.45 + Math.sin(elTs * 0.8) * 0.15) * flareVis;
+                  // Edge diffraction: rays get BRIGHTER and more colorful at eclipse edge
+                  const rayEdgeBoost = 1.0 + edgeDiff * 3.0;
+                  lf.rays.material.opacity = (0.45 + Math.sin(elTs * 0.8) * 0.15) * ep.flareStarburstStrength * Math.max(flareVis, edgeDiff * 0.6) * rayEdgeBoost;
+                  if (edgeEffect > 0.1) {
+                    // Prismatic color shift during edge diffraction
+                    const hue = elTs * 0.5;
+                    lf.rays.material.color.setHSL((hue % 1.0), 0.3 + edgeEffect * 0.5, 0.7 + edgeEffect * 0.3);
+                  } else {
+                    lf.rays.material.color.setHex(0xffffff);
+                  }
                 }
                 if (lf.main) {
                   const breathe = 1.0 + Math.sin(elTs * 1.2) * 0.12;
-                  lf.main.scale.set(150 * breathe, 150 * breathe, 1);
-                  lf.main.material.opacity = 0.9 * flareVis;
+                  // Sun persists slightly even when partially occluded
+                  const mainVis = Math.max(flareVis, edgeDiff * 0.4);
+                  lf.main.scale.set(150 * breathe * (1.0 + edgeDiff * 0.5), 150 * breathe * (1.0 + edgeDiff * 0.5), 1);
+                  lf.main.material.opacity = 0.9 * mainVis;
                 }
                 if (lf.halo) {
                   const hBreath = 1.0 + Math.sin(elTs * 0.5) * 0.08;
                   lf.halo.scale.set(550 * hBreath, 550 * hBreath, 1);
-                  lf.halo.material.opacity = 0.4 * flareVis;
+                  lf.halo.material.opacity = 0.4 * Math.max(flareVis, edgeDiff * 0.3);
                 }
                 if (lf.anamorphic) {
                   const streakBreath = 1.0 + Math.sin(elTs * 0.6) * 0.08;
-                  lf.anamorphic.scale.set(900 * streakBreath, 40, 1);
-                  lf.anamorphic.material.opacity = 0.5 * flareVis;
+                  // Anamorphic streak GROWS during edge occlusion (real optical flare behavior)
+                  const anamVis = Math.max(flareVis, edgeDiff * 0.8);
+                  const anamStretch = 1.0 + edgeDiff * 2.0;
+                  lf.anamorphic.scale.set(900 * streakBreath * anamStretch * ep.flareAnamorphicStrength, 40, 1);
+                  lf.anamorphic.material.opacity = 0.5 * anamVis;
+                  if (edgeEffect > 0.1) {
+                    lf.anamorphic.material.color.setHSL(0.6 + edgeEffect * 0.2, 0.5, 0.8);
+                  } else {
+                    lf.anamorphic.material.color.setHex(0xffffff);
+                  }
                 }
                 if (lf.artifacts) {
-                  lf.artifacts.forEach(a => {
-                    a.material.opacity = a.material.opacity > 0 ? a.material.opacity * flareVis : 0;
+                  lf.artifacts.forEach((a, i) => {
+                    const baseOp = 0.2 - i * 0.02;
+                    a.material.opacity = baseOp * Math.max(flareVis, edgeDiff * 0.5);
+                    // Edge diffraction makes artifacts prismatic
+                    if (edgeEffect > 0.1) {
+                      a.material.color.setHSL((elTs * 0.3 + i * 0.15) % 1.0, 0.6 + edgeEffect * 0.3, 0.7);
+                    }
                   });
                 }
               }

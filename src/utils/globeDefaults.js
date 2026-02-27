@@ -46,9 +46,11 @@ export const GLOBE_DEFAULTS = {
   atmosFresnelPow: 2.0,
   atmosStrength: 0.45,
 
-  // ── Sunset ──
+  // ── Sunset/Terminator ──
   sunsetColor: [0.867, 0.447, 0.294],
   sunsetStrength: 0.14,
+  terminatorSoftness: 0.35,
+  terminatorGlow: 0.2,
 
   // ── Clouds ──
   cloudAlphaMin: 0.0,
@@ -109,10 +111,10 @@ export const GLOBE_DEFAULTS = {
   auroraNoiseScale: 4.2,
   auroraHeight: 101.5,
   auroraCurtainPow: 2.6,
-  auroraEvolution: 1.7,
+  auroraEvolution: 1.05,
   auroraWaveSpeed: 0.8,
 
-  // ── Prismatic Glow Layer (iridescent fresnel noise) ──
+  // ── Prismatic Glow Layer ──
   prismGlowEnabled: true,
   prismGlowColor1: [0.2, 0.6, 1.0],
   prismGlowColor2: [0.5, 0.1, 0.9],
@@ -122,18 +124,33 @@ export const GLOBE_DEFAULTS = {
   prismGlowNoiseScale: 6.9,
   prismGlowFresnelPow: 2.0,
   prismGlowHeight: 101.2,
-  prismGlowRotSpeed: 0.05,  // auto-rotation speed
+  prismGlowRotSpeed: 0.05,
+  prismGlowTiltX: 0.0,
+  prismGlowTiltZ: 0.0,
 
-  // ── Environment Glow Layer (full-wrap prismatic noise field) ──
+  // ── Environment Glow Layer ──
   envGlowEnabled: true,
   envGlowColor1: [0.1, 0.4, 1.0],
   envGlowColor2: [0.7, 0.1, 0.9],
   envGlowColor3: [0.1, 0.9, 0.5],
-  envGlowIntensity: 0.12,
+  envGlowIntensity: 0.62,
   envGlowSpeed: 0.25,
-  envGlowNoiseScale: 2.5,
+  envGlowNoiseScale: 4.9,
   envGlowHeight: 102.0,
-  envGlowCoverage: 0.6,     // how much of the globe it wraps (0=limb only, 1=full)
+  envGlowCoverage: 0.65,
+  envGlowTiltX: 0.0,
+  envGlowTiltZ: 0.0,
+
+  // ── Lava Lamp Layer ──
+  lavaLampEnabled: false,
+  lavaLampColor1: [0.1, 0.8, 0.5],
+  lavaLampColor2: [0.7, 0.1, 0.85],
+  lavaLampColor3: [0.05, 0.3, 0.95],
+  lavaLampIntensity: 0.08,
+  lavaLampSpeed: 0.12,
+  lavaLampScale: 1.5,
+  lavaLampHeight: 102.5,
+  lavaLampBlobSize: 3.0,
 
   // ── Shader Lighting ──
   shaderAmbient: 0.07,
@@ -162,7 +179,7 @@ export const GLOBE_DEFAULTS = {
   cloudRotationSpeed: 0.012,
 
   // ── Time Control ──
-  timeOverrideHour: -1, // -1 = real time (accurate sun position)
+  timeOverrideHour: -1,
 
   // ── Animation ──
   animationPaused: false,
@@ -184,7 +201,7 @@ export const GLOBE_DEFAULTS = {
   satelliteSpeed: 1.0,
   planeSpeed: 1.0,
   wispSpeed: 1.0,
-  satelliteScale: 1.0,
+  satelliteScale: 0.4,
   planeScale: 1.0,
   carScale: 1.0,
   wispScale: 1.0,
@@ -200,15 +217,44 @@ export const GLOBE_DEFAULTS = {
   labelSize: 1.2,
   labelDotRadius: 0.3,
 
-  // ── Prism Bop Effector (controls what the prism character bop does) ──
-  bopDecayRate: 0.08,       // how fast prismPulse decays
-  bopParticleBurst: 1.2,    // particle size explosion
-  bopColorShift: 0.4,       // prismatic color blend on particles
-  bopGlowBoost: 3.0,        // prismatic glow layer intensity multiplier
-  bopAuroraBoost: 2.0,      // aurora brightness spike
-  bopCloudFlash: 0.15,      // cloud brightness flash
-  bopWaterRipple: 0.3,      // water prismatic distortion
-  bopStarBurst: 1.0,        // star size multiplier on bop
-  bopEnvGlowBoost: 2.0,     // environment glow layer boost
-  bopLightShow: false,       // enable strobing color cycle on bop
+  // ── Prism Bop Effector (tuned for subtle multi-effect pulse) ──
+  bopDecayRate: 0.12,
+  bopParticleBurst: 0.8,
+  bopColorShift: 0.25,
+  bopGlowBoost: 1.2,
+  bopAuroraBoost: 1.5,
+  bopCloudFlash: 0.08,
+  bopWaterRipple: 0.15,
+  bopStarBurst: 0.5,
+  bopEnvGlowBoost: 1.0,
+  bopLightShow: false,
+
+  // ── Advanced Lens Flare ──
+  flareEdgeDiffraction: 0.5,
+  flareStarburstStrength: 0.6,
+  flareAnamorphicStrength: 0.45,
+
+  // ── Post-Processing ──
+  ppEnabled: true,
+  ppChromaticAberration: 0.0015,
+  ppVignetteStrength: 0.3,
+  ppVignetteRadius: 0.85,
+  ppBrightness: 0.0,
+  ppContrast: 1.0,
+  ppSaturation: 1.05,
+  ppGamma: 1.0,
+  ppTint: [1.0, 1.0, 1.0],
+  ppFilmGrain: 0.02,
+  ppScanLines: 0.0,
+  ppScanLineSpeed: 1.0,
+
+  // ── TV/Camera Effects ──
+  tvEnabled: false,
+  tvGlitch: 0.0,
+  tvGlitchSpeed: 1.0,
+  tvScanLineJitter: 0.0,
+  tvColorBleed: 0.0,
+  tvStaticNoise: 0.0,
+  tvBarrelDistortion: 0.0,
+  tvRGBShift: 0.0,
 };
