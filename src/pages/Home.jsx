@@ -1966,6 +1966,10 @@ export default function Home() {
           globe._windVel = windVel;
           globe._windOrigPos = windOrigPos;
           globe._windCount = windCount;
+          // Spin tracking state
+          globe._prevCamPos = new THREE.Vector3();
+          globe._angularVel = new THREE.Vector3();
+          globe._spinMagnitude = 0;
         }
 
         // --- F. Orbiting Objects + Micro Hidden Gems ---
@@ -2716,7 +2720,7 @@ export default function Home() {
                 });
               }
 
-              // Wind particle physics (CPU-side fluid simulation)
+              // Wind particle physics (CPU-side fluid simulation with spin coupling)
               if (globe.windParticles && globe.windParticles.visible) {
                 const wp = editorParams.current;
                 const windGravity = wp.windGravity || 6.5;
@@ -2725,8 +2729,41 @@ export default function Home() {
                 const windEscapeVel = wp.windEscapeVelocity || 0.35;
                 const windColorSpeed = wp.windColorSpeed || 0.02;
                 const windTrail = wp.windTrailEffect || 0.95;
-                const windShellInner = 101.0;
-                const windShellOuter = 110.0;
+                const windSpinInfluence = wp.windSpinInfluence ?? 1.5;
+                const windTurbulence = wp.windTurbulence ?? 0.4;
+                const windVortexStrength = wp.windVortexStrength ?? 0.8;
+                const windShellInner = wp.windShellInner ?? 101.0;
+                const windShellOuter = wp.windShellOuter ?? 110.0;
+
+                // --- Compute globe spin angular velocity from camera movement ---
+                const cam = globe.camera();
+                if (cam && globe._prevCamPos) {
+                  const curPos = cam.position;
+                  const prevPos = globe._prevCamPos;
+                  if (prevPos.lengthSq() > 1.0) {
+                    // Camera orbits globe → apparent globe rotation is opposite
+                    const curNorm = curPos.clone().normalize();
+                    const prevNorm = prevPos.clone().normalize();
+                    const dotVal = Math.min(1, Math.max(-1, curNorm.dot(prevNorm)));
+                    const angle = Math.acos(dotVal);
+                    if (angle > 0.00001 && dt > 0.0001) {
+                      // Rotation axis = cross(prev, cur), negated for globe-relative
+                      const axis = new THREE.Vector3().crossVectors(prevNorm, curNorm).normalize();
+                      const angSpeed = angle / dt;
+                      // Smooth angular velocity (exponential moving average)
+                      const smoothing = Math.min(dt * 8, 0.9);
+                      globe._angularVel.lerp(axis.multiplyScalar(-angSpeed), smoothing);
+                      globe._spinMagnitude = globe._spinMagnitude * (1 - smoothing) + angSpeed * smoothing;
+                    } else {
+                      // Decay when not spinning
+                      globe._angularVel.multiplyScalar(0.95);
+                      globe._spinMagnitude *= 0.95;
+                    }
+                  }
+                  globe._prevCamPos.copy(curPos);
+                }
+                const spinActive = globe._spinMagnitude > 0.01;
+                const avx = globe._angularVel.x, avy = globe._angularVel.y, avz = globe._angularVel.z;
 
                 const wPos = globe.windParticles.geometry.attributes.position.array;
                 const wCol = globe.windParticles.geometry.attributes.color.array;
@@ -2739,7 +2776,53 @@ export default function Home() {
                 for (let i = 0; i < wCount; i++) {
                   const idx = i * 3;
                   const x = wPos[idx], y = wPos[idx+1], z = wPos[idx+2];
+                  const cDist = Math.sqrt(x*x + y*y + z*z);
 
+                  // --- Globe spin → atmospheric drag force ---
+                  if (spinActive && windSpinInfluence > 0) {
+                    // Tangential velocity at this point = cross(angularVel, position)
+                    const svx = avy * z - avz * y;
+                    const svy = avz * x - avx * z;
+                    const svz = avx * y - avy * x;
+                    // Force falls off with distance from surface (strongest near globe)
+                    const surfaceDist = cDist - 100;
+                    const proximity = Math.max(0, 1.0 - surfaceDist / 12.0);
+                    const spinForce = windSpinInfluence * proximity * proximity * dt;
+                    wVel[idx]     += svx * spinForce;
+                    wVel[idx + 1] += svy * spinForce;
+                    wVel[idx + 2] += svz * spinForce;
+
+                    // Vortex shedding — turbulent eddies in the wake of spin
+                    if (windVortexStrength > 0 && globe._spinMagnitude > 0.1) {
+                      const vortexPhase = elTs * 3.0 + i * 0.37;
+                      const vortexScale = windVortexStrength * proximity * Math.min(globe._spinMagnitude * 0.5, 1.0) * dt;
+                      // Perpendicular perturbation (cross product of spin velocity with surface normal)
+                      const nnx = x/cDist, nny = y/cDist, nnz = z/cDist;
+                      const perpX = svy * nnz - svz * nny;
+                      const perpY = svz * nnx - svx * nnz;
+                      const perpZ = svx * nny - svy * nnx;
+                      const pLen = Math.sqrt(perpX*perpX + perpY*perpY + perpZ*perpZ) || 1;
+                      wVel[idx]     += (perpX/pLen) * Math.sin(vortexPhase) * vortexScale;
+                      wVel[idx + 1] += (perpY/pLen) * Math.cos(vortexPhase * 0.7) * vortexScale;
+                      wVel[idx + 2] += (perpZ/pLen) * Math.sin(vortexPhase * 1.3) * vortexScale;
+                    }
+                  }
+
+                  // --- Turbulence (3D coherent noise-like perturbation) ---
+                  if (windTurbulence > 0) {
+                    const tx = x * 0.03, ty = y * 0.03, tz = z * 0.03;
+                    const t = elTs * 0.8;
+                    // Cheap 3D pseudo-noise via layered sines
+                    const noiseX = Math.sin(ty * 2.1 + t) * Math.cos(tz * 1.7 + t * 0.6) + Math.sin(tz * 3.3 - t * 0.4) * 0.5;
+                    const noiseY = Math.cos(tx * 1.9 + t * 0.7) * Math.sin(tz * 2.3 - t) + Math.cos(tx * 2.7 + t * 0.3) * 0.5;
+                    const noiseZ = Math.sin(tx * 2.5 + t * 0.5) * Math.cos(ty * 1.3 + t * 0.9) + Math.sin(ty * 3.1 - t * 0.6) * 0.5;
+                    const turbForce = windTurbulence * dt * 0.15;
+                    wVel[idx]     += noiseX * turbForce;
+                    wVel[idx + 1] += noiseY * turbForce;
+                    wVel[idx + 2] += noiseZ * turbForce;
+                  }
+
+                  // --- Mouse gravitational pull + swirl ---
                   if (mouseValid) {
                     const dx = x - mouseHit.x;
                     const dy = y - mouseHit.y;
@@ -2747,29 +2830,22 @@ export default function Home() {
                     const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
 
                     if (dist < windInfluenceRadius && dist > 0.5) {
-                      // Gravitational pull toward mouse (inverse square, clamped)
                       const force = windGravity / (dist * dist + 0.5);
                       const acc = force * dt;
-
-                      // Radial direction (toward mouse)
                       const invDist = 1.0 / dist;
                       const rx = -dx * invDist, ry = -dy * invDist, rz = -dz * invDist;
+                      // Tangential (swirl) direction
+                      const nnx = x/cDist, nny = y/cDist, nnz = z/cDist;
+                      let stx = ry * nnz - rz * nny;
+                      let sty = rz * nnx - rx * nnz;
+                      let stz = rx * nny - ry * nnx;
+                      const tLen = Math.sqrt(stx*stx + sty*sty + stz*stz) || 1;
+                      stx /= tLen; sty /= tLen; stz /= tLen;
+                      wVel[idx]     += rx * acc * 0.7 + stx * acc * 1.2;
+                      wVel[idx + 1] += ry * acc * 0.7 + sty * acc * 1.2;
+                      wVel[idx + 2] += rz * acc * 0.7 + stz * acc * 1.2;
 
-                      // Tangential direction (perpendicular, creates swirl)
-                      const nLen = Math.sqrt(x*x + y*y + z*z);
-                      const nnx = x/nLen, nny = y/nLen, nnz = z/nLen;
-                      let tx = ry * nnz - rz * nny;
-                      let ty = rz * nnx - rx * nnz;
-                      let tz = rx * nny - ry * nnx;
-                      const tLen = Math.sqrt(tx*tx + ty*ty + tz*tz) || 1;
-                      tx /= tLen; ty /= tLen; tz /= tLen;
-
-                      // Apply radial (0.7) + tangential (1.2) forces
-                      wVel[idx]     += rx * acc * 0.7 + tx * acc * 1.2;
-                      wVel[idx + 1] += ry * acc * 0.7 + ty * acc * 1.2;
-                      wVel[idx + 2] += rz * acc * 0.7 + tz * acc * 1.2;
-
-                      // Dynamic color: HSL based on speed + distance + time
+                      // Dynamic color based on speed + distance + time
                       const speed = Math.sqrt(wVel[idx]*wVel[idx] + wVel[idx+1]*wVel[idx+1] + wVel[idx+2]*wVel[idx+2]);
                       const speedIntensity = Math.min(speed / windEscapeVel, 1.0);
                       const distIntensity = 1.0 - dist / windInfluenceRadius;
@@ -2782,39 +2858,67 @@ export default function Home() {
                       wCol[idx + 1] = Math.min(c[1] * (1 + distIntensity), 1.0);
                       wCol[idx + 2] = Math.min(c[2] * (1 + speedIntensity * distIntensity), 1.0);
                     } else {
-                      // Ambient: gradual color fade + subtle drift
+                      // Ambient color fade
                       const ambHue = (elTs * windColorSpeed * 0.3 + i * 0.0005) % 1.0;
                       const ac = _hsl2rgb(ambHue, 0.4, 0.3);
                       wCol[idx]     = wCol[idx] * windTrail + ac[0] * (1 - windTrail);
                       wCol[idx + 1] = wCol[idx+1] * windTrail + ac[1] * (1 - windTrail);
                       wCol[idx + 2] = wCol[idx+2] * windTrail + ac[2] * (1 - windTrail);
-                      // Subtle ambient drift
-                      wVel[idx] += Math.sin(elTs * 0.5 + wOrig[idx] * 0.1) * 0.001;
-                      wVel[idx+1] += Math.cos(elTs * 0.3 + wOrig[idx+1] * 0.1) * 0.001;
                     }
                   }
 
-                  // Integrate velocity → position
+                  // --- Spin-driven color: particles glow brighter/warmer when spinning ---
+                  if (spinActive && globe._spinMagnitude > 0.05) {
+                    const speed = Math.sqrt(wVel[idx]*wVel[idx] + wVel[idx+1]*wVel[idx+1] + wVel[idx+2]*wVel[idx+2]);
+                    const spinGlow = Math.min(globe._spinMagnitude * 0.3, 1.0);
+                    const speedGlow = Math.min(speed / windEscapeVel, 1.0);
+                    const spinHue = (elTs * windColorSpeed * 2 + i * 0.0003) % 1.0;
+                    const sc = _hsl2rgb(spinHue, 0.7 + speedGlow * 0.3, 0.4 + spinGlow * 0.4);
+                    const blend = spinGlow * 0.6;
+                    wCol[idx]     = wCol[idx] * (1 - blend) + sc[0] * blend;
+                    wCol[idx + 1] = wCol[idx+1] * (1 - blend) + sc[1] * blend;
+                    wCol[idx + 2] = wCol[idx+2] * (1 - blend) + sc[2] * blend;
+                  }
+
+                  // --- Subtle ambient drift (always active) ---
+                  wVel[idx]   += Math.sin(elTs * 0.5 + wOrig[idx] * 0.1) * 0.0005;
+                  wVel[idx+1] += Math.cos(elTs * 0.3 + wOrig[idx+1] * 0.1) * 0.0005;
+                  wVel[idx+2] += Math.sin(elTs * 0.4 + wOrig[idx+2] * 0.1) * 0.0005;
+
+                  // --- Integrate velocity → position ---
                   wPos[idx]     += wVel[idx] * dt * 60;
                   wPos[idx + 1] += wVel[idx+1] * dt * 60;
                   wPos[idx + 2] += wVel[idx+2] * dt * 60;
 
-                  // Adaptive damping (faster at edges)
-                  const cDist = Math.sqrt(wPos[idx]*wPos[idx] + wPos[idx+1]*wPos[idx+1] + wPos[idx+2]*wPos[idx+2]);
-                  const adaptDamp = windDamping + (1 - windDamping) * Math.min(cDist / windShellOuter, 0.5);
-                  wVel[idx] *= adaptDamp;
+                  // Adaptive damping (stronger near shell edges, softer in sweet spot)
+                  const newDist = Math.sqrt(wPos[idx]*wPos[idx] + wPos[idx+1]*wPos[idx+1] + wPos[idx+2]*wPos[idx+2]);
+                  const shellMid = (windShellInner + windShellOuter) * 0.5;
+                  const edgeFactor = Math.abs(newDist - shellMid) / ((windShellOuter - windShellInner) * 0.5);
+                  const adaptDamp = windDamping - edgeFactor * (1 - windDamping) * 2;
+                  wVel[idx]   *= adaptDamp;
                   wVel[idx+1] *= adaptDamp;
                   wVel[idx+2] *= adaptDamp;
 
-                  // Shell constraint: keep particles between inner/outer radius
-                  if (cDist > windShellOuter) {
-                    const scale = windShellOuter / cDist * 0.95;
+                  // Shell constraint with soft bounce
+                  if (newDist > windShellOuter) {
+                    const scale = windShellOuter / newDist * 0.95;
                     wPos[idx] *= scale; wPos[idx+1] *= scale; wPos[idx+2] *= scale;
-                    wVel[idx] *= -0.3; wVel[idx+1] *= -0.3; wVel[idx+2] *= -0.3;
-                  } else if (cDist < windShellInner) {
-                    const scale = windShellInner / cDist * 1.05;
+                    // Reflect velocity inward + tangential scatter
+                    const bnx = wPos[idx]/newDist, bny = wPos[idx+1]/newDist, bnz = wPos[idx+2]/newDist;
+                    const vDotN = wVel[idx]*bnx + wVel[idx+1]*bny + wVel[idx+2]*bnz;
+                    wVel[idx]   -= bnx * vDotN * 1.5;
+                    wVel[idx+1] -= bny * vDotN * 1.5;
+                    wVel[idx+2] -= bnz * vDotN * 1.5;
+                    wVel[idx] *= 0.5; wVel[idx+1] *= 0.5; wVel[idx+2] *= 0.5;
+                  } else if (newDist < windShellInner) {
+                    const scale = windShellInner / newDist * 1.05;
                     wPos[idx] *= scale; wPos[idx+1] *= scale; wPos[idx+2] *= scale;
-                    wVel[idx] *= -0.3; wVel[idx+1] *= -0.3; wVel[idx+2] *= -0.3;
+                    const bnx = wPos[idx]/newDist, bny = wPos[idx+1]/newDist, bnz = wPos[idx+2]/newDist;
+                    const vDotN = wVel[idx]*bnx + wVel[idx+1]*bny + wVel[idx+2]*bnz;
+                    wVel[idx]   -= bnx * vDotN * 1.5;
+                    wVel[idx+1] -= bny * vDotN * 1.5;
+                    wVel[idx+2] -= bnz * vDotN * 1.5;
+                    wVel[idx] *= 0.5; wVel[idx+1] *= 0.5; wVel[idx+2] *= 0.5;
                   }
                 }
 

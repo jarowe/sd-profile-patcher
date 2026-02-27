@@ -440,12 +440,6 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     mouseFolder.add(proxy, 'mouseRippleRadius', 1.0, 30.0, 0.5).name('Ripple Radius').onChange(updateShaderUniform(getParticleMat, 'mouseRippleRadius'));
     const windFolder = particleFolder.addFolder('Wind Particles');
     windFolder.add(proxy, 'windParticlesVisible').name('Enabled').onChange(updateParam('windParticlesVisible'));
-    windFolder.add(proxy, 'windGravity', 0, 15, 0.1).name('Gravity').onChange(updateParam('windGravity'));
-    windFolder.add(proxy, 'windInfluenceRadius', 1, 30, 0.5).name('Influence Radius').onChange(updateParam('windInfluenceRadius'));
-    windFolder.add(proxy, 'windDamping', 0.95, 0.999, 0.001).name('Damping').onChange(updateParam('windDamping'));
-    windFolder.add(proxy, 'windEscapeVelocity', 0.05, 1.0, 0.01).name('Escape Velocity').onChange(updateParam('windEscapeVelocity'));
-    windFolder.add(proxy, 'windColorSpeed', 0, 0.1, 0.001).name('Color Cycle').onChange(updateParam('windColorSpeed'));
-    windFolder.add(proxy, 'windTrailEffect', 0.8, 0.999, 0.001).name('Trail Effect').onChange(updateParam('windTrailEffect'));
     windFolder.add(proxy, 'windParticleSize', 0.05, 2.0, 0.05).name('Particle Size').onChange((v) => {
       p.windParticleSize = v;
       const wm = globeRef.current?.windParticles?.material;
@@ -456,6 +450,20 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
       const wm = globeRef.current?.windParticles?.material;
       if (wm) wm.opacity = v;
     });
+    const windPhysicsFolder = windFolder.addFolder('Physics');
+    windPhysicsFolder.add(proxy, 'windGravity', 0, 15, 0.1).name('Mouse Gravity').onChange(updateParam('windGravity'));
+    windPhysicsFolder.add(proxy, 'windInfluenceRadius', 1, 30, 0.5).name('Mouse Radius').onChange(updateParam('windInfluenceRadius'));
+    windPhysicsFolder.add(proxy, 'windDamping', 0.95, 0.999, 0.001).name('Damping').onChange(updateParam('windDamping'));
+    windPhysicsFolder.add(proxy, 'windEscapeVelocity', 0.05, 1.0, 0.01).name('Escape Velocity').onChange(updateParam('windEscapeVelocity'));
+    windPhysicsFolder.add(proxy, 'windShellInner', 100.0, 105.0, 0.5).name('Shell Inner R').onChange(updateParam('windShellInner'));
+    windPhysicsFolder.add(proxy, 'windShellOuter', 106.0, 120.0, 0.5).name('Shell Outer R').onChange(updateParam('windShellOuter'));
+    const windFluidFolder = windFolder.addFolder('Fluid Dynamics');
+    windFluidFolder.add(proxy, 'windSpinInfluence', 0, 5.0, 0.1).name('Spin Coupling').onChange(updateParam('windSpinInfluence'));
+    windFluidFolder.add(proxy, 'windTurbulence', 0, 2.0, 0.05).name('Turbulence').onChange(updateParam('windTurbulence'));
+    windFluidFolder.add(proxy, 'windVortexStrength', 0, 3.0, 0.05).name('Vortex Shedding').onChange(updateParam('windVortexStrength'));
+    const windColorFolder = windFolder.addFolder('Color');
+    windColorFolder.add(proxy, 'windColorSpeed', 0, 0.1, 0.001).name('Color Cycle').onChange(updateParam('windColorSpeed'));
+    windColorFolder.add(proxy, 'windTrailEffect', 0.8, 0.999, 0.001).name('Trail Effect').onChange(updateParam('windTrailEffect'));
     particleFolder.close();
 
     // ══════════════════════════════════════════

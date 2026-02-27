@@ -188,6 +188,11 @@ export const GLOBE_DEFAULTS = {
   windTrailEffect: 0.95,
   windParticleSize: 0.35,
   windParticleOpacity: 0.8,
+  windSpinInfluence: 1.5,
+  windTurbulence: 0.4,
+  windVortexStrength: 0.8,
+  windShellInner: 101.0,
+  windShellOuter: 110.0,
 
   // ── Cloud Mesh ──
   cloudMeshRadius: 100.8,
