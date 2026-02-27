@@ -349,7 +349,7 @@ export default function Home() {
                 vec3 worldViewDir = normalize(cameraPosition - vWorldPos);
                 float NdotL = dot(vWorldNormal, sunDir);
                 float dayStrength = smoothstep(-0.25, 0.5, NdotL);
-                float dayLight = 0.03 + max(NdotL, 0.0) * 0.97;
+                float dayLight = max(NdotL, 0.0);
                 float rawFresnel = clamp(1.0 - dot(worldViewDir, vWorldNormal), 0.0, 1.0);
                 vec3 halfDir = normalize(sunDir + worldViewDir);
 
@@ -361,11 +361,11 @@ export default function Home() {
                 float roughness = packed.g;
                 float landSpec = (1.0 - roughness) * pow(max(dot(vWorldNormal, halfDir), 0.0), 60.0) * 0.12;
                 landDay += vec3(0.7, 0.75, 0.8) * landSpec;
-                // City lights: only actual city pixels visible, everything else is black
+                // City lights: only real city pixels visible, noise below threshold = pure black
                 float lightPeak = max(max(nightCol.r, nightCol.g), nightCol.b);
-                float cityGate = smoothstep(0.04, 0.15, lightPeak);
-                vec3 landNight = nightCol * vec3(3.0, 2.7, 2.0) * cityGate;
-                landNight += vec3(1.0, 0.8, 0.4) * pow(lightPeak, 2.0) * cityGate * 2.5;
+                float cityGate = smoothstep(0.06, 0.2, lightPeak);
+                vec3 landNight = nightCol * vec3(2.0, 1.8, 1.3) * cityGate;
+                landNight += vec3(1.0, 0.8, 0.4) * pow(lightPeak, 2.0) * cityGate * 2.0;
                 vec3 landColor = mix(landNight, landDay, dayStrength);
 
                 // --- WATER: animated ocean + tidal currents + specular + Fresnel ---
@@ -460,14 +460,15 @@ export default function Home() {
             `,
           });
 
-          // Replace the globe's default MeshPhongMaterial
+          // Replace the globe's default material (any type - MeshPhong, MeshStandard, etc.)
           scene.traverse((child) => {
-            if (child.isMesh && child.material && child.material.type === 'MeshPhongMaterial' && child.geometry?.parameters?.radius > 90) {
+            if (child.isMesh && child.geometry?.parameters?.radius > 90 && child.material !== oceanMat) {
               child.material = oceanMat;
-              globe._globeMesh = child; // Store for raycaster occlusion
+              globe._globeMesh = child;
             }
           });
-          globe.oceanMaterialSet = true;
+          // Only mark as set if we actually found and replaced the globe mesh
+          if (globe._globeMesh) globe.oceanMaterialSet = true;
         }
 
         // --- B2. Volumetric Cloud Layer (4K from packed texture blue channel) ---
@@ -579,52 +580,43 @@ export default function Home() {
 
         // (Aurora shell removed - was creating purple wash via additive blending over globe face)
 
-        // --- D. Atmospheric Glow (BackSide halo - Franky/TSL hybrid approach) ---
-        // Single BackSide sphere with additive blending for clean glow without dark edges.
-        // Pow-based fresnel concentrates glow at rim. Sun-masked for day/twilight/dark.
+        // --- D. Dual Atmospheric Glow (tight rim + soft outer halo) ---
         if (!globe.atmosShell) {
-          const atmosMat = new THREE.ShaderMaterial({
-            uniforms: {
-              sunDir: globe.customUniforms.sunDir,
-              introIntensity: globe.customUniforms.introIntensity
-            },
-            vertexShader: `
-              varying vec3 vWorldNormal;
-              varying vec3 vWorldPos;
-              void main() {
-                vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
-                vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
-                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-              }
-            `,
+          // Shared atmosphere vertex shader
+          const atmosVert = `
+            varying vec3 vWorldNormal;
+            varying vec3 vWorldPos;
+            void main() {
+              vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+              vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+              gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+          `;
+
+          // Layer 1: Tight bright rim (BackSide, r104 = TSL-style 4% larger)
+          const rimMat = new THREE.ShaderMaterial({
+            uniforms: { sunDir: globe.customUniforms.sunDir },
+            vertexShader: atmosVert,
             fragmentShader: `
               uniform vec3 sunDir;
-              uniform float introIntensity;
               varying vec3 vWorldNormal;
               varying vec3 vWorldPos;
               void main() {
-                // World-space fresnel (TSL approach)
                 vec3 viewDir = normalize(vWorldPos - cameraPosition);
                 float fresnel = 1.0 - abs(dot(viewDir, vWorldNormal));
 
-                // Rim intensity: pow(4) concentrates at edge, * 6.0 for visible brightness
-                float rimGlow = pow(fresnel, 4.0) * 6.0;
+                // Tight concentrated rim glow
+                float rim = pow(fresnel, 5.0) * 3.5;
 
-                // Atmosphere color: blue day side, warm orange at twilight/terminator
+                // TSL atmosphere colors: saturated blue day + warm burnt orange twilight
                 float sunOri = dot(vWorldNormal, sunDir);
-                vec3 dayColor = vec3(0.302, 0.698, 1.0);
-                vec3 twilightColor = vec3(0.737, 0.286, 0.043);
-                vec3 color = mix(twilightColor, dayColor, smoothstep(-0.25, 0.75, sunOri));
+                vec3 dayCol = vec3(0.25, 0.6, 1.0);
+                vec3 twilightCol = vec3(0.8, 0.32, 0.05);
+                vec3 color = mix(twilightCol, dayCol, smoothstep(-0.25, 0.75, sunOri));
 
-                // Atmosphere whitening toward thicker center (Franky technique)
-                color = mix(color, color + vec3(0.12), fresnel);
-
-                // Sun mask: glow on day side + twilight, fading on deep dark side
-                // smoothstep(-0.5, 1.0) lets warm orange extend past terminator for backlit effect
+                // Sun mask with backlit twilight edge
                 float sunMask = smoothstep(-0.5, 1.0, sunOri);
-
-                // Final intensity with intro boost
-                float intensity = rimGlow * max(sunMask, introIntensity * 0.4);
+                float intensity = rim * sunMask;
 
                 gl_FragColor = vec4(color * intensity, intensity);
               }
@@ -634,12 +626,48 @@ export default function Home() {
             depthWrite: false,
             side: THREE.BackSide
           });
-          // 8% larger than globe for visible atmospheric rim
-          const atmosMesh = new THREE.Mesh(new THREE.SphereGeometry(108, 64, 64), atmosMat);
-          atmosMesh.renderOrder = 3;
-          scene.add(atmosMesh);
+          const rimMesh = new THREE.Mesh(new THREE.SphereGeometry(104, 64, 64), rimMat);
+          rimMesh.renderOrder = 3;
+          scene.add(rimMesh);
 
-          globe.atmosShell = atmosMesh;
+          // Layer 2: Soft diffuse outer halo (BackSide, r115 = 15% larger)
+          const haloMat = new THREE.ShaderMaterial({
+            uniforms: { sunDir: globe.customUniforms.sunDir },
+            vertexShader: atmosVert,
+            fragmentShader: `
+              uniform vec3 sunDir;
+              varying vec3 vWorldNormal;
+              varying vec3 vWorldPos;
+              void main() {
+                vec3 viewDir = normalize(vWorldPos - cameraPosition);
+                float fresnel = 1.0 - abs(dot(viewDir, vWorldNormal));
+
+                // Softer, wider glow
+                float glow = pow(fresnel, 2.5) * 0.6;
+
+                // Same color scheme but softer
+                float sunOri = dot(vWorldNormal, sunDir);
+                vec3 dayCol = vec3(0.2, 0.5, 0.9);
+                vec3 twilightCol = vec3(0.6, 0.25, 0.04);
+                vec3 color = mix(twilightCol, dayCol, smoothstep(-0.3, 0.8, sunOri));
+
+                // Stronger sun masking on outer halo (less visible on dark side)
+                float sunMask = smoothstep(-0.3, 1.0, sunOri);
+                float intensity = glow * sunMask;
+
+                gl_FragColor = vec4(color * intensity, intensity);
+              }
+            `,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            side: THREE.BackSide
+          });
+          const haloMesh = new THREE.Mesh(new THREE.SphereGeometry(115, 48, 48), haloMat);
+          haloMesh.renderOrder = 2;
+          scene.add(haloMesh);
+
+          globe.atmosShell = { rim: rimMesh, halo: haloMesh };
         }
 
         // --- D2. Cinematic Lens Flare (procedural, at sun position) ---
