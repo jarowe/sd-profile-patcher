@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Lock, Unlock, Zap, X } from 'lucide-react';
+import { Lock, Unlock, Zap, X, Sparkles } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { motion, AnimatePresence } from 'framer-motion';
 import { playClickSound, playHoverSound } from '../utils/sounds';
@@ -57,6 +57,17 @@ export default function DailyCipher({ showVault = false }) {
     const [showRewardSpash, setShowRewardSplash] = useState(false);
     const [selectedCard, setSelectedCard] = useState(null);
 
+    // Bonus cipher state
+    const [mode, setMode] = useState('daily'); // 'daily' | 'bonus'
+    const [bonusAvailable, setBonusAvailable] = useState(0);
+    const [bonusWord, setBonusWord] = useState('');
+    const [bonusCardId, setBonusCardId] = useState(0);
+    const dailyStateRef = useRef({ guesses: [], gameState: 'playing' });
+
+    // Computed active values based on mode
+    const activeWord = mode === 'bonus' ? bonusWord : dailyWord;
+    const activeCardId = mode === 'bonus' ? bonusCardId : dailyCardId;
+
     // 3D card tilt for hero card in splash view
     const heroCardRef = useRef(null);
     const handleHeroMouseMove = useCallback((e) => {
@@ -98,6 +109,7 @@ export default function DailyCipher({ showVault = false }) {
         card.style.transition = 'none';
     }, []);
 
+    // Mount: load daily data, collection, bonus ciphers, and restore state
     useEffect(() => {
         const data = getDailyData();
         setDailyWord(data.word);
@@ -108,6 +120,38 @@ export default function DailyCipher({ showVault = false }) {
             setUnlockedCards(JSON.parse(storedStats));
         }
 
+        // Load bonus cipher count
+        const bonusCount = parseInt(localStorage.getItem('jarowe_bonus_ciphers') || '0', 10);
+        setBonusAvailable(bonusCount);
+
+        // Check for in-progress bonus cipher
+        const bonusState = localStorage.getItem('jarowe_bonus_cipher_state');
+        if (bonusState) {
+            const parsed = JSON.parse(bonusState);
+            if (parsed.gameState === 'playing') {
+                // Resume bonus cipher
+                setMode('bonus');
+                setBonusWord(parsed.word);
+                setBonusCardId(parsed.cardIndex);
+                setGuesses(parsed.guesses || []);
+                setGameState('playing');
+
+                // Save daily state for later restoration
+                const storedDaily = localStorage.getItem('dailyCipher');
+                if (storedDaily) {
+                    const dp = JSON.parse(storedDaily);
+                    if (dp.date === new Date().toDateString()) {
+                        dailyStateRef.current = { guesses: dp.guesses || [], gameState: dp.gameState || 'playing' };
+                    }
+                }
+                return;
+            } else {
+                // Bonus cipher was completed, clean up
+                localStorage.removeItem('jarowe_bonus_cipher_state');
+            }
+        }
+
+        // Load daily state
         const storedState = localStorage.getItem('dailyCipher');
         if (storedState) {
             const parsed = JSON.parse(storedState);
@@ -119,24 +163,94 @@ export default function DailyCipher({ showVault = false }) {
         }
     }, []);
 
+    // Save state based on mode
     useEffect(() => {
-        if (dailyWord) {
+        if (mode === 'daily' && dailyWord) {
             localStorage.setItem('dailyCipher', JSON.stringify({
                 date: new Date().toDateString(),
                 guesses,
                 gameState
             }));
+        } else if (mode === 'bonus' && bonusWord) {
+            localStorage.setItem('jarowe_bonus_cipher_state', JSON.stringify({
+                word: bonusWord,
+                cardIndex: bonusCardId,
+                guesses,
+                gameState
+            }));
         }
-    }, [guesses, gameState, dailyWord]);
+    }, [guesses, gameState, dailyWord, bonusWord, mode, bonusCardId]);
+
+    // Start a bonus cipher
+    const startBonusCipher = useCallback(() => {
+        playClickSound();
+
+        // Save current daily state
+        dailyStateRef.current = { guesses, gameState };
+
+        // Decrement bonus available
+        const newCount = bonusAvailable - 1;
+        setBonusAvailable(newCount);
+        localStorage.setItem('jarowe_bonus_ciphers', String(newCount));
+
+        // Generate bonus word (avoid daily word)
+        const dailyW = getDailyData().word;
+        const seed = Date.now();
+        let word;
+        let i = 0;
+        do {
+            word = WORDS[(seed + i) % WORDS.length];
+            i++;
+        } while (word === dailyW && i < WORDS.length);
+
+        // Pick a card to potentially unlock
+        const collection = JSON.parse(localStorage.getItem('jarowe_collection') || '[]');
+        let cardId = 0;
+        for (let j = 0; j < vaultPhotos.length; j++) {
+            if (!collection.includes(j)) {
+                cardId = j;
+                break;
+            }
+        }
+
+        // Set bonus state
+        setBonusWord(word);
+        setBonusCardId(cardId);
+        setGuesses([]);
+        setCurrentGuess('');
+        setGameState('playing');
+        setMode('bonus');
+
+        // Save bonus state
+        localStorage.setItem('jarowe_bonus_cipher_state', JSON.stringify({
+            word,
+            cardIndex: cardId,
+            guesses: [],
+            gameState: 'playing'
+        }));
+    }, [bonusAvailable, guesses, gameState]);
+
+    // Finish bonus cipher and return to daily
+    const finishBonusCipher = useCallback(() => {
+        playClickSound();
+        localStorage.removeItem('jarowe_bonus_cipher_state');
+        setMode('daily');
+        setBonusWord('');
+        setBonusCardId(0);
+        // Restore daily state
+        setGuesses(dailyStateRef.current.guesses);
+        setGameState(dailyStateRef.current.gameState);
+        setCurrentGuess('');
+    }, []);
 
     const handleWin = () => {
         setGameState('won');
         playClickSound();
 
         let newUnlocked = [...unlockedCards];
-        let cardToUnlock = dailyCardId;
+        let cardToUnlock = activeCardId;
 
-        // If they already have today's card, give them the next locked one
+        // If they already have this card, give them the next locked one
         if (newUnlocked.includes(cardToUnlock)) {
             for (let i = 0; i < vaultPhotos.length; i++) {
                 if (!newUnlocked.includes(i)) {
@@ -157,7 +271,9 @@ export default function DailyCipher({ showVault = false }) {
                     particleCount: 200,
                     spread: 120,
                     origin: { y: 0.6 },
-                    colors: ['#7c3aed', '#38bdf8', '#f472b6', '#fbbf24', '#22c55e']
+                    colors: mode === 'bonus'
+                        ? ['#fbbf24', '#f59e0b', '#f472b6', '#7c3aed', '#22c55e']
+                        : ['#7c3aed', '#38bdf8', '#f472b6', '#fbbf24', '#22c55e']
                 });
             }, 1000);
         }
@@ -176,7 +292,7 @@ export default function DailyCipher({ showVault = false }) {
                 const newGuesses = [...guesses, currentGuess];
                 setGuesses(newGuesses);
 
-                if (currentGuess === dailyWord) {
+                if (currentGuess === activeWord) {
                     handleWin();
                 } else if (newGuesses.length >= MAX_GUESSES) {
                     setGameState('lost');
@@ -191,33 +307,198 @@ export default function DailyCipher({ showVault = false }) {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [currentGuess, gameState, guesses, dailyWord, showRewardSpash, selectedCard, unlockedCards, dailyCardId]);
+    }, [currentGuess, gameState, guesses, activeWord, showRewardSpash, selectedCard, unlockedCards, activeCardId, mode]);
 
     const getCharClasses = (char, index, guessWord) => {
-        if (!dailyWord) return '';
-        if (dailyWord[index] === char) return 'correct';
-        if (dailyWord.includes(char)) {
-            const remainingTarget = Array.from(dailyWord).filter((c, i) => c === char && guessWord[i] !== char).length;
-            const previousGuessesOfChar = Array.from(guessWord.slice(0, index)).filter((c, i) => c === char && dailyWord[i] !== char).length;
+        if (!activeWord) return '';
+        if (activeWord[index] === char) return 'correct';
+        if (activeWord.includes(char)) {
+            const remainingTarget = Array.from(activeWord).filter((c, i) => c === char && guessWord[i] !== char).length;
+            const previousGuessesOfChar = Array.from(guessWord.slice(0, index)).filter((c, i) => c === char && activeWord[i] !== char).length;
             if (previousGuessesOfChar < remainingTarget) return 'present';
         }
         return 'absent';
     };
 
+    const isBonus = mode === 'bonus';
+    const dailyDone = mode === 'daily' && (gameState === 'won' || gameState === 'lost');
+    const showBonusButton = bonusAvailable > 0 && dailyDone;
+
+    // ===== DEBUG PANEL (lil-gui) — activated by ?editor=jarowe =====
+    const debugGuiRef = useRef(null);
+    const debugActionsRef = useRef({});
+    debugActionsRef.current = {
+        setBonusAvailable, bonusAvailable,
+        setUnlockedCards, unlockedCards,
+        setGuesses, setCurrentGuess, setGameState, gameState,
+        setMode, mode, setBonusWord, setBonusCardId,
+        handleWin, startBonusCipher, finishBonusCipher,
+        dailyWord, activeWord,
+    };
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        if (new URLSearchParams(window.location.search).get('editor') !== 'jarowe') return;
+        if (debugGuiRef.current) return;
+
+        let gui;
+        import('lil-gui').then(({ default: GUI }) => {
+            gui = new GUI({ title: 'Cipher Debug', width: 280 });
+            gui.domElement.style.position = 'fixed';
+            gui.domElement.style.bottom = '10px';
+            gui.domElement.style.left = '10px';
+            gui.domElement.style.top = 'auto';
+            gui.domElement.style.zIndex = '10001';
+            gui.domElement.style.maxHeight = '80vh';
+            gui.domElement.style.overflowY = 'auto';
+            debugGuiRef.current = gui;
+
+            // === Bonus Ciphers ===
+            const bonusFolder = gui.addFolder('Bonus Ciphers');
+            const bonusProxy = { count: parseInt(localStorage.getItem('jarowe_bonus_ciphers') || '0', 10) };
+            bonusFolder.add(bonusProxy, 'count', 0, 20, 1).name('Available').onChange(v => {
+                localStorage.setItem('jarowe_bonus_ciphers', String(v));
+                debugActionsRef.current.setBonusAvailable(v);
+            });
+            bonusFolder.add({ fn: () => {
+                const c = parseInt(localStorage.getItem('jarowe_bonus_ciphers') || '0', 10) + 1;
+                localStorage.setItem('jarowe_bonus_ciphers', String(c));
+                debugActionsRef.current.setBonusAvailable(c);
+                bonusProxy.count = c;
+                gui.controllersRecursive().forEach(ctrl => ctrl.updateDisplay());
+            }}, 'fn').name('Grant +1');
+            bonusFolder.add({ fn: () => {
+                const c = parseInt(localStorage.getItem('jarowe_bonus_ciphers') || '0', 10) + 5;
+                localStorage.setItem('jarowe_bonus_ciphers', String(c));
+                debugActionsRef.current.setBonusAvailable(c);
+                bonusProxy.count = c;
+                gui.controllersRecursive().forEach(ctrl => ctrl.updateDisplay());
+            }}, 'fn').name('Grant +5');
+
+            // === Vault Collection ===
+            const vaultFolder = gui.addFolder('Vault');
+            vaultFolder.add({ fn: () => {
+                const current = JSON.parse(localStorage.getItem('jarowe_collection') || '[]');
+                for (let i = 0; i < vaultPhotos.length; i++) {
+                    if (!current.includes(i)) {
+                        current.push(i);
+                        break;
+                    }
+                }
+                localStorage.setItem('jarowe_collection', JSON.stringify(current));
+                debugActionsRef.current.setUnlockedCards([...current]);
+            }}, 'fn').name('Unlock Next Card');
+            vaultFolder.add({ fn: () => {
+                const all = vaultPhotos.map((_, i) => i);
+                localStorage.setItem('jarowe_collection', JSON.stringify(all));
+                debugActionsRef.current.setUnlockedCards(all);
+            }}, 'fn').name('Unlock ALL Cards');
+            vaultFolder.add({ fn: () => {
+                localStorage.setItem('jarowe_collection', JSON.stringify([]));
+                debugActionsRef.current.setUnlockedCards([]);
+            }}, 'fn').name('Clear Collection');
+
+            // === Game State ===
+            const gameFolder = gui.addFolder('Game State');
+            gameFolder.add({ fn: () => {
+                debugActionsRef.current.handleWin();
+            }}, 'fn').name('Force Win');
+            gameFolder.add({ fn: () => {
+                debugActionsRef.current.setGameState('lost');
+            }}, 'fn').name('Force Lose');
+            gameFolder.add({ fn: () => {
+                const w = debugActionsRef.current.activeWord;
+                console.log('[Cipher Debug] Active word:', w);
+                alert('Active word: ' + w);
+            }}, 'fn').name('Reveal Word');
+            gameFolder.add({ fn: () => {
+                debugActionsRef.current.setGuesses([]);
+                debugActionsRef.current.setCurrentGuess('');
+                debugActionsRef.current.setGameState('playing');
+                localStorage.removeItem('dailyCipher');
+            }}, 'fn').name('Reset Daily');
+            gameFolder.add({ fn: () => {
+                localStorage.removeItem('jarowe_bonus_cipher_state');
+                debugActionsRef.current.setMode('daily');
+                debugActionsRef.current.setBonusWord('');
+                debugActionsRef.current.setBonusCardId(0);
+                debugActionsRef.current.setGuesses([]);
+                debugActionsRef.current.setCurrentGuess('');
+                debugActionsRef.current.setGameState('playing');
+                const stored = localStorage.getItem('dailyCipher');
+                if (stored) {
+                    const p = JSON.parse(stored);
+                    if (p.date === new Date().toDateString()) {
+                        debugActionsRef.current.setGuesses(p.guesses || []);
+                        debugActionsRef.current.setGameState(p.gameState || 'playing');
+                    }
+                }
+            }}, 'fn').name('Exit Bonus Mode');
+
+            // === Prism Dash ===
+            const prismFolder = gui.addFolder('Prism Dash');
+            const prismProxy = { highScore: parseInt(localStorage.getItem('jarowe_speed_highscore') || '0', 10) };
+            prismFolder.add(prismProxy, 'highScore', 0, 999, 1).name('High Score').onChange(v => {
+                localStorage.setItem('jarowe_speed_highscore', String(v));
+            });
+            prismFolder.add({ fn: () => {
+                localStorage.setItem('jarowe_speed_highscore', '0');
+                prismProxy.highScore = 0;
+                gui.controllersRecursive().forEach(ctrl => ctrl.updateDisplay());
+            }}, 'fn').name('Reset High Score');
+
+            // === Nuclear ===
+            const nukeFolder = gui.addFolder('Reset');
+            nukeFolder.add({ fn: () => {
+                if (!confirm('Reset ALL cipher data?')) return;
+                localStorage.removeItem('jarowe_collection');
+                localStorage.removeItem('dailyCipher');
+                localStorage.removeItem('jarowe_bonus_cipher_state');
+                localStorage.removeItem('jarowe_bonus_ciphers');
+                localStorage.removeItem('jarowe_speed_highscore');
+                window.location.reload();
+            }}, 'fn').name('RESET EVERYTHING');
+            nukeFolder.close();
+
+            // Collapse less-used folders
+            vaultFolder.close();
+            prismFolder.close();
+        });
+
+        return () => { if (gui) { gui.destroy(); debugGuiRef.current = null; } };
+    }, []);
+
     return (
         <div className={`cipher-vault-wrapper ${showVault ? 'with-vault' : ''}`}>
 
             {/* LEFT: CIPHER TERMINAL */}
-            <div className="cipher-terminal">
+            <div className={`cipher-terminal ${isBonus ? 'bonus-mode' : ''}`}>
                 <div className="terminal-header">
                     <div className="terminal-title">
-                        <Zap size={16} className="text-accent" />
-                        <span>NETWORK DECRYPT</span>
+                        {isBonus ? (
+                            <>
+                                <Sparkles size={16} className="text-bonus" />
+                                <span>BONUS DECRYPT</span>
+                            </>
+                        ) : (
+                            <>
+                                <Zap size={16} className="text-accent" />
+                                <span>NETWORK DECRYPT</span>
+                            </>
+                        )}
                     </div>
-                    <div className="terminal-status">
-                        {gameState === 'playing' ? 'AWAITING INPUT...' : gameState === 'won' ? 'ACCESS GRANTED' : 'LOCKDOWN INITIATED'}
+                    <div className={`terminal-status ${isBonus ? 'bonus' : ''}`}>
+                        {gameState === 'playing' ? (isBonus ? 'SECRET INTEL...' : 'AWAITING INPUT...') : gameState === 'won' ? 'ACCESS GRANTED' : 'LOCKDOWN INITIATED'}
                     </div>
                 </div>
+
+                {/* Bonus availability badge */}
+                {bonusAvailable > 0 && !isBonus && (
+                    <div className="bonus-badge">
+                        <Unlock size={12} />
+                        <span>{bonusAvailable} BONUS {bonusAvailable === 1 ? 'CIPHER' : 'CIPHERS'} AVAILABLE</span>
+                    </div>
+                )}
 
                 <div className="cipher-grid">
                     {Array.from({ length: MAX_GUESSES }).map((_, rowIndex) => {
@@ -230,6 +511,7 @@ export default function DailyCipher({ showVault = false }) {
                                 {Array.from({ length: WORD_LENGTH }).map((_, colIndex) => {
                                     const char = guess[colIndex] || '';
                                     let classNames = 'cipher-cell';
+                                    if (isBonus) classNames += ' bonus';
                                     if (char) classNames += ' filled';
                                     if (isSubmitted) {
                                         classNames += ` submitted ${getCharClasses(char, colIndex, guess)}`;
@@ -247,15 +529,47 @@ export default function DailyCipher({ showVault = false }) {
                 </div>
 
                 <div className="terminal-footer">
-                    <span>KEY: [{dailyWord.length} CHARS]</span>
+                    <span>{isBonus ? 'SECRET' : 'KEY'}: [{activeWord.length} CHARS]</span>
                     <span>ATTEMPTS: {guesses.length}/{MAX_GUESSES}</span>
                 </div>
 
+                {/* Bonus activate button */}
+                {showBonusButton && (
+                    <motion.button
+                        className="bonus-activate-btn"
+                        onClick={startBonusCipher}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.97 }}
+                    >
+                        <Sparkles size={16} />
+                        ACTIVATE BONUS CIPHER
+                    </motion.button>
+                )}
+
+                {/* Lost overlay */}
                 {gameState === 'lost' && (
-                    <div className="terminal-overlay lost">
+                    <div className={`terminal-overlay lost ${isBonus ? 'bonus' : ''}`}>
                         <Lock size={32} />
-                        <h3>FATAL ERROR</h3>
-                        <p>KEY WAS: {dailyWord}</p>
+                        <h3>{isBonus ? 'CIPHER EXPIRED' : 'FATAL ERROR'}</h3>
+                        <p>{isBonus ? 'THE CODE WAS' : 'KEY WAS'}: {activeWord}</p>
+                        {isBonus && (
+                            <button className="bonus-return-btn" onClick={finishBonusCipher}>
+                                RETURN TO DAILY
+                            </button>
+                        )}
+                    </div>
+                )}
+
+                {/* Won overlay for bonus - show return button */}
+                {gameState === 'won' && isBonus && showRewardSpash === false && (
+                    <div className="terminal-overlay bonus-won">
+                        <Unlock size={32} />
+                        <h3>DECRYPTED!</h3>
+                        <button className="bonus-return-btn" onClick={finishBonusCipher}>
+                            RETURN TO DAILY
+                        </button>
                     </div>
                 )}
             </div>
@@ -332,7 +646,9 @@ export default function DailyCipher({ showVault = false }) {
                             </button>
 
                             {showRewardSpash !== false && (
-                                <div className="reward-title">NEW RELIC ACQUIRED!</div>
+                                <div className={`reward-title ${isBonus ? 'bonus' : ''}`}>
+                                    {isBonus ? 'BONUS RELIC ACQUIRED!' : 'NEW RELIC ACQUIRED!'}
+                                </div>
                             )}
 
                             <div

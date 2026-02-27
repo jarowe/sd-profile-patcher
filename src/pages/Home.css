@@ -1111,14 +1111,11 @@
     }
 }
 
-/* Globe breakout: sphere pokes above bento card, sides/bottom stay clipped */
+/* Globe breakout: sphere pokes above bento card via SVG clipPath union (rect + circle) */
 .bento-cell.cell-map.globe-breakout {
     overflow: visible;
     z-index: 20;
-    clip-path: inset(calc(-1 * var(--globe-breakout-px, 0px)) 0px 0px 0px round 0 0 28px 28px);
-}
-.bento-cell.cell-map.globe-breakout .map-container {
-    margin-top: calc(-1 * var(--globe-breakout-px, 0px));
+    clip-path: url(#globe-breakout-clip);
 }
 
 /* ── Liquid Glass Edge Effect ── */

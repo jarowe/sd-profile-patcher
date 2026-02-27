@@ -188,6 +188,7 @@ export const GLOBE_DEFAULTS = {
   // ── Globe Breakout (sphere pokes above bento card) ──
   globeBreakout: false,
   globeBreakoutPx: 60,
+  globeBreakoutClipPad: 4,
 
   // ── Visibility Toggles ──
   satellitesVisible: true,

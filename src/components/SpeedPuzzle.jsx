@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap, X, Trophy, Timer } from 'lucide-react';
+import { Zap, X, Trophy, Timer, Unlock } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { playClickSound } from '../utils/sounds';
 import './SpeedPuzzle.css';
@@ -29,6 +29,7 @@ export default function SpeedPuzzle({ onClose }) {
   const [highScore, setHighScore] = useState(() => {
     return parseInt(localStorage.getItem('jarowe_speed_highscore') || '0', 10);
   });
+  const [isNewRecord, setIsNewRecord] = useState(false);
   const timerRef = useRef(null);
 
   const generateRound = useCallback(() => {
@@ -46,6 +47,7 @@ export default function SpeedPuzzle({ onClose }) {
     setStreak(0);
     setBestStreak(0);
     setTimeLeft(GAME_DURATION);
+    setIsNewRecord(false);
     generateRound();
   }, [generateRound]);
 
@@ -67,8 +69,12 @@ export default function SpeedPuzzle({ onClose }) {
   useEffect(() => {
     if (phase === 'results') {
       if (score > highScore) {
+        setIsNewRecord(true);
         setHighScore(score);
         localStorage.setItem('jarowe_speed_highscore', String(score));
+        // Grant a bonus cipher
+        const current = parseInt(localStorage.getItem('jarowe_bonus_ciphers') || '0', 10);
+        localStorage.setItem('jarowe_bonus_ciphers', String(current + 1));
         confetti({
           particleCount: 200,
           spread: 140,
@@ -206,6 +212,17 @@ export default function SpeedPuzzle({ onClose }) {
               <div>Best Streak: {bestStreak}x</div>
               {score >= highScore && score > 0 && (
                 <div className="speed-new-record">NEW HIGH SCORE!</div>
+              )}
+              {isNewRecord && (
+                <motion.div
+                  className="speed-bonus-unlocked"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                >
+                  <Unlock size={16} />
+                  <span>SECRET CIPHER UNLOCKED!</span>
+                </motion.div>
               )}
             </div>
             <div className="speed-results-actions">

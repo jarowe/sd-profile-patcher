@@ -283,3 +283,26 @@
     color: #fff;
     border-color: rgba(255, 255, 255, 0.3);
 }
+
+/* Bonus Cipher Unlocked Notification */
+.speed-bonus-unlocked {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    justify-content: center;
+    margin-top: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(124, 58, 237, 0.15));
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    border-radius: 0.75rem;
+    color: #fbbf24;
+    font-weight: 700;
+    font-size: 0.8rem;
+    letter-spacing: 1.5px;
+    animation: bonusGlow 2s infinite;
+}
+
+@keyframes bonusGlow {
+    0%, 100% { box-shadow: 0 0 8px rgba(251, 191, 36, 0.2); }
+    50% { box-shadow: 0 0 20px rgba(251, 191, 36, 0.5), 0 0 40px rgba(124, 58, 237, 0.2); }
+}

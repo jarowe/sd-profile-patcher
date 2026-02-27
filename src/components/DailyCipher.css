@@ -457,6 +457,126 @@
 }
 
 /* =========================================
+   BONUS CIPHER MODE
+   ========================================= */
+.cipher-terminal.bonus-mode {
+    border-color: rgba(251, 191, 36, 0.2);
+}
+
+.cipher-terminal.bonus-mode::before {
+    background: linear-gradient(90deg, transparent, #fbbf24, transparent);
+}
+
+.text-bonus {
+    color: #fbbf24;
+}
+
+.terminal-status.bonus {
+    color: #fbbf24;
+    background: rgba(251, 191, 36, 0.12);
+}
+
+.bonus-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    justify-content: center;
+    padding: 0.35rem 0.75rem;
+    margin-bottom: 0.75rem;
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(124, 58, 237, 0.1));
+    border: 1px solid rgba(251, 191, 36, 0.25);
+    border-radius: 0.5rem;
+    color: #fbbf24;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    font-family: 'JetBrains Mono', monospace;
+    animation: bonusBadgePulse 3s infinite;
+}
+
+@keyframes bonusBadgePulse {
+    0%, 100% { box-shadow: 0 0 6px rgba(251, 191, 36, 0.1); }
+    50% { box-shadow: 0 0 16px rgba(251, 191, 36, 0.3), 0 0 30px rgba(251, 191, 36, 0.1); }
+}
+
+.bonus-activate-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    justify-content: center;
+    width: 100%;
+    padding: 0.65rem 1rem;
+    margin-top: 0.75rem;
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(124, 58, 237, 0.15));
+    border: 1px solid rgba(251, 191, 36, 0.35);
+    border-radius: 0.6rem;
+    color: #fbbf24;
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 2px;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    transition: all 0.2s ease;
+    animation: bonusBtnGlow 2s infinite;
+}
+
+.bonus-activate-btn:hover {
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.25), rgba(124, 58, 237, 0.25));
+    border-color: rgba(251, 191, 36, 0.5);
+}
+
+@keyframes bonusBtnGlow {
+    0%, 100% { box-shadow: 0 0 8px rgba(251, 191, 36, 0.15); }
+    50% { box-shadow: 0 0 20px rgba(251, 191, 36, 0.35), 0 0 40px rgba(124, 58, 237, 0.15); }
+}
+
+.cipher-cell.bonus.filled {
+    border-color: rgba(251, 191, 36, 0.4);
+}
+
+.bonus-return-btn {
+    margin-top: 0.5rem;
+    padding: 0.5rem 1.25rem;
+    background: rgba(251, 191, 36, 0.15);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    border-radius: 2rem;
+    color: #fbbf24;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    transition: all 0.2s ease;
+}
+
+.bonus-return-btn:hover {
+    background: rgba(251, 191, 36, 0.25);
+    border-color: rgba(251, 191, 36, 0.5);
+}
+
+.terminal-overlay.bonus-won {
+    background: rgba(0, 0, 0, 0.85);
+}
+
+.terminal-overlay.bonus-won h3 {
+    color: #fbbf24;
+    font-weight: 800;
+    letter-spacing: 2px;
+}
+
+.terminal-overlay.bonus h3 {
+    color: #f59e0b;
+}
+
+.reward-title.bonus {
+    text-shadow: 0 0 20px rgba(251, 191, 36, 0.8);
+    background: linear-gradient(135deg, #fbbf24, #f472b6, #7c3aed);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+/* =========================================
    ANIMATIONS
    ========================================= */
 

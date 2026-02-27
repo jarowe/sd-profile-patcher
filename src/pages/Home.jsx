@@ -125,6 +125,8 @@ export default function Home() {
 
   const globeRef = useRef();
   const mapContainerRef = useRef();
+  const breakoutRectRef = useRef();
+  const breakoutCircleRef = useRef();
   const [globeSize, setGlobeSize] = useState({ width: 0, height: 0 });
   const [globeMounted, setGlobeMounted] = useState(false);
   const [globeReady, setGlobeReady] = useState(false);
@@ -2536,6 +2538,42 @@ export default function Home() {
                   }
                 });
               }
+
+              // Globe breakout: project sphere to screen for SVG clipPath
+              if (ep.globeBreakout && breakoutCircleRef.current && breakoutRectRef.current) {
+                const cam = globe.camera();
+                if (cam && mapContainerRef.current) {
+                  const mapRect = mapContainerRef.current.getBoundingClientRect();
+                  const cellEl = mapContainerRef.current.parentElement;
+                  const cellRect = cellEl.getBoundingClientRect();
+
+                  // Project globe center (world origin) to screen
+                  const center = new THREE.Vector3(0, 0, 0).project(cam);
+                  const screenX = (center.x + 1) * 0.5 * mapRect.width;
+                  const screenY = (1 - center.y) * 0.5 * mapRect.height;
+
+                  // Apparent screen radius of sphere (globe radius = 100)
+                  const distance = cam.position.length();
+                  const angularRadius = Math.asin(Math.min(100 / distance, 1.0));
+                  const fovRad = cam.fov * Math.PI / 180;
+                  const screenRadius = Math.tan(angularRadius) / Math.tan(fovRad / 2) * (mapRect.height / 2);
+
+                  const pad = ep.globeBreakoutClipPad || 4;
+
+                  // Offset from map-container to cell-map parent
+                  const offsetX = mapRect.left - cellRect.left;
+                  const offsetY = mapRect.top - cellRect.top;
+
+                  breakoutCircleRef.current.setAttribute('cx', screenX + offsetX);
+                  breakoutCircleRef.current.setAttribute('cy', screenY + offsetY);
+                  breakoutCircleRef.current.setAttribute('r', screenRadius + pad);
+
+                  breakoutRectRef.current.setAttribute('x', 0);
+                  breakoutRectRef.current.setAttribute('y', 0);
+                  breakoutRectRef.current.setAttribute('width', cellRect.width);
+                  breakoutRectRef.current.setAttribute('height', cellRect.height);
+                }
+              }
             }
             requestAnimationFrame(tick);
           };
@@ -2895,7 +2933,6 @@ export default function Home() {
           {/* WORLD MAP CELL */}
           <div className={`bento-cell cell-map${editorParams.current.globeBreakout ? ' globe-breakout' : ''}${!editorParams.current.glassSweepEnabled ? ' glass-sweep-off' : ''}${!editorParams.current.glassShimmerEnabled ? ' glass-shimmer-off' : ''}${!editorParams.current.innerGlowEnabled ? ' inner-glow-off' : ''}`}
             style={{
-              ...(editorParams.current.globeBreakout ? { '--globe-breakout-px': `${editorParams.current.globeBreakoutPx}px` } : {}),
               ...(editorParams.current.glassSweepOpacity !== undefined ? { '--glass-sweep-opacity': editorParams.current.glassSweepOpacity } : {}),
               ...(editorParams.current.glassShimmerOpacity !== undefined ? { '--glass-shimmer-opacity': editorParams.current.glassShimmerOpacity } : {}),
               '--badge-bg-opacity': editorParams.current.badgeBgOpacity,
@@ -2908,6 +2945,15 @@ export default function Home() {
               '--badge-bottom': `${editorParams.current.badgeBottom}rem`,
               '--badge-inset': `${editorParams.current.badgeInset}rem`,
             }}>
+            {/* SVG clipPath for globe breakout: rect (card body) + circle (globe dome) union */}
+            <svg width="0" height="0" style={{ position: 'absolute' }}>
+              <defs>
+                <clipPath id="globe-breakout-clip" clipPathUnits="userSpaceOnUse">
+                  <rect ref={breakoutRectRef} x="0" y="0" width="0" height="0" />
+                  <circle ref={breakoutCircleRef} cx="0" cy="0" r="0" />
+                </clipPath>
+              </defs>
+            </svg>
             <div className="map-container" ref={mapContainerRef} style={{ opacity: globeReady ? 1 : 0, transition: 'opacity 1.5s ease-in' }}>
               <Suspense fallback={<div style={{ color: '#fff', padding: '2rem' }}>Loading globe...</div>}>
                 {globeSize.width > 0 && (
