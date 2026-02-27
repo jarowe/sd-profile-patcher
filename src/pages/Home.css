@@ -97,26 +97,18 @@
     position: relative;
     overflow: hidden;
     padding: 0;
-    /* Remove transform from transition — prevents sub-pixel gap on hover-out */
-    transition: box-shadow 0.4s ease, border-color 0.4s ease;
-}
-
-/* Must match .bento-cell:not(.tilt-enabled):hover specificity (0,3,0) to override it */
-.bento-cell.cell-instagram:hover {
-    transform: none;
-    box-shadow: none;
-    z-index: auto;
 }
 
 .insta-carousel {
     position: absolute;
-    /* Oversized by 2px on each side to guarantee no sub-pixel edge leaks */
-    top: -2px;
-    left: -2px;
-    width: calc(100% + 4px);
-    height: calc(100% + 4px);
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     border-radius: inherit;
     overflow: hidden;
+    will-change: transform;
+    isolation: isolate;
 }
 
 .insta-photo {
@@ -127,18 +119,22 @@
     height: 100%;
     background-size: cover;
     background-position: center;
+    will-change: transform;
 }
 
 .insta-overlay {
     position: absolute;
-    inset: 0;
-    padding: 2rem;
-    background: linear-gradient(to top, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.85) 25%, transparent 100%);
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 1.5rem;
+    background: linear-gradient(to top, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.85) 30%, transparent 100%);
     z-index: 10;
     display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    border-radius: inherit;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-end;
+    border-radius: 0 0 28px 28px;
 }
 
 /* Solid mask at very bottom edge to cover any sub-pixel photo leak */

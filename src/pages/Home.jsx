@@ -3681,7 +3681,7 @@ export default function Home() {
                 />
               </AnimatePresence>
             </div>
-            <div className="insta-overlay" style={{ flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'flex-end', padding: '1.5rem', background: 'linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 30%, transparent 100%)' }}>
+            <div className="insta-overlay">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: '4px' }}>
                 <div className="insta-text">Life in Photos</div>
                 <Instagram size={20} color="#fff" />
