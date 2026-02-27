@@ -125,8 +125,6 @@ export default function Home() {
 
   const globeRef = useRef();
   const mapContainerRef = useRef();
-  const breakoutRectRef = useRef();
-  const breakoutCircleRef = useRef();
   const [globeSize, setGlobeSize] = useState({ width: 0, height: 0 });
   const [globeMounted, setGlobeMounted] = useState(false);
   const [globeReady, setGlobeReady] = useState(false);
@@ -2107,6 +2105,18 @@ export default function Home() {
               godRaysWeight: { value: editorParams.current.godRaysWeight },
               godRaysDecay: { value: editorParams.current.godRaysDecay },
               godRaysExposure: { value: editorParams.current.godRaysExposure },
+              // Breakout masking + glass border
+              breakoutEnabled: { value: 0.0 },
+              cardRect: { value: new THREE.Vector4(0, 0, 1, 1) },
+              cardRadius: { value: 28.0 },
+              domeCenter: { value: new THREE.Vector2(0, 0) },
+              domeRadius: { value: 0.0 },
+              domePad: { value: 4.0 },
+              glassThickness: { value: 30.0 },
+              glassIntensity: { value: 0.8 },
+              glassTint: { value: new THREE.Vector3(0.4, 0.6, 1.0) },
+              glassSweepAngle: { value: 0.0 },
+              breakoutFeather: { value: 3.0 },
             },
             vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
             fragmentShader: `
@@ -2137,6 +2147,17 @@ export default function Home() {
               uniform float godRaysWeight;
               uniform float godRaysDecay;
               uniform float godRaysExposure;
+              uniform float breakoutEnabled;
+              uniform vec4 cardRect;
+              uniform float cardRadius;
+              uniform vec2 domeCenter;
+              uniform float domeRadius;
+              uniform float domePad;
+              uniform float glassThickness;
+              uniform float glassIntensity;
+              uniform vec3 glassTint;
+              uniform float glassSweepAngle;
+              uniform float breakoutFeather;
               varying vec2 vUv;
 
               float hash12(vec2 p) {
@@ -2150,6 +2171,12 @@ export default function Home() {
                 float r2 = dot(c, c);
                 c *= 1.0 + amount * r2;
                 return c * 0.5 + 0.5;
+              }
+
+              // Signed distance to rounded rectangle
+              float sdRoundedBox(vec2 p, vec2 center, vec2 halfSize, float r) {
+                vec2 d = abs(p - center) - halfSize + r;
+                return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - r;
               }
 
               void main() {
@@ -2245,7 +2272,72 @@ export default function Home() {
                   col = mix(col, vec3(noise), staticNoise * 0.3);
                 }
 
-                gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+                // ── Breakout mask + liquid glass border ──
+                if (breakoutEnabled > 0.5) {
+                  vec2 pixel = vUv * resolution;
+
+                  // Card rectangle SDF (rounded corners)
+                  vec2 cardCenter = vec2((cardRect.x + cardRect.z) * 0.5, (cardRect.y + cardRect.w) * 0.5);
+                  vec2 cardHalf = vec2((cardRect.z - cardRect.x) * 0.5, (cardRect.w - cardRect.y) * 0.5);
+                  float dRect = sdRoundedBox(pixel, cardCenter, cardHalf, cardRadius);
+
+                  // Dome circle SDF
+                  float dCircle = length(pixel - domeCenter) - (domeRadius + domePad);
+
+                  // Union: inside if either shape contains pixel
+                  float dUnion = min(dRect, dCircle);
+
+                  // Alpha mask: hide everything outside the card+dome area
+                  float maskAlpha = 1.0 - smoothstep(-breakoutFeather, 0.0, dUnion);
+
+                  // ── Liquid glass border on CARD edges (not dome) ──
+                  bool nearCard = (dRect < dCircle + 5.0);
+                  float borderDist = -dRect;
+
+                  if (nearCard && borderDist > 0.0 && borderDist < glassThickness && glassIntensity > 0.01) {
+                    float borderFactor = 1.0 - (borderDist / glassThickness);
+                    borderFactor = pow(borderFactor, 0.7);
+
+                    // Glass refraction: offset UV inward from edge
+                    vec2 edgeNormal = normalize(pixel - cardCenter) * borderFactor;
+                    vec2 refractedUV = vUv + edgeNormal * 0.003 * glassIntensity;
+                    vec3 refracted = texture2D(tDiffuse, clamp(refractedUV, 0.0, 1.0)).rgb;
+
+                    // Chromatic split at glass edge
+                    float chromaSplit = borderFactor * 0.008 * glassIntensity;
+                    vec3 glassCol;
+                    glassCol.r = texture2D(tDiffuse, clamp(refractedUV + chromaSplit, 0.0, 1.0)).r;
+                    glassCol.g = refracted.g;
+                    glassCol.b = texture2D(tDiffuse, clamp(refractedUV - chromaSplit, 0.0, 1.0)).b;
+
+                    // Specular highlight: bright edge catch light
+                    float specular = pow(borderFactor, 4.0) * 0.4 * glassIntensity;
+
+                    // Animated sweep highlight
+                    vec2 toPixel = pixel - cardCenter;
+                    float angle = atan(toPixel.y, toPixel.x);
+                    float sweep = smoothstep(0.3, 0.0, abs(mod(angle - glassSweepAngle + 3.14159, 6.28318) - 3.14159)) * borderFactor;
+                    specular += sweep * 0.3 * glassIntensity;
+
+                    // Iridescent tint at edge
+                    vec3 tintColor = glassTint * borderFactor * 0.15 * glassIntensity;
+
+                    // Darken inner shadow for depth
+                    float innerShadow = borderFactor * 0.2 * glassIntensity;
+
+                    // Compose glass effect
+                    col = mix(col, glassCol, borderFactor * 0.5 * glassIntensity);
+                    col += tintColor;
+                    col += specular;
+                    col *= (1.0 - innerShadow);
+                  }
+
+                  // Apply mask
+                  col *= maskAlpha;
+                  gl_FragColor = vec4(clamp(col, 0.0, 1.0), maskAlpha);
+                } else {
+                  gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+                }
               }
             `,
           };
@@ -2545,39 +2637,56 @@ export default function Home() {
                 });
               }
 
-              // Globe breakout: project sphere to screen for SVG clipPath
-              if (ep.globeBreakout && breakoutCircleRef.current && breakoutRectRef.current) {
-                const cam = globe.camera();
-                if (cam && mapContainerRef.current) {
-                  const mapRect = mapContainerRef.current.getBoundingClientRect();
-                  const cellEl = mapContainerRef.current.parentElement;
-                  const cellRect = cellEl.getBoundingClientRect();
+              // Globe breakout: update PP shader breakout uniforms
+              if (globe.ppPass) {
+                const ppu2 = globe.ppPass.uniforms;
+                if (ep.globeBreakout && mapContainerRef.current) {
+                  const cam = globe.camera();
+                  if (cam) {
+                    const renderer = globe.renderer();
+                    const canvasW = renderer.domElement.width;
+                    const canvasH = renderer.domElement.height;
+                    const mapRect = mapContainerRef.current.getBoundingClientRect();
+                    const cellEl = mapContainerRef.current.parentElement;
+                    const cellRect = cellEl.getBoundingClientRect();
 
-                  // Project globe center (world origin) to canvas/map-container space
-                  const center = new THREE.Vector3(0, 0, 0).project(cam);
-                  const screenX = (center.x + 1) * 0.5 * mapRect.width;
-                  const screenY = (1 - center.y) * 0.5 * mapRect.height;
+                    // Card body in canvas pixel coordinates
+                    const offsetX = cellRect.left - mapRect.left;
+                    const offsetY = cellRect.top - mapRect.top;
+                    const scaleX = canvasW / mapRect.width;
+                    const scaleY = canvasH / mapRect.height;
 
-                  // Apparent screen radius of sphere (globe radius = 100)
-                  const distance = cam.position.length();
-                  const angularRadius = Math.asin(Math.min(100 / distance, 1.0));
-                  const fovRad = cam.fov * Math.PI / 180;
-                  const screenRadius = Math.tan(angularRadius) / Math.tan(fovRad / 2) * (mapRect.height / 2);
+                    ppu2.breakoutEnabled.value = 1.0;
+                    ppu2.cardRect.value.set(
+                      offsetX * scaleX,
+                      offsetY * scaleY,
+                      (offsetX + cellRect.width) * scaleX,
+                      (offsetY + cellRect.height) * scaleY
+                    );
+                    ppu2.cardRadius.value = 28 * scaleX;
 
-                  const pad = ep.globeBreakoutClipPad || 4;
+                    // Project globe center to canvas coords
+                    const center = new THREE.Vector3(0, 0, 0).project(cam);
+                    const screenX = (center.x + 1) * 0.5 * canvasW;
+                    const screenY = (1 - center.y) * 0.5 * canvasH;
+                    const distance = cam.position.length();
+                    const angularRadius = Math.asin(Math.min(100 / distance, 1.0));
+                    const fovRad = cam.fov * Math.PI / 180;
+                    const screenRadius = Math.tan(angularRadius) / Math.tan(fovRad / 2) * (canvasH / 2);
 
-                  // Offset from map-container to cell-map
-                  const offsetX = mapRect.left - cellRect.left;
-                  const offsetY = mapRect.top - cellRect.top;
+                    ppu2.domeCenter.value.set(screenX, screenY);
+                    ppu2.domeRadius.value = screenRadius;
+                    ppu2.domePad.value = (ep.globeBreakoutClipPad || 4) * scaleX;
+                    ppu2.breakoutFeather.value = (ep.globeBreakoutFeather || 3) * scaleX;
 
-                  // SVG clipPath on map-container: coords in map-container space
-                  breakoutCircleRef.current.setAttribute('cx', screenX);
-                  breakoutCircleRef.current.setAttribute('cy', screenY);
-                  breakoutCircleRef.current.setAttribute('r', screenRadius + pad);
-                  breakoutRectRef.current.setAttribute('x', -offsetX);
-                  breakoutRectRef.current.setAttribute('y', -offsetY);
-                  breakoutRectRef.current.setAttribute('width', cellRect.width);
-                  breakoutRectRef.current.setAttribute('height', cellRect.height);
+                    // Glass border params
+                    ppu2.glassThickness.value = 30 * scaleX;
+                    ppu2.glassIntensity.value = 0.8;
+                    // Animate sweep angle (~8s rotation)
+                    ppu2.glassSweepAngle.value = elTs * 0.785;
+                  }
+                } else {
+                  ppu2.breakoutEnabled.value = 0.0;
                 }
               }
             }
@@ -2952,15 +3061,6 @@ export default function Home() {
               '--badge-bottom': `${editorParams.current.badgeBottom}rem`,
               '--badge-inset': `${editorParams.current.badgeInset}rem`,
             }}>
-            {/* SVG clipPath for globe breakout: rect (card body) + circle (dome) */}
-            <svg width="0" height="0" style={{ position: 'absolute' }}>
-              <defs>
-                <clipPath id="globe-breakout-clip" clipPathUnits="userSpaceOnUse">
-                  <rect ref={breakoutRectRef} x="0" y="0" width="0" height="0" />
-                  <circle ref={breakoutCircleRef} cx="0" cy="0" r="0" />
-                </clipPath>
-              </defs>
-            </svg>
             <div className="map-container" ref={mapContainerRef} style={{ opacity: globeReady ? 1 : 0, transition: 'opacity 1.5s ease-in' }}>
               <Suspense fallback={<div style={{ color: '#fff', padding: '2rem' }}>Loading globe...</div>}>
                 {globeSize.width > 0 && (
@@ -3170,7 +3270,7 @@ export default function Home() {
                 />
               </AnimatePresence>
             </div>
-            <div className="insta-overlay" style={{ flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'flex-end', padding: '1.5rem', background: 'linear-gradient(to top, rgba(0,0,0,0.9), transparent)' }}>
+            <div className="insta-overlay" style={{ flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'flex-end', padding: '1.5rem', background: 'linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 30%, transparent 100%)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: '4px' }}>
                 <div className="insta-text">Life in Photos</div>
                 <Instagram size={20} color="#fff" />

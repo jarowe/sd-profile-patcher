@@ -105,7 +105,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    border-radius: 16px;
+    border-radius: inherit;
     overflow: hidden;
 }
 
@@ -1111,26 +1111,26 @@
     }
 }
 
-/* Globe breakout: sphere pokes above bento card */
+/* Globe breakout: sphere breaks through top of bento card */
 .bento-cell.cell-map.globe-breakout {
     overflow: visible;
     z-index: 20;
 }
-/* Extend canvas above card + clip to sphere dome shape */
+/* Extend canvas above card — PP shader handles all masking */
 .bento-cell.cell-map.globe-breakout .map-container {
     top: calc(-1 * var(--globe-breakout-px, 60px));
     height: calc(100% + var(--globe-breakout-px, 60px) + 10px);
-    clip-path: url(#globe-breakout-clip);
-    z-index: 7; /* above glass edge (z:6) so globe renders over glass border */
+    /* NO clip-path — PP shader SDF mask handles it */
+    /* NO z-index override — glass is rendered in PP shader, not CSS */
 }
-/* Glass edge: fade out top where globe breaks through */
+/* Hide CSS glass edge in breakout mode (PP shader renders it instead) */
 .bento-cell.cell-map.globe-breakout .liquid-glass-edge {
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 12%);
-    mask-image: linear-gradient(to bottom, transparent 0%, black 12%);
+    display: none;
 }
-.bento-cell.cell-map.globe-breakout .liquid-glass-edge::before,
-.bento-cell.cell-map.globe-breakout .liquid-glass-edge::after {
-    border-radius: 0 0 28px 28px;
+/* Hide cell-map pseudo overlays in breakout mode (they can't extend above card) */
+.bento-cell.cell-map.globe-breakout::before,
+.bento-cell.cell-map.globe-breakout::after {
+    display: none;
 }
 
 /* ── Liquid Glass Edge Effect ── */

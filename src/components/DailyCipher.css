@@ -353,16 +353,25 @@
 .card-foil {
     position: absolute;
     inset: 0;
-    background: linear-gradient(125deg, transparent 20%, rgba(255, 255, 255, 0.3) 40%, transparent 60%);
-    background-size: 200% 200%;
+    background: linear-gradient(
+        125deg,
+        transparent 0%,
+        rgba(255, 100, 255, 0.12) 15%,
+        rgba(100, 200, 255, 0.2) 25%,
+        rgba(255, 255, 255, 0.28) 35%,
+        rgba(180, 100, 255, 0.2) 45%,
+        rgba(100, 255, 200, 0.12) 55%,
+        transparent 70%
+    );
+    background-size: 300% 300%;
     z-index: 1;
     opacity: 0;
-    transition: opacity 0.3s ease;
+    transition: opacity 0.4s ease;
 }
 
 .collection-card.unlocked:hover .card-foil {
     opacity: 1;
-    animation: shine 2s infinite linear;
+    animation: shine 2.5s infinite ease-in-out;
 }
 
 .card-locked-state {
@@ -653,8 +662,8 @@
 }
 
 @keyframes shine {
-    0% { background-position: -100% -100%; }
-    100% { background-position: 200% 200%; }
+    0% { background-position: 150% 150%; }
+    100% { background-position: -50% -50%; }
 }
 
 @keyframes heroShine {
