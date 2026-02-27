@@ -521,6 +521,38 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     overlayFolder.close();
 
     // ══════════════════════════════════════════
+    // MAP BADGE (Location Bar)
+    // ══════════════════════════════════════════
+    const badgeFolder = gui.addFolder('Location Bar');
+    const updateBadgeVar = (cssVar, unit) => (v) => {
+      p[cssVar] = v;
+      const cell = document.querySelector('.cell-map');
+      if (!cell) return;
+      const propMap = {
+        badgeBgOpacity: '--badge-bg-opacity',
+        badgeBlur: '--badge-blur',
+        badgeBorderOpacity: '--badge-border-opacity',
+        badgeRadius: '--badge-radius',
+        badgeFontSize: '--badge-font-size',
+        badgePadding: '--badge-padding',
+        badgeBottom: '--badge-bottom',
+        badgeInset: '--badge-inset',
+      };
+      const prop = propMap[cssVar];
+      if (prop) cell.style.setProperty(prop, unit ? `${v}${unit}` : v);
+      if (cssVar === 'badgePadding') cell.style.setProperty('--badge-padding-x', `${v * 1.4}rem`);
+    };
+    badgeFolder.add(proxy, 'badgeBgOpacity', 0.0, 1.0, 0.01).name('Background Opacity').onChange(updateBadgeVar('badgeBgOpacity'));
+    badgeFolder.add(proxy, 'badgeBlur', 0, 30, 1).name('Blur (px)').onChange(updateBadgeVar('badgeBlur', 'px'));
+    badgeFolder.add(proxy, 'badgeBorderOpacity', 0.0, 0.5, 0.01).name('Border Opacity').onChange(updateBadgeVar('badgeBorderOpacity'));
+    badgeFolder.add(proxy, 'badgeRadius', 0, 40, 1).name('Border Radius').onChange(updateBadgeVar('badgeRadius', 'px'));
+    badgeFolder.add(proxy, 'badgeFontSize', 0.5, 1.5, 0.05).name('Font Size (rem)').onChange(updateBadgeVar('badgeFontSize', 'rem'));
+    badgeFolder.add(proxy, 'badgePadding', 0.1, 1.5, 0.05).name('Padding (rem)').onChange(updateBadgeVar('badgePadding', 'rem'));
+    badgeFolder.add(proxy, 'badgeBottom', 0.0, 3.0, 0.1).name('Bottom (rem)').onChange(updateBadgeVar('badgeBottom', 'rem'));
+    badgeFolder.add(proxy, 'badgeInset', 0.0, 3.0, 0.1).name('Side Inset (rem)').onChange(updateBadgeVar('badgeInset', 'rem'));
+    badgeFolder.close();
+
+    // ══════════════════════════════════════════
     // PRESETS
     // ══════════════════════════════════════════
     const presetFolder = gui.addFolder('Presets');

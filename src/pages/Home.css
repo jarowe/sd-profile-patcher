@@ -247,17 +247,17 @@
 
 .map-badge {
     position: absolute;
-    bottom: 1rem;
-    left: 1rem;
-    right: 1rem;
-    background: rgba(0, 0, 0, 0.7);
-    padding: 0.35rem 0.5rem;
-    border-radius: 20px;
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    border-top-color: rgba(255, 255, 255, 0.28);
-    border-bottom-color: rgba(255, 255, 255, 0.06);
-    font-size: 0.8rem;
+    bottom: var(--badge-bottom, 1rem);
+    left: var(--badge-inset, 1rem);
+    right: var(--badge-inset, 1rem);
+    background: rgba(0, 0, 0, var(--badge-bg-opacity, 0.7));
+    padding: var(--badge-padding, 0.35rem) var(--badge-padding-x, 0.5rem);
+    border-radius: var(--badge-radius, 20px);
+    backdrop-filter: blur(var(--badge-blur, 12px));
+    border: 1px solid rgba(255, 255, 255, var(--badge-border-opacity, 0.18));
+    border-top-color: rgba(255, 255, 255, calc(var(--badge-border-opacity, 0.18) + 0.1));
+    border-bottom-color: rgba(255, 255, 255, calc(var(--badge-border-opacity, 0.18) * 0.33));
+    font-size: var(--badge-font-size, 0.8rem);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -1111,23 +1111,10 @@
     }
 }
 
-/* Globe overflow: let globe poke above bento card with feathered mask */
+/* Globe overflow: let globe poke above bento card cleanly */
 .bento-cell.cell-map.globe-overflow {
     overflow: visible;
-    -webkit-mask-image: linear-gradient(
-        to bottom,
-        transparent 0%,
-        black calc(var(--globe-overflow-top, 0px)),
-        black calc(100% - 20px),
-        transparent 100%
-    );
-    mask-image: linear-gradient(
-        to bottom,
-        transparent 0%,
-        black calc(var(--globe-overflow-top, 0px)),
-        black calc(100% - 20px),
-        transparent 100%
-    );
+    clip-path: inset(calc(-1 * var(--globe-overflow-top, 0px)) 0 0 0);
 }
 .bento-cell.cell-map.globe-overflow .map-container {
     margin-top: calc(-1 * var(--globe-overflow-top, 0px));

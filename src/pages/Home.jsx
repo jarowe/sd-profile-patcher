@@ -2370,14 +2370,16 @@ export default function Home() {
                 globe.cloudMesh.rotation.x = Math.sin(elTs * 0.03) * 0.005;
               }
 
-              // Animate sun rays (3D volumetric beams)
+              // Animate sun rays (3D volumetric beams) — uses flare occlusion for hiding behind globe
               if (globe.sunRaysMesh) {
-                globe.sunRaysMesh.visible = ep.sunRaysEnabled;
+                const sunRayVis = 1.0 - (globe._flareOcclusion || 0);
+                globe.sunRaysMesh.visible = ep.sunRaysEnabled && sunRayVis > 0.01;
                 globe.sunRaysMesh.position.copy(newSunDir.clone().multiplyScalar(800));
-                globe.sunRaysMesh.material.opacity = ep.sunRaysIntensity;
+                globe.sunRaysMesh.material.opacity = ep.sunRaysIntensity * sunRayVis;
                 globe.sunRaysMesh.material.rotation = elTs * 0.01;
                 const breathe = 1.0 + Math.sin(elTs * 0.3) * 0.05;
-                globe.sunRaysMesh.scale.set(600 * breathe, 600 * breathe, 1);
+                const baseScale = ep.sunRaysLength * 200;
+                globe.sunRaysMesh.scale.set(baseScale * breathe, baseScale * breathe, 1);
               }
 
               // Animate lens flare with occlusion (fades behind globe)
@@ -2894,6 +2896,15 @@ export default function Home() {
               ...(showEditor && editorParams.current.globeOverflowTop > 0 ? { '--globe-overflow-top': `${editorParams.current.globeOverflowTop}px` } : {}),
               ...(editorParams.current.glassSweepOpacity !== undefined ? { '--glass-sweep-opacity': editorParams.current.glassSweepOpacity } : {}),
               ...(editorParams.current.glassShimmerOpacity !== undefined ? { '--glass-shimmer-opacity': editorParams.current.glassShimmerOpacity } : {}),
+              '--badge-bg-opacity': editorParams.current.badgeBgOpacity,
+              '--badge-blur': `${editorParams.current.badgeBlur}px`,
+              '--badge-border-opacity': editorParams.current.badgeBorderOpacity,
+              '--badge-radius': `${editorParams.current.badgeRadius}px`,
+              '--badge-font-size': `${editorParams.current.badgeFontSize}rem`,
+              '--badge-padding': `${editorParams.current.badgePadding}rem`,
+              '--badge-padding-x': `${editorParams.current.badgePadding * 1.4}rem`,
+              '--badge-bottom': `${editorParams.current.badgeBottom}rem`,
+              '--badge-inset': `${editorParams.current.badgeInset}rem`,
             }}>
             <div className="map-container" ref={mapContainerRef} style={{ opacity: globeReady ? 1 : 0, transition: 'opacity 1.5s ease-in' }}>
               <Suspense fallback={<div style={{ color: '#fff', padding: '2rem' }}>Loading globe...</div>}>
