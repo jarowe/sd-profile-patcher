@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, Component } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useConstellationStore } from '../constellation/store';
 import ConstellationCanvas from '../constellation/scene/ConstellationCanvas';
@@ -7,6 +7,26 @@ import TimelineScrubber from '../constellation/ui/TimelineScrubber';
 import DetailPanel from '../constellation/ui/DetailPanel';
 import MediaLightbox from '../constellation/ui/MediaLightbox';
 import './ConstellationPage.css';
+
+/** Error boundary to catch R3F Canvas crashes gracefully */
+class CanvasErrorBoundary extends Component {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(err) { console.error('Constellation 3D error:', err); }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="constellation-loading">
+          <p>3D scene failed to load.</p>
+          <button onClick={() => this.setState({ hasError: false })} style={{ marginTop: '1rem', padding: '0.5rem 1rem', cursor: 'pointer' }}>
+            Retry
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export default function ConstellationPage() {
   const viewMode = useConstellationStore((s) => s.viewMode);
@@ -106,7 +126,9 @@ export default function ConstellationPage() {
               Initializing Constellation...
             </div>
           )}
-          <ConstellationCanvas />
+          <CanvasErrorBoundary>
+            <ConstellationCanvas />
+          </CanvasErrorBoundary>
           <Toolbar />
           <TimelineScrubber />
           <DetailPanel />

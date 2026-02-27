@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 const useConstellationStore = create((set) => ({
   // View mode: '3d' | '2d'
-  viewMode: localStorage.getItem('constellation-view') || '3d',
+  viewMode: '3d', // always start in 3D — user can toggle to 2D
   setViewMode: (mode) => {
     localStorage.setItem('constellation-view', mode);
     set({ viewMode: mode });

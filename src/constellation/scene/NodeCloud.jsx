@@ -198,19 +198,19 @@ export default function NodeCloud({ nodes, gpuConfig }) {
     >
       <sphereGeometry
         args={[1, gpuConfig.sphereSegments, gpuConfig.sphereSegments]}
-      />
+      >
+        <instancedBufferAttribute
+          attach="attributes-color"
+          args={[colors, 3]}
+        />
+      </sphereGeometry>
       <meshStandardMaterial
         ref={materialRef}
         emissive="white"
         emissiveIntensity={1.5}
         toneMapped={false}
         vertexColors
-      >
-        <instancedBufferAttribute
-          attach="attributes-color"
-          args={[colors, 3]}
-        />
-      </meshStandardMaterial>
+      />
     </instancedMesh>
   );
 }
