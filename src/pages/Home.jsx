@@ -2822,8 +2822,8 @@ export default function Home() {
                     svz -= radialComp * nz;
                     // Force falls off with distance from surface
                     const surfaceDist = cDist - 100;
-                    const proximity = Math.max(0, 1.0 - surfaceDist / 16.0);
-                    const spinForce = windSpinInfluence * proximity * (0.5 + proximity * 0.5) * safeDt;
+                    const proximity = Math.max(0, 1.0 - surfaceDist / 12.0);
+                    const spinForce = windSpinInfluence * proximity * proximity * safeDt;
                     wVel[idx]     += svx * spinForce;
                     wVel[idx + 1] += svy * spinForce;
                     wVel[idx + 2] += svz * spinForce;
@@ -2831,7 +2831,7 @@ export default function Home() {
                     // Vortex shedding — turbulent surface-tangent eddies
                     if (windVortexStrength > 0 && globe._spinMagnitude > 0.15) {
                       const vp = elTs * 2.5 + i * 0.37;
-                      const vScale = windVortexStrength * proximity * Math.min(globe._spinMagnitude * 0.4, 1.0) * safeDt;
+                      const vScale = windVortexStrength * proximity * Math.min(globe._spinMagnitude * 0.5, 1.0) * safeDt;
                       // Cross product of spin direction with normal → tangent perturbation
                       let px2 = svy * nz - svz * ny;
                       let py2 = svz * nx - svx * nz;
@@ -2853,7 +2853,7 @@ export default function Home() {
                     const noiseZ = Math.sin(x*s*2.5 + t*0.5) * Math.cos(y*s*1.3 + t*0.9) + Math.sin(y*s*3.1 - t*0.6) * 0.5;
                     // Project turbulence onto tangent plane too
                     const turbRad = noiseX * nx + noiseY * ny + noiseZ * nz;
-                    const turbForce = windTurbulence * safeDt * 0.12;
+                    const turbForce = windTurbulence * safeDt * 0.15;
                     wVel[idx]     += (noiseX - turbRad * nx) * turbForce;
                     wVel[idx + 1] += (noiseY - turbRad * ny) * turbForce;
                     wVel[idx + 2] += (noiseZ - turbRad * nz) * turbForce;
@@ -2869,7 +2869,7 @@ export default function Home() {
 
                     if (dist < windInfluenceRadius && dist > 0.3) {
                       mouseInfluenced = true;
-                      const force = windGravity / (dist * dist + 0.6);
+                      const force = windGravity / (dist * dist + 0.5);
                       const acc = force * safeDt;
                       const id = 1.0 / dist;
                       const rx = -dx * id, ry = -dy * id, rz = -dz * id;
@@ -2879,9 +2879,9 @@ export default function Home() {
                       let stz = rx * ny - ry * nx;
                       const tLen = Math.sqrt(stx*stx + sty*sty + stz*stz) || 1;
                       stx /= tLen; sty /= tLen; stz /= tLen;
-                      wVel[idx]     += rx * acc * 0.65 + stx * acc * 1.05;
-                      wVel[idx + 1] += ry * acc * 0.65 + sty * acc * 1.05;
-                      wVel[idx + 2] += rz * acc * 0.65 + stz * acc * 1.05;
+                      wVel[idx]     += rx * acc * 0.7 + stx * acc * 1.2;
+                      wVel[idx + 1] += ry * acc * 0.7 + sty * acc * 1.2;
+                      wVel[idx + 2] += rz * acc * 0.7 + stz * acc * 1.2;
 
                       // Dynamic color based on speed + distance
                       const speed = Math.sqrt(wVel[idx]*wVel[idx] + wVel[idx+1]*wVel[idx+1] + wVel[idx+2]*wVel[idx+2]);
@@ -2922,8 +2922,7 @@ export default function Home() {
                   if (windHomeForce > 0) {
                     const homeX = wOrig[idx] - x, homeY = wOrig[idx+1] - y, homeZ = wOrig[idx+2] - z;
                     const homeDist = Math.sqrt(homeX*homeX + homeY*homeY + homeZ*homeZ);
-                    if (homeDist > 1.5) {
-                      // Gentle pull, only kicks in when far displaced
+                    if (homeDist > 2.0) {
                       const pull = windHomeForce * Math.min(homeDist * 0.01, 0.5) * safeDt;
                       wVel[idx]     += homeX / homeDist * pull;
                       wVel[idx + 1] += homeY / homeDist * pull;
