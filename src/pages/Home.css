@@ -1111,13 +1111,14 @@
     }
 }
 
-/* Globe overflow: let globe poke above bento card cleanly */
-.bento-cell.cell-map.globe-overflow {
+/* Globe breakout: sphere pokes above bento card, sides/bottom stay clipped */
+.bento-cell.cell-map.globe-breakout {
     overflow: visible;
-    clip-path: inset(calc(-1 * var(--globe-overflow-top, 0px)) 0 0 0);
+    z-index: 20;
+    clip-path: inset(calc(-1 * var(--globe-breakout-px, 0px)) 0px 0px 0px round 0 0 28px 28px);
 }
-.bento-cell.cell-map.globe-overflow .map-container {
-    margin-top: calc(-1 * var(--globe-overflow-top, 0px));
+.bento-cell.cell-map.globe-breakout .map-container {
+    margin-top: calc(-1 * var(--globe-breakout-px, 0px));
 }
 
 /* ── Liquid Glass Edge Effect ── */

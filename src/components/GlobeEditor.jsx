@@ -116,17 +116,18 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
       p.timeOverrideHour = utcHour;
     });
 
-    controlsFolder.add(proxy, 'globeOverflowTop', 0, 200, 1).name('Globe Overflow Top (px)').onChange((v) => {
-      p.globeOverflowTop = v;
+    controlsFolder.add(proxy, 'globeBreakout').name('Globe Breakout').onChange((v) => {
+      p.globeBreakout = v;
       const cell = document.querySelector('.cell-map');
       if (cell) {
-        if (v > 0) {
-          cell.classList.add('globe-overflow');
-          cell.style.setProperty('--globe-overflow-top', `${v}px`);
-        } else {
-          cell.classList.remove('globe-overflow');
-        }
+        cell.classList.toggle('globe-breakout', v);
+        if (v) cell.style.setProperty('--globe-breakout-px', `${p.globeBreakoutPx}px`);
       }
+    });
+    controlsFolder.add(proxy, 'globeBreakoutPx', 0, 200, 1).name('Breakout Amount (px)').onChange((v) => {
+      p.globeBreakoutPx = v;
+      const cell = document.querySelector('.cell-map');
+      if (cell && p.globeBreakout) cell.style.setProperty('--globe-breakout-px', `${v}px`);
     });
 
     // ── Visibility Toggles ──
@@ -623,6 +624,26 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
         const update = {};
         overlayKeys.forEach(k => { update[k] = p[k]; });
         setOverlayParams(update);
+      }
+      // Sync CSS class toggles and custom properties
+      const cell = document.querySelector('.cell-map');
+      if (cell) {
+        cell.classList.toggle('globe-breakout', !!p.globeBreakout);
+        if (p.globeBreakout) cell.style.setProperty('--globe-breakout-px', `${p.globeBreakoutPx}px`);
+        cell.classList.toggle('glass-sweep-off', !p.glassSweepEnabled);
+        cell.classList.toggle('glass-shimmer-off', !p.glassShimmerEnabled);
+        cell.classList.toggle('inner-glow-off', !p.innerGlowEnabled);
+        cell.style.setProperty('--glass-sweep-opacity', p.glassSweepOpacity);
+        cell.style.setProperty('--glass-shimmer-opacity', p.glassShimmerOpacity);
+        cell.style.setProperty('--badge-bg-opacity', p.badgeBgOpacity);
+        cell.style.setProperty('--badge-blur', `${p.badgeBlur}px`);
+        cell.style.setProperty('--badge-border-opacity', p.badgeBorderOpacity);
+        cell.style.setProperty('--badge-radius', `${p.badgeRadius}px`);
+        cell.style.setProperty('--badge-font-size', `${p.badgeFontSize}rem`);
+        cell.style.setProperty('--badge-padding', `${p.badgePadding}rem`);
+        cell.style.setProperty('--badge-padding-x', `${p.badgePadding * 1.4}rem`);
+        cell.style.setProperty('--badge-bottom', `${p.badgeBottom}rem`);
+        cell.style.setProperty('--badge-inset', `${p.badgeInset}rem`);
       }
       gui.controllersRecursive().forEach(c => c.updateDisplay());
     }

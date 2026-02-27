@@ -7,7 +7,7 @@ export const GLOBE_DEFAULTS = {
   dayStrengthMax: 0.41,
 
   // ── City Lights ──
-  cityGateMin: 0.17,
+  cityGateMin: 0.215,
   cityGateMax: 0.37,
   cityLightColor: [0.996, 0.706, 0.302],
   cityLightBoost: [0.0, 0.0, 0.0],
@@ -146,12 +146,12 @@ export const GLOBE_DEFAULTS = {
   lavaLampColor1: [0.1, 0.8, 0.5],
   lavaLampColor2: [0.7, 0.1, 0.85],
   lavaLampColor3: [0.05, 0.3, 0.95],
-  lavaLampIntensity: 0.265,
+  lavaLampIntensity: 0.305,
   lavaLampSpeed: 0.12,
   lavaLampScale: 2.3,
   lavaLampHeight: 102.5,
   lavaLampBlobSize: 2.7,
-  lavaLampFeather: 1.0,
+  lavaLampFeather: 2.81,
 
   // ── Shader Lighting ──
   shaderAmbient: 0.07,
@@ -185,8 +185,9 @@ export const GLOBE_DEFAULTS = {
   // ── Animation ──
   animationPaused: false,
 
-  // ── Globe Overflow ──
-  globeOverflowTop: 0,
+  // ── Globe Breakout (sphere pokes above bento card) ──
+  globeBreakout: false,
+  globeBreakoutPx: 60,
 
   // ── Visibility Toggles ──
   satellitesVisible: true,
@@ -237,16 +238,16 @@ export const GLOBE_DEFAULTS = {
   labelDotRadius: 0.3,
 
   // ── Prism Bop Effector ──
-  bopDecayRate: 0.325,
-  bopParticleBurst: 2.2,
-  bopColorShift: 0.28,
+  bopDecayRate: 0.12,
+  bopParticleBurst: 1.4,
+  bopColorShift: 0.37,
   bopGlowBoost: 0.3,
-  bopAuroraBoost: 0.5,
-  bopCloudFlash: 0.2,
+  bopAuroraBoost: 1.6,
+  bopCloudFlash: 0.3,
   bopWaterRipple: 2.0,
-  bopStarBurst: 1.1,
-  bopEnvGlowBoost: 0.8,
-  bopLavaLampBoost: 2.0,
+  bopStarBurst: 1.3,
+  bopEnvGlowBoost: 0.4,
+  bopLavaLampBoost: 1.5,
   bopLightShow: true,
 
   // ── Advanced Lens Flare ──
@@ -266,7 +267,7 @@ export const GLOBE_DEFAULTS = {
   godRaysDensity: 0.1,
   godRaysWeight: 0.05,
   godRaysDecay: 0.9,
-  godRaysExposure: 0.185,
+  godRaysExposure: 0.25,
   godRaysSamples: 60,
 
   // ── Post-Processing ──
@@ -274,9 +275,9 @@ export const GLOBE_DEFAULTS = {
   ppChromaticAberration: 0.009,
   ppVignetteStrength: 0.29,
   ppVignetteRadius: 1.0,
-  ppBrightness: 0.04,
+  ppBrightness: 0.03,
   ppContrast: 0.97,
-  ppSaturation: 0.92,
+  ppSaturation: 0.96,
   ppGamma: 1.0,
   ppTint: [0.949, 0.965, 0.969],
   ppFilmGrain: 0.016,
@@ -289,12 +290,12 @@ export const GLOBE_DEFAULTS = {
   tvGlitchSpeed: 0.0,
   tvScanLineJitter: 0.03,
   tvColorBleed: 0.04,
-  tvStaticNoise: 0.08,
+  tvStaticNoise: 0.12,
   tvBarrelDistortion: 0.02,
-  tvRGBShift: 0.18,
+  tvRGBShift: 0.16,
 
   // ── Map Badge (Location Bar) ──
-  badgeBgOpacity: 0.7,
+  badgeBgOpacity: 0.31,
   badgeBlur: 12,
   badgeBorderOpacity: 0.18,
   badgeRadius: 20,
