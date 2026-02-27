@@ -27,11 +27,14 @@ export const GLOBE_DEFAULTS = {
   deepSeaColor: [0.005, 0.02, 0.08],
   midSeaColor: [0.02, 0.08, 0.22],
   shallowSeaColor: [0.06, 0.18, 0.38],
-  waterSpecPow: 120.0,
-  waterSpecMult: 2.5,
-  waterGlarePow: 12.0,
-  waterGlareMult: 0.5,
-  waterFresnelPow: 4.0,
+  waterSpecPow: 159.0,
+  waterSpecMult: 0.5,
+  waterGlarePow: 12.5,
+  waterGlareMult: 0.55,
+  waterFresnelPow: 4.1,
+  waterWaveSpeed: 1.0,
+  waterWaveScale: 1.0,
+  waterCurrentStrength: 1.0,
 
   // ── Surface Atmosphere ──
   atmosDayColor: [0.3, 0.7, 1.0],
@@ -106,19 +109,31 @@ export const GLOBE_DEFAULTS = {
   auroraNoiseScale: 4.2,
   auroraHeight: 101.5,
   auroraCurtainPow: 2.6,
-  auroraEvolution: 0.3,   // how fast the curtain shape morphs
-  auroraWaveSpeed: 0.8,   // lateral wave propagation speed
+  auroraEvolution: 1.7,
+  auroraWaveSpeed: 0.8,
 
   // ── Prismatic Glow Layer (iridescent fresnel noise) ──
   prismGlowEnabled: true,
   prismGlowColor1: [0.2, 0.6, 1.0],
   prismGlowColor2: [0.5, 0.1, 0.9],
   prismGlowColor3: [0.1, 0.9, 0.4],
-  prismGlowIntensity: 0.25,
+  prismGlowIntensity: 1.3,
   prismGlowSpeed: 0.6,
-  prismGlowNoiseScale: 2.5,
-  prismGlowFresnelPow: 2.5,
+  prismGlowNoiseScale: 6.9,
+  prismGlowFresnelPow: 2.0,
   prismGlowHeight: 101.2,
+  prismGlowRotSpeed: 0.05,  // auto-rotation speed
+
+  // ── Environment Glow Layer (full-wrap prismatic noise field) ──
+  envGlowEnabled: true,
+  envGlowColor1: [0.1, 0.4, 1.0],
+  envGlowColor2: [0.7, 0.1, 0.9],
+  envGlowColor3: [0.1, 0.9, 0.5],
+  envGlowIntensity: 0.12,
+  envGlowSpeed: 0.25,
+  envGlowNoiseScale: 2.5,
+  envGlowHeight: 102.0,
+  envGlowCoverage: 0.6,     // how much of the globe it wraps (0=limb only, 1=full)
 
   // ── Shader Lighting ──
   shaderAmbient: 0.07,
@@ -165,10 +180,14 @@ export const GLOBE_DEFAULTS = {
   dustVisible: true,
   starsVisible: true,
 
-  // ── Object Speeds ──
+  // ── Object Speeds & Scales ──
   satelliteSpeed: 1.0,
   planeSpeed: 1.0,
   wispSpeed: 1.0,
+  satelliteScale: 1.0,
+  planeScale: 1.0,
+  carScale: 1.0,
+  wispScale: 1.0,
 
   // ── Overlay Graphics ──
   arcStroke: 0.5,
@@ -180,4 +199,16 @@ export const GLOBE_DEFAULTS = {
   ringRepeatPeriod: 1000,
   labelSize: 1.2,
   labelDotRadius: 0.3,
+
+  // ── Prism Bop Effector (controls what the prism character bop does) ──
+  bopDecayRate: 0.08,       // how fast prismPulse decays
+  bopParticleBurst: 1.2,    // particle size explosion
+  bopColorShift: 0.4,       // prismatic color blend on particles
+  bopGlowBoost: 3.0,        // prismatic glow layer intensity multiplier
+  bopAuroraBoost: 2.0,      // aurora brightness spike
+  bopCloudFlash: 0.15,      // cloud brightness flash
+  bopWaterRipple: 0.3,      // water prismatic distortion
+  bopStarBurst: 1.0,        // star size multiplier on bop
+  bopEnvGlowBoost: 2.0,     // environment glow layer boost
+  bopLightShow: false,       // enable strobing color cycle on bop
 };

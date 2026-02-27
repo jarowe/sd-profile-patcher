@@ -225,6 +225,10 @@ export default function Home() {
         waterGlarePow: { value: p.waterGlarePow },
         waterGlareMult: { value: p.waterGlareMult },
         waterFresnelPow: { value: p.waterFresnelPow },
+        waterWaveSpeed: { value: p.waterWaveSpeed },
+        waterWaveScale: { value: p.waterWaveScale },
+        waterCurrentStrength: { value: p.waterCurrentStrength },
+        bopWaterRipple: { value: p.bopWaterRipple },
         // Surface Atmosphere
         atmosDayColor: { value: new THREE.Vector3(...p.atmosDayColor) },
         atmosTwilightColor: { value: new THREE.Vector3(...p.atmosTwilightColor) },
@@ -290,6 +294,10 @@ export default function Home() {
         uniform float waterGlarePow;
         uniform float waterGlareMult;
         uniform float waterFresnelPow;
+        uniform float waterWaveSpeed;
+        uniform float waterWaveScale;
+        uniform float waterCurrentStrength;
+        uniform float bopWaterRipple;
         // Atmosphere uniforms
         uniform vec3 atmosDayColor;
         uniform vec3 atmosTwilightColor;
@@ -370,15 +378,15 @@ export default function Home() {
           // --- WATER: animated ocean + tidal currents + specular + Fresnel ---
           float lat = vUv.y * 3.14159 - 1.5708;
           vec2 currentFlow = vec2(
-            sin(lat * 3.0) * 0.008 + sin(lat * 7.0 + time * 0.02) * 0.003,
-            cos(vUv.x * 6.28 + time * 0.015) * 0.004
+            sin(lat * 3.0) * 0.008 * waterCurrentStrength + sin(lat * 7.0 + time * 0.02 * waterWaveSpeed) * 0.003 * waterCurrentStrength,
+            cos(vUv.x * 6.28 + time * 0.015 * waterWaveSpeed) * 0.004 * waterCurrentStrength
           );
-          float tide = sin(time * 0.03) * 0.003 + sin(time * 0.07 + vUv.x * 12.0) * 0.001;
+          float tide = sin(time * 0.03 * waterWaveSpeed) * 0.003 + sin(time * 0.07 * waterWaveSpeed + vUv.x * 12.0) * 0.001;
           vec2 tidalUv = vUv + currentFlow + vec2(tide, tide * 0.5);
 
-          vec2 waveUv = tidalUv * 1200.0;
-          vec2 bigWaveUv = tidalUv * 300.0;
-          float t = time * 0.12;
+          vec2 waveUv = tidalUv * 1200.0 * waterWaveScale;
+          vec2 bigWaveUv = tidalUv * 300.0 * waterWaveScale;
+          float t = time * 0.12 * waterWaveSpeed;
 
           float bigW1 = fbm(bigWaveUv + vec2(t * 0.8, t * 0.5));
           float bigW2 = fbm(bigWaveUv * 0.6 - vec2(t * 0.3, t * 0.6));
@@ -422,7 +430,7 @@ export default function Home() {
             0.5 + 0.5 * sin(time * 2.0 + vUv.x * 20.0 + 2.094),
             0.5 + 0.5 * sin(time * 2.0 + vUv.x * 20.0 + 4.189)
           );
-          waterColor = mix(waterColor, prismWater * waterColor * 2.0, prismPulse * 0.3 * isWater);
+          waterColor = mix(waterColor, prismWater * waterColor * 2.0, prismPulse * bopWaterRipple * isWater);
 
           vec3 finalColor = mix(landColor, waterColor, isWater);
 
@@ -604,6 +612,8 @@ export default function Home() {
               cloudRimStrength: { value: cp.cloudRimStrength },
               cloudSubsurfaceColor: { value: new THREE.Vector3(...cp.cloudSubsurfaceColor) },
               cloudSilverLiningColor: { value: new THREE.Vector3(...cp.cloudSilverLiningColor) },
+              prismPulse: globe.customUniforms.prismPulse,
+              bopCloudFlash: { value: cp.bopCloudFlash },
             },
             vertexShader: `
               varying vec2 vUv;
@@ -636,6 +646,8 @@ export default function Home() {
               uniform float cloudRimStrength;
               uniform vec3 cloudSubsurfaceColor;
               uniform vec3 cloudSilverLiningColor;
+              uniform float prismPulse;
+              uniform float bopCloudFlash;
               varying vec2 vUv;
               varying vec3 vNormal;
               varying vec3 vViewPos;
@@ -680,8 +692,9 @@ export default function Home() {
                 float rim = pow(1.0 - max(dot(viewDir, vNormal), 0.0), cloudRimPow);
                 cloudColor += cloudSilverLiningColor * rim * cloudRimStrength * illumination;
 
-                // Music-reactive cloud brightness
+                // Music-reactive + bop cloud brightness
                 cloudColor += cloudColor * audioPulse * 0.15;
+                cloudColor += cloudColor * prismPulse * bopCloudFlash;
 
                 // Night side: clouds invisible (dark side should be clean black)
                 alpha *= dayFactor;
@@ -716,6 +729,8 @@ export default function Home() {
             uniforms: {
               sunDir: globe.customUniforms.sunDir,
               time: globe.customUniforms.time,
+              prismPulse: globe.customUniforms.prismPulse,
+              bopAuroraBoost: { value: ap.bopAuroraBoost },
               auroraColor1: { value: new THREE.Vector3(...ap.auroraColor1) },
               auroraColor2: { value: new THREE.Vector3(...ap.auroraColor2) },
               auroraColor3: { value: new THREE.Vector3(...ap.auroraColor3) },
@@ -753,6 +768,8 @@ export default function Home() {
               uniform float auroraCurtainPow;
               uniform float auroraEvolution;
               uniform float auroraWaveSpeed;
+              uniform float prismPulse;
+              uniform float bopAuroraBoost;
               varying vec3 vWorldNormal;
               varying vec3 vWorldPos;
               varying vec3 vViewPos;
@@ -837,10 +854,11 @@ export default function Home() {
                 float fresnel = pow(1.0 - abs(dot(viewDir, normalize(vWorldNormal))), 1.5);
                 float edgeBoost = 0.6 + fresnel * 0.4;
 
-                float alpha = latMask * nightMask * curtain * auroraIntensity * edgeBoost;
+                float bopBoost = 1.0 + prismPulse * bopAuroraBoost;
+                float alpha = latMask * nightMask * curtain * auroraIntensity * edgeBoost * bopBoost;
                 alpha = clamp(alpha, 0.0, 1.0);
 
-                gl_FragColor = vec4(auroraCol * auroraIntensity, alpha);
+                gl_FragColor = vec4(auroraCol * auroraIntensity * bopBoost, alpha);
               }
             `,
             transparent: true,
@@ -872,6 +890,7 @@ export default function Home() {
               prismGlowSpeed: { value: pg.prismGlowSpeed },
               prismGlowNoiseScale: { value: pg.prismGlowNoiseScale },
               prismGlowFresnelPow: { value: pg.prismGlowFresnelPow },
+              bopGlowBoost: { value: pg.bopGlowBoost },
             },
             vertexShader: `
               varying vec3 vWorldNormal;
@@ -895,6 +914,7 @@ export default function Home() {
               uniform float prismGlowSpeed;
               uniform float prismGlowNoiseScale;
               uniform float prismGlowFresnelPow;
+              uniform float bopGlowBoost;
               varying vec3 vWorldNormal;
               varying vec3 vWorldPos;
               varying vec3 vViewPos;
@@ -924,34 +944,33 @@ export default function Home() {
               }
 
               void main() {
-                // Fresnel: strongest at edges, gives the iridescent rim look
                 vec3 viewDir = normalize(-vViewPos);
                 float fresnel = pow(1.0 - abs(dot(viewDir, normalize(vWorldNormal))), prismGlowFresnelPow);
 
-                // Seamless spherical noise from world position
+                // Sun interaction: glow orbits with sun, brighter on lit side
+                float NdotL = dot(vWorldNormal, sunDir);
+                float sunWrap = 0.5 + NdotL * 0.3;
+
+                // Seamless spherical noise
                 vec3 nPos = normalize(vWorldPos);
                 float lng = atan(nPos.z, nPos.x);
                 float lat = asin(clamp(nPos.y, -1.0, 1.0));
                 float t = time * prismGlowSpeed;
 
-                // Multi-octave flowing noise for iridescent pattern
                 vec2 noiseUv = vec2(lng * prismGlowNoiseScale + t * 0.4, lat * prismGlowNoiseScale + t * 0.2);
                 float n1 = fbm(noiseUv);
                 float n2 = fbm(noiseUv * 1.5 + vec2(t * 0.3, -t * 0.1) + n1 * 0.5);
 
-                // Rainbow color cycling: shifts through all 3 prism colors
                 float phase = n1 * 3.0 + n2 * 2.0 + t * 1.5;
                 vec3 col = prismGlowColor1 * (0.5 + 0.5 * sin(phase));
                 col += prismGlowColor2 * (0.5 + 0.5 * sin(phase + 2.094));
                 col += prismGlowColor3 * (0.5 + 0.5 * sin(phase + 4.189));
                 col = normalize(col) * length(col) * 0.5;
 
-                // Base intensity: always subtly visible, boosted massively by prism pulse
-                float baseIntensity = prismGlowIntensity * 0.3;
-                float pulseBoost = prismPulse * prismGlowIntensity * 3.0;
+                float baseIntensity = prismGlowIntensity * 0.3 * sunWrap;
+                float pulseBoost = prismPulse * prismGlowIntensity * bopGlowBoost;
                 float intensity = (baseIntensity + pulseBoost) * fresnel * (0.5 + n2 * 0.5);
 
-                // Thin band of maximum iridescence near the limb
                 float bandMask = smoothstep(0.2, 0.5, fresnel) * smoothstep(1.0, 0.7, fresnel);
                 intensity *= (0.5 + bandMask * 1.5);
 
@@ -971,6 +990,135 @@ export default function Home() {
           prismGlowMesh.renderOrder = 1;
           scene.add(prismGlowMesh);
           globe.prismGlowMesh = prismGlowMesh;
+        }
+
+        // --- C3. Environment Glow Layer (full-wrap prismatic noise field) ---
+        if (!globe.envGlowMesh && editorParams.current.envGlowEnabled) {
+          const eg = editorParams.current;
+          const envGlowMat = new THREE.ShaderMaterial({
+            uniforms: {
+              sunDir: globe.customUniforms.sunDir,
+              time: globe.customUniforms.time,
+              prismPulse: globe.customUniforms.prismPulse,
+              envGlowColor1: { value: new THREE.Vector3(...eg.envGlowColor1) },
+              envGlowColor2: { value: new THREE.Vector3(...eg.envGlowColor2) },
+              envGlowColor3: { value: new THREE.Vector3(...eg.envGlowColor3) },
+              envGlowIntensity: { value: eg.envGlowIntensity },
+              envGlowSpeed: { value: eg.envGlowSpeed },
+              envGlowNoiseScale: { value: eg.envGlowNoiseScale },
+              envGlowCoverage: { value: eg.envGlowCoverage },
+              bopEnvGlowBoost: { value: eg.bopEnvGlowBoost },
+            },
+            vertexShader: `
+              varying vec3 vWorldNormal;
+              varying vec3 vWorldPos;
+              varying vec3 vViewPos;
+              void main() {
+                vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+                vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+                vViewPos = (modelViewMatrix * vec4(position, 1.0)).xyz;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+              }
+            `,
+            fragmentShader: `
+              uniform vec3 sunDir;
+              uniform float time;
+              uniform float prismPulse;
+              uniform vec3 envGlowColor1;
+              uniform vec3 envGlowColor2;
+              uniform vec3 envGlowColor3;
+              uniform float envGlowIntensity;
+              uniform float envGlowSpeed;
+              uniform float envGlowNoiseScale;
+              uniform float envGlowCoverage;
+              uniform float bopEnvGlowBoost;
+              varying vec3 vWorldNormal;
+              varying vec3 vWorldPos;
+              varying vec3 vViewPos;
+
+              float hash(vec2 p) {
+                p = fract(p * vec2(234.34, 435.345));
+                p += dot(p, p + 34.23);
+                return fract(p.x * p.y);
+              }
+              float noise(vec2 p) {
+                vec2 i = floor(p);
+                vec2 f = fract(p);
+                f = f * f * (3.0 - 2.0 * f);
+                return mix(
+                  mix(hash(i), hash(i + vec2(1,0)), f.x),
+                  mix(hash(i + vec2(0,1)), hash(i + vec2(1,1)), f.x), f.y);
+              }
+              float fbm(vec2 p) {
+                float v = 0.0; float a = 0.5;
+                mat2 rot = mat2(0.8, 0.6, -0.6, 0.8);
+                for (int i = 0; i < 5; i++) {
+                  v += a * noise(p);
+                  p = rot * p * 2.0;
+                  a *= 0.5;
+                }
+                return v;
+              }
+
+              void main() {
+                vec3 viewDir = normalize(-vViewPos);
+                float fresnel = 1.0 - abs(dot(viewDir, normalize(vWorldNormal)));
+
+                // Coverage: 0 = limb only (like atmosphere), 1 = full sphere
+                float coverageMask = smoothstep(1.0 - envGlowCoverage, 1.0, fresnel + envGlowCoverage * 0.5);
+
+                // Seamless spherical noise
+                vec3 nPos = normalize(vWorldPos);
+                float lng = atan(nPos.z, nPos.x);
+                float lat = asin(clamp(nPos.y, -1.0, 1.0));
+                float t = time * envGlowSpeed;
+
+                // Large-scale flowing noise pattern
+                vec2 uv1 = vec2(lng * envGlowNoiseScale + t * 0.3, lat * envGlowNoiseScale + t * 0.15);
+                float n1 = fbm(uv1);
+                // Warped secondary layer for depth
+                vec2 uv2 = vec2(lng * envGlowNoiseScale * 0.7 - t * 0.2, lat * envGlowNoiseScale * 1.3 + t * 0.1);
+                float n2 = fbm(uv2 + n1 * 0.8);
+                // Third layer for fine detail
+                vec2 uv3 = vec2(lng * envGlowNoiseScale * 2.0 + t * 0.5, lat * envGlowNoiseScale * 1.5 - t * 0.25);
+                float n3 = fbm(uv3 + n2 * 0.3);
+
+                float pattern = n1 * 0.5 + n2 * 0.35 + n3 * 0.15;
+
+                // Sun interaction: glow shifts color near terminator
+                float NdotL = dot(vWorldNormal, sunDir);
+                float sunFade = smoothstep(-0.3, 0.3, NdotL);
+
+                // Prismatic color cycling
+                float phase = pattern * 4.0 + t * 2.0;
+                vec3 col = envGlowColor1 * (0.5 + 0.5 * sin(phase));
+                col += envGlowColor2 * (0.5 + 0.5 * sin(phase + 2.094));
+                col += envGlowColor3 * (0.5 + 0.5 * sin(phase + 4.189));
+                col *= 0.5;
+
+                // Warm shift near terminator
+                col = mix(col, col * vec3(1.2, 0.8, 0.5), (1.0 - sunFade) * 0.3);
+
+                float baseIntensity = envGlowIntensity;
+                float pulseBoost = prismPulse * bopEnvGlowBoost;
+                float intensity = (baseIntensity + pulseBoost) * coverageMask * pattern;
+
+                float alpha = clamp(intensity, 0.0, 1.0);
+                gl_FragColor = vec4(col * intensity, alpha);
+              }
+            `,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            side: THREE.FrontSide,
+          });
+          const envGlowMesh = new THREE.Mesh(
+            new THREE.SphereGeometry(eg.envGlowHeight, 64, 64),
+            envGlowMat
+          );
+          envGlowMesh.renderOrder = 1;
+          scene.add(envGlowMesh);
+          globe.envGlowMesh = envGlowMesh;
         }
 
         // --- D. Atmospheric Glow (tight rim + soft feathered halo) ---
@@ -1390,6 +1538,9 @@ export default function Home() {
               dustSpeed: { value: pp.dustSpeed },
               dustAmplitude: { value: pp.dustAmplitude },
               mouseRippleRadius: { value: pp.mouseRippleRadius },
+              bopParticleBurst: { value: pp.bopParticleBurst },
+              bopColorShift: { value: pp.bopColorShift },
+              bopStarBurst: { value: pp.bopStarBurst },
             },
             vertexShader: `
               uniform float time; uniform float audioPulse; uniform float prismPulse; uniform float pixelRatio;
@@ -1402,6 +1553,8 @@ export default function Home() {
               uniform float dustSpeed;
               uniform float dustAmplitude;
               uniform float mouseRippleRadius;
+              uniform float bopParticleBurst;
+              uniform float bopStarBurst;
               attribute float aScale; attribute vec3 customColor; attribute float pType; attribute vec3 burstOffset;
               varying vec3 vColor; varying float vType; varying float vMouseDist;
               void main() {
@@ -1438,7 +1591,7 @@ export default function Home() {
                   float starId = position.x * 73.1 + position.y * 127.3 + position.z * 57.7;
                   twinkle = starTwinkleBase + starTwinkleDepth * (0.5 + 0.5 * sin(time * (starTwinkleSpeed + fract(starId) * 3.0) + starId));
                 }
-                float baseSize = (pType>0.5) ? aScale*dustSize*(1.0 + audioPulse*3.0 + prismPulse*1.2) : aScale*starSize*(1.0+audioPulse*1.0) * twinkle;
+                float baseSize = (pType>0.5) ? aScale*dustSize*(1.0 + audioPulse*3.0 + prismPulse*bopParticleBurst) : aScale*starSize*(1.0+audioPulse*1.0 + prismPulse*bopStarBurst) * twinkle;
                 gl_PointSize = baseSize * pixelRatio * (300.0 / -mv.z);
               }
             `,
@@ -1446,6 +1599,7 @@ export default function Home() {
               varying vec3 vColor; varying float vType; varying float vMouseDist;
               uniform float audioPulse; uniform float prismPulse; uniform float time;
               uniform float mouseRippleRadius;
+              uniform float bopColorShift;
               void main() {
                 vec2 xy = gl_PointCoord.xy - vec2(0.5);
                 float ll = length(xy);
@@ -1456,13 +1610,13 @@ export default function Home() {
                 // Mouse proximity glow - particles near cursor glow brighter
                 float mouseGlow = (vMouseDist < mouseRippleRadius) ? (1.0 - vMouseDist / mouseRippleRadius) * 0.5 : 0.0;
 
-                // Gentle prismatic color shift
+                // Prismatic color shift (intensity controlled by bopColorShift)
                 vec3 prismatic = vec3(
                   0.5 + 0.5 * sin(time * 3.0),
                   0.5 + 0.5 * sin(time * 3.0 + 2.094),
                   0.5 + 0.5 * sin(time * 3.0 + 4.189)
                 );
-                vec3 shimmer = mix(vColor, prismatic, prismPulse * 0.4);
+                vec3 shimmer = mix(vColor, prismatic, prismPulse * bopColorShift);
                 // Mouse makes nearby particles glow white/bright
                 shimmer += vec3(0.3, 0.5, 1.0) * mouseGlow;
                 gl_FragColor = vec4(shimmer*(1.0 + audioPulse*0.8 + prismPulse*0.3 + mouseGlow), alpha + mouseGlow * 0.3);
@@ -1481,37 +1635,70 @@ export default function Home() {
           scene.add(globe.satellitesGroup);
 
           const satColors = [0xffffff, 0x38bdf8, 0xfbbf24, 0xf472b6];
-          // High-orbit satellites
+          // Satellites with solar panels
           for(let i=0; i<15; i++) {
-            const geo = new THREE.BoxGeometry(0.5, 0.2, 0.5);
-            const mat = new THREE.MeshBasicMaterial({ color: satColors[i % satColors.length], wireframe: true });
-            const m = new THREE.Mesh(geo, mat);
-            m.userData = {
-              r: 115 + Math.random() * 20,
+            const satGroup = new THREE.Group();
+            // Main body
+            const body = new THREE.Mesh(
+              new THREE.BoxGeometry(0.8, 0.4, 0.8),
+              new THREE.MeshBasicMaterial({ color: satColors[i % satColors.length], wireframe: true })
+            );
+            satGroup.add(body);
+            // Solar panels (two wings)
+            const panelMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true, transparent: true, opacity: 0.7 });
+            const panel1 = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.05, 0.6), panelMat);
+            panel1.position.x = 1.3;
+            satGroup.add(panel1);
+            const panel2 = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.05, 0.6), panelMat);
+            panel2.position.x = -1.3;
+            satGroup.add(panel2);
+            // Antenna
+            const ant = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.02, 0.02, 0.8, 4),
+              new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true })
+            );
+            ant.position.y = 0.5;
+            satGroup.add(ant);
+            satGroup.userData = {
+              r: 112 + Math.random() * 15,
               lat: (Math.random() - 0.5) * Math.PI,
               lng: (Math.random() - 0.5) * Math.PI * 2,
               speedLat: (Math.random() - 0.5) * 0.05,
               speedLng: (Math.random() - 0.5) * 0.08 + 0.02
             };
-            globe.satellitesGroup.add(m);
+            globe.satellitesGroup.add(satGroup);
           }
 
-          // Micro wireframe planes (TINY - need to zoom very close)
+          // Airplane shapes (visible at normal zoom)
           for(let i=0; i<12; i++) {
             const planeGroup = new THREE.Group();
             // Fuselage
             const body = new THREE.Mesh(
-              new THREE.CylinderGeometry(0.02, 0.015, 0.15, 4),
-              new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.6 })
+              new THREE.CylinderGeometry(0.08, 0.05, 0.8, 6),
+              new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.7 })
             );
             body.rotation.z = Math.PI / 2;
             planeGroup.add(body);
             // Wings
             const wing = new THREE.Mesh(
-              new THREE.BoxGeometry(0.04, 0.005, 0.12),
-              new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true, transparent: true, opacity: 0.5 })
+              new THREE.BoxGeometry(0.15, 0.02, 0.7),
+              new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true, transparent: true, opacity: 0.6 })
             );
             planeGroup.add(wing);
+            // Tail
+            const tail = new THREE.Mesh(
+              new THREE.BoxGeometry(0.08, 0.25, 0.02),
+              new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true, transparent: true, opacity: 0.5 })
+            );
+            tail.position.set(-0.35, 0.1, 0);
+            planeGroup.add(tail);
+            // Contrail (thin trailing line)
+            const trailGeo = new THREE.CylinderGeometry(0.01, 0.0, 1.5, 4);
+            const trailMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.15 });
+            const trail = new THREE.Mesh(trailGeo, trailMat);
+            trail.rotation.z = Math.PI / 2;
+            trail.position.x = -1.1;
+            planeGroup.add(trail);
             planeGroup.userData = {
               r: 100.6 + Math.random() * 0.8,
               lat: (Math.random() - 0.5) * Math.PI * 0.8,
@@ -1523,13 +1710,24 @@ export default function Home() {
             globe.satellitesGroup.add(planeGroup);
           }
 
-          // Micro wireframe cars (MICROSCOPIC - on the surface)
+          // Cars on the surface (small glowing boxes with headlights)
           for(let i=0; i<8; i++) {
-            const car = new THREE.Mesh(
-              new THREE.BoxGeometry(0.04, 0.02, 0.02),
-              new THREE.MeshBasicMaterial({ color: [0xef4444, 0xfbbf24, 0x22c55e, 0x38bdf8][i%4], wireframe: true, transparent: true, opacity: 0.5 })
+            const carGroup = new THREE.Group();
+            const carColor = [0xef4444, 0xfbbf24, 0x22c55e, 0x38bdf8][i%4];
+            const carBody = new THREE.Mesh(
+              new THREE.BoxGeometry(0.2, 0.08, 0.1),
+              new THREE.MeshBasicMaterial({ color: carColor, wireframe: true, transparent: true, opacity: 0.6 })
             );
-            car.userData = {
+            carGroup.add(carBody);
+            // Headlights (tiny bright dots)
+            const hlMat = new THREE.MeshBasicMaterial({ color: 0xffffcc, transparent: true, opacity: 0.9 });
+            const hl1 = new THREE.Mesh(new THREE.SphereGeometry(0.015, 4, 4), hlMat);
+            hl1.position.set(0.1, 0, 0.04);
+            carGroup.add(hl1);
+            const hl2 = new THREE.Mesh(new THREE.SphereGeometry(0.015, 4, 4), hlMat);
+            hl2.position.set(0.1, 0, -0.04);
+            carGroup.add(hl2);
+            carGroup.userData = {
               r: 100.15,
               lat: (Math.random() - 0.5) * Math.PI * 0.6,
               lng: Math.random() * Math.PI * 2,
@@ -1537,17 +1735,17 @@ export default function Home() {
               speedLng: 0.005 + Math.random() * 0.01,
               type: 'car'
             };
-            globe.satellitesGroup.add(car);
+            globe.satellitesGroup.add(carGroup);
           }
 
-          // Ghost spirit wisps (tiny glowing entities near surface)
+          // Spirit wisps (glowing orbs near surface)
           for(let i=0; i<20; i++) {
-            const wispGeo = new THREE.SphereGeometry(0.03 + Math.random() * 0.02, 4, 4);
+            const wispGeo = new THREE.SphereGeometry(0.08 + Math.random() * 0.06, 6, 6);
             const wispMat = new THREE.MeshBasicMaterial({
               color: [0x7c3aed, 0x38bdf8, 0xf472b6, 0x22c55e, 0xfbbf24][i%5],
               wireframe: true,
               transparent: true,
-              opacity: 0.3 + Math.random() * 0.3
+              opacity: 0.4 + Math.random() * 0.3
             });
             const wisp = new THREE.Mesh(wispGeo, wispMat);
             wisp.userData = {
@@ -1614,7 +1812,15 @@ export default function Home() {
               // Visibility toggles
               if (globe.cloudMesh) globe.cloudMesh.visible = ep.cloudsVisible;
               if (globe.auroraMesh) globe.auroraMesh.visible = ep.auroraEnabled;
-              if (globe.prismGlowMesh) globe.prismGlowMesh.visible = ep.prismGlowEnabled;
+              if (globe.prismGlowMesh) {
+                globe.prismGlowMesh.visible = ep.prismGlowEnabled;
+                // Rotate prismatic glow layer slowly
+                if (!ep.animationPaused && ep.prismGlowRotSpeed) {
+                  globe.prismGlowMesh.rotation.y += dt * ep.prismGlowRotSpeed;
+                  globe.prismGlowMesh.rotation.x = Math.sin(elTs * 0.05) * 0.1;
+                }
+              }
+              if (globe.envGlowMesh) globe.envGlowMesh.visible = ep.envGlowEnabled;
               if (globe.lensFlare) {
                 const lfVis = ep.lensFlareVisible;
                 if (globe.lensFlare.main) globe.lensFlare.main.visible = lfVis;
@@ -1640,11 +1846,11 @@ export default function Home() {
                 globe.customUniforms.introIntensity.value = Math.max(0, globe.customUniforms.introIntensity.value - dt * 0.5);
               }
 
-              // Decay Prism Pulse slowly and gracefully (8+ second fade)
+              // Decay Prism Pulse (configurable via bopDecayRate)
               if (globe.customUniforms.prismPulse.value > 0) {
                  const ppv = globe.customUniforms.prismPulse.value;
-                 // Slower exponential decay: gentle return to normal
-                 globe.customUniforms.prismPulse.value = Math.max(0, ppv - dt * (0.08 + ppv * 0.06));
+                 const decay = ep.bopDecayRate || 0.08;
+                 globe.customUniforms.prismPulse.value = Math.max(0, ppv - dt * (decay + ppv * (decay * 0.75)));
               }
 
               if (window.globalAnalyser) {
@@ -1734,6 +1940,13 @@ export default function Home() {
                     : ud.type === 'car' ? 1.0 : ep.satelliteSpeed;
                   ud.lat += ud.speedLat * dt * globalPrismMultiplier * speedMult;
                   ud.lng += ud.speedLng * dt * globalPrismMultiplier * speedMult;
+
+                  // Apply editor scale multipliers
+                  const scaleMult = ud.type === 'plane' ? ep.planeScale
+                    : ud.type === 'car' ? ep.carScale
+                    : ud.type === 'wisp' ? ep.wispScale
+                    : ep.satelliteScale;
+                  m.scale.set(scaleMult, scaleMult, scaleMult);
 
                   const phi = Math.PI / 2 - ud.lat;
                   const theta = ud.lng;

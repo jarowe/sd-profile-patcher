@@ -102,6 +102,7 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     visFolder.add(proxy, 'cloudsVisible').name('Clouds').onChange(updateParam('cloudsVisible'));
     visFolder.add(proxy, 'auroraEnabled').name('Aurora').onChange(updateParam('auroraEnabled'));
     visFolder.add(proxy, 'prismGlowEnabled').name('Prismatic Glow').onChange(updateParam('prismGlowEnabled'));
+    visFolder.add(proxy, 'envGlowEnabled').name('Env Glow').onChange(updateParam('envGlowEnabled'));
     visFolder.add(proxy, 'lensFlareVisible').name('Lens Flare').onChange(updateParam('lensFlareVisible'));
     visFolder.add(proxy, 'starsVisible').name('Stars').onChange(updateParam('starsVisible'));
     visFolder.add(proxy, 'dustVisible').name('Dust').onChange(updateParam('dustVisible'));
@@ -179,6 +180,9 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     waterFolder.add(proxy, 'waterGlarePow', 1.0, 50.0, 0.5).name('Glare Power').onChange(updateSurfaceUniform('waterGlarePow'));
     waterFolder.add(proxy, 'waterGlareMult', 0.0, 5.0, 0.05).name('Glare Mult').onChange(updateSurfaceUniform('waterGlareMult'));
     waterFolder.add(proxy, 'waterFresnelPow', 0.5, 10.0, 0.1).name('Fresnel Pow').onChange(updateSurfaceUniform('waterFresnelPow'));
+    waterFolder.add(proxy, 'waterWaveSpeed', 0.0, 5.0, 0.05).name('Wave Speed').onChange(updateSurfaceUniform('waterWaveSpeed'));
+    waterFolder.add(proxy, 'waterWaveScale', 0.1, 3.0, 0.05).name('Wave Scale').onChange(updateSurfaceUniform('waterWaveScale'));
+    waterFolder.add(proxy, 'waterCurrentStrength', 0.0, 3.0, 0.05).name('Current Strength').onChange(updateSurfaceUniform('waterCurrentStrength'));
     waterFolder.close();
 
     // ══════════════════════════════════════════
@@ -225,11 +229,26 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     prismFolder.addColor(proxy, 'prismGlowColor1').name('Color 1 (Blue)').onChange(updateShaderColor(getPrismGlowMat, 'prismGlowColor1'));
     prismFolder.addColor(proxy, 'prismGlowColor2').name('Color 2 (Purple)').onChange(updateShaderColor(getPrismGlowMat, 'prismGlowColor2'));
     prismFolder.addColor(proxy, 'prismGlowColor3').name('Color 3 (Green)').onChange(updateShaderColor(getPrismGlowMat, 'prismGlowColor3'));
-    prismFolder.add(proxy, 'prismGlowIntensity', 0.0, 2.0, 0.01).name('Intensity').onChange(updateShaderUniform(getPrismGlowMat, 'prismGlowIntensity'));
+    prismFolder.add(proxy, 'prismGlowIntensity', 0.0, 3.0, 0.01).name('Intensity').onChange(updateShaderUniform(getPrismGlowMat, 'prismGlowIntensity'));
     prismFolder.add(proxy, 'prismGlowSpeed', 0.0, 3.0, 0.05).name('Speed').onChange(updateShaderUniform(getPrismGlowMat, 'prismGlowSpeed'));
     prismFolder.add(proxy, 'prismGlowNoiseScale', 0.5, 10.0, 0.1).name('Noise Scale').onChange(updateShaderUniform(getPrismGlowMat, 'prismGlowNoiseScale'));
     prismFolder.add(proxy, 'prismGlowFresnelPow', 0.5, 8.0, 0.1).name('Fresnel Power').onChange(updateShaderUniform(getPrismGlowMat, 'prismGlowFresnelPow'));
+    prismFolder.add(proxy, 'prismGlowRotSpeed', -0.5, 0.5, 0.005).name('Rotation Speed').onChange(updateParam('prismGlowRotSpeed'));
     prismFolder.close();
+
+    // ══════════════════════════════════════════
+    // ENVIRONMENT GLOW LAYER
+    // ══════════════════════════════════════════
+    const getEnvGlowMat = () => globeRef.current?.envGlowMesh?.material;
+    const envFolder = gui.addFolder('Environment Glow');
+    envFolder.addColor(proxy, 'envGlowColor1').name('Color 1').onChange(updateShaderColor(getEnvGlowMat, 'envGlowColor1'));
+    envFolder.addColor(proxy, 'envGlowColor2').name('Color 2').onChange(updateShaderColor(getEnvGlowMat, 'envGlowColor2'));
+    envFolder.addColor(proxy, 'envGlowColor3').name('Color 3').onChange(updateShaderColor(getEnvGlowMat, 'envGlowColor3'));
+    envFolder.add(proxy, 'envGlowIntensity', 0.0, 1.0, 0.005).name('Intensity').onChange(updateShaderUniform(getEnvGlowMat, 'envGlowIntensity'));
+    envFolder.add(proxy, 'envGlowSpeed', 0.0, 2.0, 0.01).name('Speed').onChange(updateShaderUniform(getEnvGlowMat, 'envGlowSpeed'));
+    envFolder.add(proxy, 'envGlowNoiseScale', 0.5, 10.0, 0.1).name('Noise Scale').onChange(updateShaderUniform(getEnvGlowMat, 'envGlowNoiseScale'));
+    envFolder.add(proxy, 'envGlowCoverage', 0.0, 1.0, 0.01).name('Coverage').onChange(updateShaderUniform(getEnvGlowMat, 'envGlowCoverage'));
+    envFolder.close();
 
     // ══════════════════════════════════════════
     // ATMOSPHERE RIM
@@ -293,7 +312,27 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     objectsFolder.add(proxy, 'satelliteSpeed', 0.0, 5.0, 0.1).name('Satellite Speed').onChange(updateParam('satelliteSpeed'));
     objectsFolder.add(proxy, 'planeSpeed', 0.0, 5.0, 0.1).name('Plane Speed').onChange(updateParam('planeSpeed'));
     objectsFolder.add(proxy, 'wispSpeed', 0.0, 5.0, 0.1).name('Wisp Speed').onChange(updateParam('wispSpeed'));
+    objectsFolder.add(proxy, 'satelliteScale', 0.1, 5.0, 0.1).name('Satellite Scale').onChange(updateParam('satelliteScale'));
+    objectsFolder.add(proxy, 'planeScale', 0.1, 5.0, 0.1).name('Plane Scale').onChange(updateParam('planeScale'));
+    objectsFolder.add(proxy, 'carScale', 0.1, 5.0, 0.1).name('Car Scale').onChange(updateParam('carScale'));
+    objectsFolder.add(proxy, 'wispScale', 0.1, 5.0, 0.1).name('Wisp Scale').onChange(updateParam('wispScale'));
     objectsFolder.close();
+
+    // ══════════════════════════════════════════
+    // PRISM BOP EFFECTOR
+    // ══════════════════════════════════════════
+    const bopFolder = gui.addFolder('Prism Bop Effects');
+    bopFolder.add(proxy, 'bopDecayRate', 0.01, 0.5, 0.005).name('Decay Rate').onChange(updateParam('bopDecayRate'));
+    bopFolder.add(proxy, 'bopParticleBurst', 0.0, 5.0, 0.1).name('Particle Burst').onChange(updateShaderUniform(getParticleMat, 'bopParticleBurst'));
+    bopFolder.add(proxy, 'bopColorShift', 0.0, 1.0, 0.01).name('Color Shift').onChange(updateShaderUniform(getParticleMat, 'bopColorShift'));
+    bopFolder.add(proxy, 'bopStarBurst', 0.0, 5.0, 0.1).name('Star Burst').onChange(updateShaderUniform(getParticleMat, 'bopStarBurst'));
+    bopFolder.add(proxy, 'bopGlowBoost', 0.0, 10.0, 0.1).name('Glow Boost').onChange(updateShaderUniform(getPrismGlowMat, 'bopGlowBoost'));
+    bopFolder.add(proxy, 'bopAuroraBoost', 0.0, 5.0, 0.1).name('Aurora Boost').onChange(updateShaderUniform(getAuroraMat, 'bopAuroraBoost'));
+    bopFolder.add(proxy, 'bopCloudFlash', 0.0, 1.0, 0.01).name('Cloud Flash').onChange(updateShaderUniform(getCloudMat, 'bopCloudFlash'));
+    bopFolder.add(proxy, 'bopWaterRipple', 0.0, 2.0, 0.01).name('Water Ripple').onChange(updateSurfaceUniform('bopWaterRipple'));
+    bopFolder.add(proxy, 'bopEnvGlowBoost', 0.0, 10.0, 0.1).name('Env Glow Boost').onChange(updateShaderUniform(getEnvGlowMat, 'bopEnvGlowBoost'));
+    bopFolder.add(proxy, 'bopLightShow').name('Light Show Mode').onChange(updateParam('bopLightShow'));
+    bopFolder.close();
 
     // ══════════════════════════════════════════
     // OVERLAY GRAPHICS (arcs, rings, labels)
@@ -367,7 +406,7 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
       const mats = [
         globeShaderMaterial,
         getCloudMat(), getRimMat(), getHaloMat(), getParticleMat(),
-        getAuroraMat(), getPrismGlowMat()
+        getAuroraMat(), getPrismGlowMat(), getEnvGlowMat()
       ].filter(Boolean);
       for (const [key, val] of Object.entries(data)) {
         for (const mat of mats) {
