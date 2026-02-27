@@ -10,7 +10,7 @@ Requirements for initial milestone. Each maps to roadmap phases.
 ### Constellation Rendering
 
 - [ ] **REND-01**: Constellation page renders 150+ nodes as instanced meshes at 60fps on desktop
-- [ ] **REND-02**: User can hover any node to see tooltip with title, type, and date
+- [ ] **REND-02**: User can hover any node to see tooltip with title (clean, minimal label)
 - [ ] **REND-03**: User can click any node to fly camera to it and open detail panel
 - [ ] **REND-04**: Detail panel shows node media (images/video), text content, and entity chips (people, places, tags)
 - [ ] **REND-05**: Connection lines render between nodes with evidence-based edges, dimming non-connected nodes on focus
