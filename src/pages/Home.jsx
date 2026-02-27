@@ -640,7 +640,6 @@ export default function Home() {
               }
             `,
             transparent: true,
-            blending: THREE.AdditiveBlending,
             depthWrite: false,
             depthTest: false,
             side: THREE.FrontSide
@@ -719,7 +718,7 @@ export default function Home() {
                 // Northern lights event: ~30s cycle with sharp burst extending south
                 float eventCycle = sin(time * 0.3) * 0.5 + 0.5;
                 float eventPulse = pow(eventCycle, 6.0);
-                float auroraZone = smoothstep(0.25 - eventPulse * 0.25, 0.65, latitude);
+                float auroraZone = smoothstep(0.55 - eventPulse * 0.15, 0.75, latitude);
                 // Aurora prefers night/twilight side (more visible where it's dark)
                 float sunOrientation = dot(normalize(vWorldPos), sunDir);
                 float nightFactor = smoothstep(0.3, -0.2, sunOrientation);
@@ -763,8 +762,8 @@ export default function Home() {
                 float introBoost = introIntensity * (0.6 + n3 * 0.4);
                 float alpha = max(fresnel * curtain * auroraZone, introBoost) * (0.7 + audioPulse * 0.5 + prismPulse * 0.2);
 
-                float brightness = 2.0 + introIntensity * 0.8 + audioPulse * 0.6 + eventPulse * 0.8 + prismPulse * 0.3;
-                float alphaOut = alpha * (0.55 + introIntensity * 0.3);
+                float brightness = 1.0 + introIntensity * 0.8 + audioPulse * 0.3 + eventPulse * 0.5 + prismPulse * 0.2;
+                float alphaOut = alpha * (0.25 + introIntensity * 0.3);
                 gl_FragColor = vec4(col * brightness, alphaOut);
               }
             `,
@@ -836,13 +835,12 @@ export default function Home() {
 
                 // Alpha masked by dayMask: atmosphere disappears on the dark side
                 float dayAlpha = smoothstep(-0.5, 0.0, sunOrientation);
-                float alpha = fresnel * (0.4 + introIntensity * 0.25) + introSweep;
+                float alpha = fresnel * (0.6 + introIntensity * 0.25) + introSweep;
                 alpha *= max(dayAlpha, introIntensity);
-                gl_FragColor = vec4(atmosColor * (1.2 + introIntensity * 0.4), alpha);
+                gl_FragColor = vec4(atmosColor, alpha);
               }
             `,
             transparent: true,
-            blending: THREE.AdditiveBlending,
             depthWrite: false,
             depthTest: false,
             side: THREE.FrontSide
@@ -891,13 +889,12 @@ export default function Home() {
                 // Mask by sun orientation (no glow on deep night side)
                 float dayStrength = smoothstep(-0.5, 1.0, sunOrientation);
                 alpha *= dayStrength;
-                alpha *= (0.25 + introIntensity * 0.15);
+                alpha *= (0.6 + introIntensity * 0.2);
 
-                gl_FragColor = vec4(color * 1.2, alpha);
+                gl_FragColor = vec4(color, alpha);
               }
             `,
             transparent: true,
-            blending: THREE.AdditiveBlending,
             depthWrite: false,
             depthTest: false,
             side: THREE.BackSide
