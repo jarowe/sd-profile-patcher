@@ -1,7 +1,7 @@
 # Requirements: The JAROWE Constellation
 
 **Defined:** 2026-02-27
-**Core Value:** The Constellation must render real life data as an explorable, evidence-connected 3D experience — every node real, every connection justified, every visit a discovery.
+**Core Value:** The Constellation must render real life data as an explorable, evidence-connected 3D experience -- every node real, every connection justified, every visit a discovery.
 
 ## v1 Requirements
 
@@ -27,7 +27,7 @@ Requirements for initial milestone. Each maps to roadmap phases.
 - [ ] **NARR-01**: Guided tour plays ~90-second cinematic journey through curated anchor nodes
 - [ ] **NARR-02**: Tour is skippable at any point with prominent skip button, returns to orbit mode without broken state
 - [ ] **NARR-03**: Scripted narrator engine responds to user behavior (hover, click, camera movement, timeline scrub)
-- [ ] **NARR-04**: Narrator speaks in Jared's inner voice — reflective, poetic, personal, not robotic or chatbot-like
+- [ ] **NARR-04**: Narrator speaks in Jared's inner voice -- reflective, poetic, personal, not robotic or chatbot-like
 - [ ] **NARR-05**: 150+ unique narration lines across 3 tiers: epoch transitions, node focus, connection reveals
 - [ ] **NARR-06**: Narration selection uses behavior-responsive logic: relevance + novelty + emotional pacing
 - [ ] **NARR-07**: No narration line repeats within 60 seconds; 3+ variants per event type
@@ -37,7 +37,7 @@ Requirements for initial milestone. Each maps to roadmap phases.
 
 - [ ] **PIPE-01**: Instagram parser extracts posts, captions, media files, GPS, tagged users, and reels from 276-file export
 - [ ] **PIPE-02**: Carbonmade parser extracts 35 projects, 20 blog posts, career milestones, clients, and collaborators from JSON archive
-- [ ] **PIPE-03**: Build-time pipeline runs end-to-end: parse → normalize (canonical schema) → enrich → connect (evidence-based edges) → layout (double-helix) → emit JSON
+- [ ] **PIPE-03**: Build-time pipeline runs end-to-end: parse -> normalize (canonical schema) -> enrich -> connect (evidence-based edges) -> layout (double-helix) -> emit JSON
 - [ ] **PIPE-04**: Pipeline outputs constellation.json with nodes, edges, layout positions, and narration metadata
 - [ ] **PIPE-05**: Evidence-based edge generation uses signal weights (person +0.55, client +0.40, place +0.25, tag +0.20, temporal +0.15) with pruning (top 6 per type per node)
 - [ ] **PIPE-06**: Defensive Instagram parsing: null-safe traversal, logs unknown fields, never crashes on format changes
@@ -64,7 +64,7 @@ Requirements for initial milestone. Each maps to roadmap phases.
 - [ ] **ADMN-04**: Allowlist management: add/remove people names for public visibility
 - [ ] **ADMN-05**: Tour anchor management: select which nodes appear in guided tour
 - [ ] **ADMN-06**: Narration text editing: modify scripted narrator lines per node/epoch/connection
-- [ ] **ADMN-07**: Publish states: draft → preview → published, with undo capability
+- [ ] **ADMN-07**: Publish states: draft -> preview -> published, with undo capability
 - [ ] **ADMN-08**: Data quality view: shows missing/malformed fields per source, last sync timestamp
 - [ ] **ADMN-09**: "Pull Latest Now" button triggers on-demand data refresh from connected platforms
 - [ ] **ADMN-10**: Admin can edit and publish Garden and Now page content (not just constellation curation)
@@ -101,7 +101,7 @@ Deferred to next iteration after v1 validates.
 ### Audio
 - **AUDI-01**: Ambient soundscape: cosmic drone, epoch tonal shifts
 - **AUDI-02**: Interaction sounds: hover ping, focus whoosh, discovery sparkle, narration bell
-- **AUDI-03**: Optional audio-reactive rendering (bass → node pulse, mids → edge glow, highs → star twinkle)
+- **AUDI-03**: Optional audio-reactive rendering (bass -> node pulse, mids -> edge glow, highs -> star twinkle)
 
 ### AI Narrator
 - **AINR-01**: LLM narrator for nodes without scripted text (Vercel Edge Function + Gemini Flash)
@@ -116,7 +116,7 @@ Deferred to future milestones.
 - **PLAT-01**: Facebook parser (timeline posts, albums, life events, check-ins)
 - **PLAT-02**: X/Twitter parser (tweets, retweets, influence signals)
 - **PLAT-03**: LinkedIn parser (positions, articles, recommendations)
-- **PLAT-04**: Google Photos parser with clustering (thousands → 200-500 moment nodes)
+- **PLAT-04**: Google Photos parser with clustering (thousands -> 200-500 moment nodes)
 
 ### Advanced Features
 - **ADVN-01**: Web Speech API TTS narrator voice toggle
@@ -146,19 +146,72 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| REND-01 through REND-12 | TBD | Pending |
-| NARR-01 through NARR-08 | TBD | Pending |
-| PIPE-01 through PIPE-07 | TBD | Pending |
-| PRIV-01 through PRIV-09 | TBD | Pending |
-| ADMN-01 through ADMN-09 | TBD | Pending |
-| AUTO-01 through AUTO-05 | TBD | Pending |
-| BENT-01 through BENT-05 | TBD | Pending |
+| REND-01 | Phase 1: Constellation Scene | Pending |
+| REND-02 | Phase 1: Constellation Scene | Pending |
+| REND-03 | Phase 1: Constellation Scene | Pending |
+| REND-04 | Phase 1: Constellation Scene | Pending |
+| REND-05 | Phase 1: Constellation Scene | Pending |
+| REND-06 | Phase 1: Constellation Scene | Pending |
+| REND-07 | Phase 1: Constellation Scene | Pending |
+| REND-08 | Phase 1: Constellation Scene | Pending |
+| REND-09 | Phase 1: Constellation Scene | Pending |
+| REND-10 | Phase 1: Constellation Scene | Pending |
+| REND-11 | Phase 1: Constellation Scene | Pending |
+| REND-12 | Phase 1: Constellation Scene | Pending |
+| NARR-01 | Phase 3: Narrator & Guided Tour | Pending |
+| NARR-02 | Phase 3: Narrator & Guided Tour | Pending |
+| NARR-03 | Phase 3: Narrator & Guided Tour | Pending |
+| NARR-04 | Phase 3: Narrator & Guided Tour | Pending |
+| NARR-05 | Phase 3: Narrator & Guided Tour | Pending |
+| NARR-06 | Phase 3: Narrator & Guided Tour | Pending |
+| NARR-07 | Phase 3: Narrator & Guided Tour | Pending |
+| NARR-08 | Phase 3: Narrator & Guided Tour | Pending |
+| PIPE-01 | Phase 2: Data Pipeline & Privacy | Pending |
+| PIPE-02 | Phase 2: Data Pipeline & Privacy | Pending |
+| PIPE-03 | Phase 2: Data Pipeline & Privacy | Pending |
+| PIPE-04 | Phase 2: Data Pipeline & Privacy | Pending |
+| PIPE-05 | Phase 2: Data Pipeline & Privacy | Pending |
+| PIPE-06 | Phase 2: Data Pipeline & Privacy | Pending |
+| PIPE-07 | Phase 2: Data Pipeline & Privacy | Pending |
+| PRIV-01 | Phase 2: Data Pipeline & Privacy | Pending |
+| PRIV-02 | Phase 2: Data Pipeline & Privacy | Pending |
+| PRIV-03 | Phase 2: Data Pipeline & Privacy | Pending |
+| PRIV-04 | Phase 2: Data Pipeline & Privacy | Pending |
+| PRIV-05 | Phase 2: Data Pipeline & Privacy | Pending |
+| PRIV-06 | Phase 2: Data Pipeline & Privacy | Pending |
+| PRIV-07 | Phase 2: Data Pipeline & Privacy | Pending |
+| PRIV-08 | Phase 2: Data Pipeline & Privacy | Pending |
+| PRIV-09 | Phase 2: Data Pipeline & Privacy | Pending |
+| PRIV-10 | Phase 4: Admin Dashboard | Pending |
+| ADMN-01 | Phase 4: Admin Dashboard | Pending |
+| ADMN-02 | Phase 4: Admin Dashboard | Pending |
+| ADMN-03 | Phase 4: Admin Dashboard | Pending |
+| ADMN-04 | Phase 4: Admin Dashboard | Pending |
+| ADMN-05 | Phase 4: Admin Dashboard | Pending |
+| ADMN-06 | Phase 4: Admin Dashboard | Pending |
+| ADMN-07 | Phase 4: Admin Dashboard | Pending |
+| ADMN-08 | Phase 4: Admin Dashboard | Pending |
+| ADMN-09 | Phase 4: Admin Dashboard | Pending |
+| ADMN-10 | Phase 4: Admin Dashboard | Pending |
+| AUTO-01 | Phase 5: Automation | Pending |
+| AUTO-02 | Phase 5: Automation | Pending |
+| AUTO-03 | Phase 5: Automation | Pending |
+| AUTO-04 | Phase 5: Automation | Pending |
+| AUTO-05 | Phase 5: Automation | Pending |
+| AUTO-06 | Phase 5: Automation | Pending |
+| AUTO-07 | Phase 5: Automation | Pending |
+| AUTO-08 | Phase 5: Automation | Pending |
+| BENT-01 | Phase 6: Bento Hub Integration | Pending |
+| BENT-02 | Phase 6: Bento Hub Integration | Pending |
+| BENT-03 | Phase 6: Bento Hub Integration | Pending |
+| BENT-04 | Phase 6: Bento Hub Integration | Pending |
+| BENT-05 | Phase 6: Bento Hub Integration | Pending |
 
 **Coverage:**
-- v1 requirements: 55 total
-- Mapped to phases: 0
-- Unmapped: 55 (pending roadmap)
+- v1 requirements: 60 total
+- Mapped to phases: 60
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-27*
-*Last updated: 2026-02-27 after initial definition*
+*Last updated: 2026-02-27 after roadmap creation*
