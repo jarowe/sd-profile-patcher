@@ -632,16 +632,29 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
         }
         const json = JSON.stringify(data, null, 2);
         navigator.clipboard.writeText(json).then(
-          () => console.log('[GlobeEditor] Exported to clipboard'),
+          () => { console.log('[GlobeEditor] Exported to clipboard'); alert('Settings copied to clipboard!'); },
           () => { const w = window.open('', '_blank'); if (w) w.document.write(`<pre>${json}</pre>`); }
         );
       },
-      reset() { applyPreset(GLOBE_DEFAULTS); console.log('[GlobeEditor] Reset'); },
+      importJSON() {
+        const input = prompt('Paste globe settings JSON:');
+        if (!input) return;
+        try {
+          const data = JSON.parse(input);
+          applyPreset(data);
+          console.log('[GlobeEditor] Imported from JSON');
+        } catch (e) {
+          alert('Invalid JSON: ' + e.message);
+          console.error('[GlobeEditor] Import failed:', e);
+        }
+      },
+      loadLive() { applyPreset(GLOBE_DEFAULTS); console.log('[GlobeEditor] Loaded live settings'); },
     };
+    presetFolder.add(presetActions, 'loadLive').name('Load Live Settings');
     presetFolder.add(presetActions, 'save').name('Save to localStorage');
     presetFolder.add(presetActions, 'load').name('Load from localStorage');
+    presetFolder.add(presetActions, 'importJSON').name('Import JSON (paste)');
     presetFolder.add(presetActions, 'exportJSON').name('Export JSON (clipboard)');
-    presetFolder.add(presetActions, 'reset').name('Reset to Defaults');
 
     function applyPreset(data) {
       for (const [key, val] of Object.entries(data)) {
@@ -699,15 +712,6 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
         cell.style.setProperty('--badge-inset', `${p.badgeInset}rem`);
       }
       gui.controllersRecursive().forEach(c => c.updateDisplay());
-    }
-
-    // Auto-load saved preset
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        const data = JSON.parse(saved);
-        setTimeout(() => applyPreset(data), 1500);
-      } catch (_) {}
     }
 
     return () => { gui.destroy(); guiRef.current = null; };
