@@ -965,13 +965,14 @@ export default function Home() {
                 float NdotL = dot(vWorldNormal, sunDir);
                 float sunWrap = 0.5 + NdotL * 0.3;
 
-                // Seamless spherical noise
+                // Seamless 3D-projected noise (no atan2 seam)
                 vec3 nPos = normalize(vWorldPos);
-                float lng = atan(nPos.z, nPos.x);
-                float lat = asin(clamp(nPos.y, -1.0, 1.0));
                 float t = time * prismGlowSpeed;
 
-                vec2 noiseUv = vec2(lng * prismGlowNoiseScale + t * 0.4, lat * prismGlowNoiseScale + t * 0.2);
+                vec2 noiseUv = vec2(
+                  nPos.x * prismGlowNoiseScale + nPos.z * 0.7 + t * 0.4,
+                  nPos.y * prismGlowNoiseScale + nPos.x * 0.3 + t * 0.2
+                );
                 float n1 = fbm(noiseUv);
                 float n2 = fbm(noiseUv * 1.5 + vec2(t * 0.3, -t * 0.1) + n1 * 0.5);
 
@@ -1081,20 +1082,27 @@ export default function Home() {
                 // Coverage: 0 = limb only (like atmosphere), 1 = full sphere
                 float coverageMask = smoothstep(1.0 - envGlowCoverage, 1.0, fresnel + envGlowCoverage * 0.5);
 
-                // Seamless spherical noise
+                // Seamless 3D-projected noise (no atan2 seam or pole pinch)
                 vec3 nPos = normalize(vWorldPos);
-                float lng = atan(nPos.z, nPos.x);
-                float lat = asin(clamp(nPos.y, -1.0, 1.0));
                 float t = time * envGlowSpeed;
 
                 // Large-scale flowing noise pattern
-                vec2 uv1 = vec2(lng * envGlowNoiseScale + t * 0.3, lat * envGlowNoiseScale + t * 0.15);
+                vec2 uv1 = vec2(
+                  nPos.x * envGlowNoiseScale + nPos.z * 0.7 + t * 0.3,
+                  nPos.y * envGlowNoiseScale + nPos.x * 0.3 + t * 0.15
+                );
                 float n1 = fbm(uv1);
                 // Warped secondary layer for depth
-                vec2 uv2 = vec2(lng * envGlowNoiseScale * 0.7 - t * 0.2, lat * envGlowNoiseScale * 1.3 + t * 0.1);
+                vec2 uv2 = vec2(
+                  nPos.z * envGlowNoiseScale * 0.7 + nPos.x * 0.5 - t * 0.2,
+                  nPos.y * envGlowNoiseScale * 1.3 - nPos.z * 0.4 + t * 0.1
+                );
                 float n2 = fbm(uv2 + n1 * 0.8);
                 // Third layer for fine detail
-                vec2 uv3 = vec2(lng * envGlowNoiseScale * 2.0 + t * 0.5, lat * envGlowNoiseScale * 1.5 - t * 0.25);
+                vec2 uv3 = vec2(
+                  nPos.x * envGlowNoiseScale * 2.0 - nPos.y * 0.6 + t * 0.5,
+                  nPos.z * envGlowNoiseScale * 1.5 + nPos.x * 0.8 - t * 0.25
+                );
                 float n3 = fbm(uv3 + n2 * 0.3);
 
                 float pattern = n1 * 0.5 + n2 * 0.35 + n3 * 0.15;
@@ -1136,7 +1144,7 @@ export default function Home() {
         }
 
         // --- C4. Lava Lamp Layer (smooth morphing blob overlay) ---
-        if (!globe.lavaLampMesh && editorParams.current.lavaLampEnabled) {
+        if (!globe.lavaLampMesh) {
           const ll = editorParams.current;
           const lavaLampMat = new THREE.ShaderMaterial({
             uniforms: {
@@ -1263,6 +1271,7 @@ export default function Home() {
             lavaLampMat
           );
           lavaLampMesh.renderOrder = 1;
+          lavaLampMesh.visible = editorParams.current.lavaLampEnabled;
           scene.add(lavaLampMesh);
           globe.lavaLampMesh = lavaLampMesh;
         }
@@ -2154,6 +2163,7 @@ export default function Home() {
               if (globe.ppPass) {
                 globe.ppPass.enabled = ep.ppEnabled;
                 const ppu = globe.ppPass.uniforms;
+                ppu.time.value = elTs;
                 // Update resolution to match current canvas
                 const renderer = globe.renderer();
                 ppu.resolution.value.set(renderer.domElement.width, renderer.domElement.height);
