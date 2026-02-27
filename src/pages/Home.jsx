@@ -2539,7 +2539,7 @@ export default function Home() {
                 });
               }
 
-              // Globe breakout: project sphere to screen for SVG clipPath
+              // Globe breakout: project sphere to screen for SVG clipPath + glass mask
               if (ep.globeBreakout && breakoutCircleRef.current && breakoutRectRef.current) {
                 const cam = globe.camera();
                 if (cam && mapContainerRef.current) {
@@ -2547,7 +2547,7 @@ export default function Home() {
                   const cellEl = mapContainerRef.current.parentElement;
                   const cellRect = cellEl.getBoundingClientRect();
 
-                  // Project globe center (world origin) to screen
+                  // Project globe center (world origin) to canvas/map-container space
                   const center = new THREE.Vector3(0, 0, 0).project(cam);
                   const screenX = (center.x + 1) * 0.5 * mapRect.width;
                   const screenY = (1 - center.y) * 0.5 * mapRect.height;
@@ -2560,18 +2560,25 @@ export default function Home() {
 
                   const pad = ep.globeBreakoutClipPad || 4;
 
-                  // Offset from map-container to cell-map parent
+                  // Offset from map-container to cell-map
                   const offsetX = mapRect.left - cellRect.left;
                   const offsetY = mapRect.top - cellRect.top;
 
-                  breakoutCircleRef.current.setAttribute('cx', screenX + offsetX);
-                  breakoutCircleRef.current.setAttribute('cy', screenY + offsetY);
+                  // SVG clipPath on map-container: coords in map-container space
+                  breakoutCircleRef.current.setAttribute('cx', screenX);
+                  breakoutCircleRef.current.setAttribute('cy', screenY);
                   breakoutCircleRef.current.setAttribute('r', screenRadius + pad);
 
-                  breakoutRectRef.current.setAttribute('x', 0);
-                  breakoutRectRef.current.setAttribute('y', 0);
+                  // Rect = card body area in map-container coords
+                  breakoutRectRef.current.setAttribute('x', -offsetX);
+                  breakoutRectRef.current.setAttribute('y', -offsetY);
                   breakoutRectRef.current.setAttribute('width', cellRect.width);
                   breakoutRectRef.current.setAttribute('height', cellRect.height);
+
+                  // CSS custom properties for glass edge radial mask (cell-map coords)
+                  cellEl.style.setProperty('--globe-cx', `${screenX + offsetX}px`);
+                  cellEl.style.setProperty('--globe-cy', `${screenY + offsetY}px`);
+                  cellEl.style.setProperty('--globe-r', `${screenRadius + pad}px`);
                 }
               }
             }
@@ -3051,6 +3058,10 @@ export default function Home() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -10, scale: 0.9 }}
                   transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                  style={{
+                    bottom: `${editorParams.current.msgBubbleBottom}px`,
+                    right: `${editorParams.current.msgBubbleRight}px`,
+                  }}
                 >
                   {globeMessage.phase === 'typing' ? (
                     <>

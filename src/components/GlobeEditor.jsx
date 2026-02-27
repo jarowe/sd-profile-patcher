@@ -134,6 +134,11 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     photoFolder.add(proxy, 'photoCardRight', -60, 40, 1).name('Right (px)').onChange(updateParam('photoCardRight'));
     photoFolder.add(proxy, 'photoCardWidth', 80, 260, 5).name('Width (px)').onChange(updateParam('photoCardWidth'));
 
+    // ── Message Bubble ──
+    const msgFolder = controlsFolder.addFolder('Message Bubble');
+    msgFolder.add(proxy, 'msgBubbleBottom', 20, 200, 1).name('Bottom (px)').onChange(updateParam('msgBubbleBottom'));
+    msgFolder.add(proxy, 'msgBubbleRight', -60, 40, 1).name('Right (px)').onChange(updateParam('msgBubbleRight'));
+
     // ── Visibility Toggles ──
     const visFolder = controlsFolder.addFolder('Visibility');
     visFolder.add(proxy, 'cloudsVisible').name('Clouds').onChange(updateParam('cloudsVisible'));

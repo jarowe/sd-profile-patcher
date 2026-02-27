@@ -195,6 +195,10 @@ export const GLOBE_DEFAULTS = {
   photoCardRight: -8,
   photoCardWidth: 160,
 
+  // ── Message Bubble ──
+  msgBubbleBottom: 56,
+  msgBubbleRight: -8,
+
   // ── Visibility Toggles ──
   satellitesVisible: true,
   planesVisible: true,
