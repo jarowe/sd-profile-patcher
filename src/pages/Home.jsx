@@ -3033,22 +3033,6 @@ export default function Home() {
                   const dpr = renderer.getPixelRatio();
                   cam.setViewOffset(canvasW, canvasH, 0, Math.round(-shiftPx * dpr), canvasW, canvasH);
 
-                  // Project globe sphere onto cell-relative CSS coords for CSS dome mask.
-                  // Glass overlays use this to create a dome-shaped hole (globe in front of glass).
-                  const center3d = new THREE.Vector3(0, 0, 0).project(cam);
-                  const sX = (center3d.x + 1) * 0.5 * canvasW;
-                  const sY = (1 - center3d.y) * 0.5 * canvasH;
-                  const domeCX = sX / scaleX - offsetX;
-                  const domeCY = sY / scaleY - offsetY;
-                  const dist = cam.position.length();
-                  const domeR = Math.max(ep.haloRadius || 108, ep.rimRadius || 103, 100);
-                  const angR = Math.asin(Math.min(domeR / dist, 1.0));
-                  const fovR = cam.fov * Math.PI / 180;
-                  const scrR = Math.tan(angR) / Math.tan(fovR / 2) * (canvasH / 2);
-                  const cssR = scrR / scaleY;
-                  cellEl.style.setProperty('--dome-cx', `${domeCX}px`);
-                  cellEl.style.setProperty('--dome-cy', `${domeCY}px`);
-                  cellEl.style.setProperty('--dome-r', `${cssR}px`);
                 } else if (cam) {
                   ppu2.breakoutEnabled.value = 0.0;
                   // Clear view offset when breakout is off

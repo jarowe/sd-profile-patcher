@@ -1150,25 +1150,13 @@
 .bento-cell.cell-map.globe-breakout::before {
     display: none;
 }
-/* Globe dome punches through glass overlays — single dome-shaped hole.
-   Glass is visible outside the dome circle (sides, bottom, corners).
-   Glass is transparent inside the dome (globe appears in front of glass).
-   --dome-cx, --dome-cy, --dome-r set dynamically by JS each frame. */
+/* Globe dome breaks through glass at the top — fade glass overlays to transparent
+   at the top edge so the dome appears in front. Sides and bottom stay fully visible. */
 .bento-cell.cell-map.globe-breakout::after,
 .bento-cell.cell-map.globe-breakout .liquid-glass-edge,
 .bento-cell.cell-map.globe-breakout .globe-fog-layer {
-    -webkit-mask-image: radial-gradient(
-        circle var(--dome-r, 200px) at var(--dome-cx, 50%) var(--dome-cy, 50%),
-        transparent 0%,
-        transparent 82%,
-        black 100%
-    );
-    mask-image: radial-gradient(
-        circle var(--dome-r, 200px) at var(--dome-cx, 50%) var(--dome-cy, 50%),
-        transparent 0%,
-        transparent 82%,
-        black 100%
-    );
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 6%);
+    mask-image: linear-gradient(to bottom, transparent 0%, black 6%);
 }
 
 /* ── Liquid Glass Edge Effect ── */
