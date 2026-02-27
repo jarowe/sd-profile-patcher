@@ -2176,14 +2176,10 @@ export default function Home() {
               godRaysWeight: { value: editorParams.current.godRaysWeight },
               godRaysDecay: { value: editorParams.current.godRaysDecay },
               godRaysExposure: { value: editorParams.current.godRaysExposure },
-              // Breakout masking + glass border
+              // Breakout masking (open-top card rect — dome extends freely above)
               breakoutEnabled: { value: 0.0 },
               cardRect: { value: new THREE.Vector4(0, 0, 1, 1) },
               cardRadius: { value: 28.0 },
-              domeCenter: { value: new THREE.Vector2(0, 0) },
-              domeRadius: { value: 0.0 },
-              domePad: { value: 10.0 },
-              breakoutFeather: { value: 12.0 },
             },
             vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
             fragmentShader: `
@@ -2217,10 +2213,6 @@ export default function Home() {
               uniform float breakoutEnabled;
               uniform vec4 cardRect;
               uniform float cardRadius;
-              uniform vec2 domeCenter;
-              uniform float domeRadius;
-              uniform float domePad;
-              uniform float breakoutFeather;
               varying vec2 vUv;
 
               float hash12(vec2 p) {
@@ -2335,26 +2327,22 @@ export default function Home() {
                   col = mix(col, vec3(noise), staticNoise * 0.3);
                 }
 
-                // ── Breakout alpha mask (CSS handles glass border) ──
+                // ── Breakout alpha mask: clip left/right/bottom to card, top is open ──
                 if (breakoutEnabled > 0.5) {
                   // DOM coords are top-down (y=0 at top), GL UVs are bottom-up — flip Y
                   vec2 pixel = vec2(vUv.x * resolution.x, (1.0 - vUv.y) * resolution.y);
 
-                  // Card rectangle SDF (rounded corners)
-                  vec2 cardCenter = vec2((cardRect.x + cardRect.z) * 0.5, (cardRect.y + cardRect.w) * 0.5);
-                  vec2 cardHalf = vec2((cardRect.z - cardRect.x) * 0.5, (cardRect.w - cardRect.y) * 0.5);
-                  float dRect = sdRoundedBox(pixel, cardCenter, cardHalf, cardRadius);
+                  // Open-top SDF: extend the card rectangle far above the canvas.
+                  // This keeps rounded corners at the bottom but never clips the dome above.
+                  float cardMidX = (cardRect.x + cardRect.z) * 0.5;
+                  float cardHalfW = (cardRect.z - cardRect.x) * 0.5;
+                  float cardBottom = cardRect.w;  // card bottom edge (DOM coords)
+                  // Pretend card top is 2000px above canvas top — effectively open
+                  vec2 extCenter = vec2(cardMidX, (cardBottom - 2000.0) * 0.5);
+                  vec2 extHalf = vec2(cardHalfW, (cardBottom + 2000.0) * 0.5);
+                  float dRect = sdRoundedBox(pixel, extCenter, extHalf, cardRadius);
 
-                  // Dome circle SDF
-                  float dCircle = length(pixel - domeCenter) - (domeRadius + domePad);
-
-                  // Card mask: crisp edge aligned with CSS glass border (0.5px AA only)
-                  float cardMask = 1.0 - smoothstep(-0.5, 0.5, dRect);
-                  // Dome mask: soft feathered edge for the protruding sphere
-                  float domeMask = 1.0 - smoothstep(-breakoutFeather * 0.2, breakoutFeather, dCircle);
-                  // Union: visible if inside card OR inside dome
-                  float maskAlpha = max(cardMask, domeMask);
-
+                  float maskAlpha = 1.0 - smoothstep(-0.5, 0.5, dRect);
                   col *= maskAlpha;
                   gl_FragColor = vec4(clamp(col, 0.0, 1.0), maskAlpha);
                 } else {
@@ -2999,52 +2987,45 @@ export default function Home() {
                 globe.windParticles.geometry.attributes.color.needsUpdate = true;
               }
 
-              // Globe breakout: update PP shader breakout uniforms
+              // Globe breakout: update PP shader + camera offset
               if (globe.ppPass) {
                 const ppu2 = globe.ppPass.uniforms;
-                if (ep.globeBreakout && mapContainerRef.current) {
-                  const cam = globe.camera();
-                  if (cam) {
-                    const renderer = globe.renderer();
-                    const canvasW = renderer.domElement.width;
-                    const canvasH = renderer.domElement.height;
-                    const mapRect = mapContainerRef.current.getBoundingClientRect();
-                    const cellEl = mapContainerRef.current.parentElement;
-                    const cellRect = cellEl.getBoundingClientRect();
+                const cam = globe.camera();
+                if (ep.globeBreakout && mapContainerRef.current && cam) {
+                  const renderer = globe.renderer();
+                  const canvasW = renderer.domElement.width;
+                  const canvasH = renderer.domElement.height;
+                  const mapRect = mapContainerRef.current.getBoundingClientRect();
+                  const cellEl = mapContainerRef.current.parentElement;
+                  const cellRect = cellEl.getBoundingClientRect();
 
-                    // Card body in canvas pixel coordinates
-                    const offsetX = cellRect.left - mapRect.left;
-                    const offsetY = cellRect.top - mapRect.top;
-                    const scaleX = canvasW / mapRect.width;
-                    const scaleY = canvasH / mapRect.height;
+                  // Card body in canvas pixel coordinates
+                  const offsetX = cellRect.left - mapRect.left;
+                  const offsetY = cellRect.top - mapRect.top;
+                  const scaleX = canvasW / mapRect.width;
+                  const scaleY = canvasH / mapRect.height;
 
-                    ppu2.breakoutEnabled.value = 1.0;
-                    ppu2.cardRect.value.set(
-                      offsetX * scaleX,
-                      offsetY * scaleY,
-                      (offsetX + cellRect.width) * scaleX,
-                      (offsetY + cellRect.height) * scaleY
-                    );
-                    ppu2.cardRadius.value = 28 * scaleX;
+                  ppu2.breakoutEnabled.value = 1.0;
+                  ppu2.cardRect.value.set(
+                    offsetX * scaleX,
+                    offsetY * scaleY,
+                    (offsetX + cellRect.width) * scaleX,
+                    (offsetY + cellRect.height) * scaleY
+                  );
+                  ppu2.cardRadius.value = 28 * scaleX;
 
-                    // Project globe center to canvas coords
-                    const center = new THREE.Vector3(0, 0, 0).project(cam);
-                    const screenX = (center.x + 1) * 0.5 * canvasW;
-                    const screenY = (1 - center.y) * 0.5 * canvasH;
-                    const distance = cam.position.length();
-                    // Use outermost atmosphere layer radius so dome mask doesn't clip glow
-                    const atmosRadius = Math.max(ep.haloRadius || 108, ep.rimRadius || 103, 100);
-                    const angularRadius = Math.asin(Math.min(atmosRadius / distance, 1.0));
-                    const fovRad = cam.fov * Math.PI / 180;
-                    const screenRadius = Math.tan(angularRadius) / Math.tan(fovRad / 2) * (canvasH / 2);
-
-                    ppu2.domeCenter.value.set(screenX, screenY);
-                    ppu2.domeRadius.value = screenRadius;
-                    ppu2.domePad.value = (ep.globeBreakoutClipPad ?? 10) * scaleX;
-                    ppu2.breakoutFeather.value = (ep.globeBreakoutFeather ?? 12) * scaleX;
-                  }
-                } else {
+                  // Camera view offset: compensate for asymmetric canvas extension above card.
+                  // Canvas is taller than card by breakoutPx at top and 10px at bottom.
+                  // Shift the frustum DOWN so the globe renders centered in the card area, not canvas center.
+                  const breakoutPx = ep.globeBreakoutPx || 60;
+                  const extraAbove = breakoutPx - 10; // how much more canvas above vs below
+                  const shiftPx = extraAbove / 2; // half the asymmetry
+                  const dpr = renderer.getPixelRatio();
+                  cam.setViewOffset(canvasW, canvasH, 0, Math.round(-shiftPx * dpr), canvasW, canvasH);
+                } else if (cam) {
                   ppu2.breakoutEnabled.value = 0.0;
+                  // Clear view offset when breakout is off
+                  cam.clearViewOffset();
                 }
               }
             }

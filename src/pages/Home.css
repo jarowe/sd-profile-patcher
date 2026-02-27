@@ -1137,21 +1137,25 @@
 .bento-cell.cell-map.globe-breakout:hover {
     transform: none;
 }
-/* Extend canvas equally above AND below — globe stays centered in card.
-   PP shader SDF mask handles clipping: card rect + dome circle above. */
+/* Extend canvas ABOVE the card only — globe dome protrudes upward.
+   camera.setViewOffset() in JS compensates so globe stays centered in card.
+   PP shader clips left/right/bottom to card rect, top is completely open. */
 .bento-cell.cell-map.globe-breakout .map-container {
     top: calc(-1 * var(--globe-breakout-px, 60px));
-    bottom: calc(-1 * var(--globe-breakout-px, 60px));
     left: -10px;
-    right: -10px;
-    width: auto;
-    height: auto;
+    width: calc(100% + 20px);
+    height: calc(100% + var(--globe-breakout-px, 60px) + 10px);
 }
-/* CSS glass edge stays visible in breakout mode — PP shader only does alpha masking */
 /* Hide cell-map pseudo overlays in breakout mode (they can't extend above card) */
 .bento-cell.cell-map.globe-breakout::before,
 .bento-cell.cell-map.globe-breakout::after {
     display: none;
+}
+/* Fade glass border at top so it doesn't cover the protruding dome.
+   Creates a 3D depth illusion — globe pushes THROUGH the card frame. */
+.bento-cell.cell-map.globe-breakout .liquid-glass-edge {
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 12%);
+    mask-image: linear-gradient(to bottom, transparent 0%, black 12%);
 }
 
 /* ── Liquid Glass Edge Effect ── */

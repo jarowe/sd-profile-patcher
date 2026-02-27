@@ -129,12 +129,6 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
       const cell = document.querySelector('.cell-map');
       if (cell && p.globeBreakout) cell.style.setProperty('--globe-breakout-px', `${v}px`);
     });
-    controlsFolder.add(proxy, 'globeBreakoutClipPad', 0, 30, 1).name('Clip Padding').onChange((v) => {
-      p.globeBreakoutClipPad = v;
-    });
-    controlsFolder.add(proxy, 'globeBreakoutFeather', 0, 30, 1).name('Clip Feather').onChange((v) => {
-      p.globeBreakoutFeather = v;
-    });
 
     // ── Expedition Photo Card ──
     const photoFolder = controlsFolder.addFolder('Photo Card');
