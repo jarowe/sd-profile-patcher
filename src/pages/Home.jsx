@@ -127,9 +127,6 @@ export default function Home() {
   const mapContainerRef = useRef();
   const breakoutRectRef = useRef();
   const breakoutCircleRef = useRef();
-  const glassMaskCircleRef = useRef();
-  const breakoutBlurRef = useRef();
-  const glassMaskBlurRef = useRef();
   const [globeSize, setGlobeSize] = useState({ width: 0, height: 0 });
   const [globeMounted, setGlobeMounted] = useState(false);
   const [globeReady, setGlobeReady] = useState(false);
@@ -2548,7 +2545,7 @@ export default function Home() {
                 });
               }
 
-              // Globe breakout: project sphere to screen for SVG masks
+              // Globe breakout: project sphere to screen for SVG clipPath
               if (ep.globeBreakout && breakoutCircleRef.current && breakoutRectRef.current) {
                 const cam = globe.camera();
                 if (cam && mapContainerRef.current) {
@@ -2568,13 +2565,12 @@ export default function Home() {
                   const screenRadius = Math.tan(angularRadius) / Math.tan(fovRad / 2) * (mapRect.height / 2);
 
                   const pad = ep.globeBreakoutClipPad || 4;
-                  const feather = ep.globeBreakoutFeather || 8;
 
                   // Offset from map-container to cell-map
                   const offsetX = mapRect.left - cellRect.left;
                   const offsetY = mapRect.top - cellRect.top;
 
-                  // Map-container mask: dome circle (feathered) + card rect (hard)
+                  // SVG clipPath on map-container: coords in map-container space
                   breakoutCircleRef.current.setAttribute('cx', screenX);
                   breakoutCircleRef.current.setAttribute('cy', screenY);
                   breakoutCircleRef.current.setAttribute('r', screenRadius + pad);
@@ -2582,15 +2578,6 @@ export default function Home() {
                   breakoutRectRef.current.setAttribute('y', -offsetY);
                   breakoutRectRef.current.setAttribute('width', cellRect.width);
                   breakoutRectRef.current.setAttribute('height', cellRect.height);
-                  if (breakoutBlurRef.current) breakoutBlurRef.current.setAttribute('stdDeviation', feather);
-
-                  // Glass edge mask: black circle punches hole where globe is (cell-map coords)
-                  if (glassMaskCircleRef.current) {
-                    glassMaskCircleRef.current.setAttribute('cx', screenX + offsetX);
-                    glassMaskCircleRef.current.setAttribute('cy', screenY + offsetY);
-                    glassMaskCircleRef.current.setAttribute('r', screenRadius * 0.92);
-                  }
-                  if (glassMaskBlurRef.current) glassMaskBlurRef.current.setAttribute('stdDeviation', feather + 8);
                 }
               }
             }
@@ -2965,25 +2952,13 @@ export default function Home() {
               '--badge-bottom': `${editorParams.current.badgeBottom}rem`,
               '--badge-inset': `${editorParams.current.badgeInset}rem`,
             }}>
-            {/* SVG masks for globe breakout: dome clip (feathered) + glass hole */}
+            {/* SVG clipPath for globe breakout: rect (card body) + circle (dome) */}
             <svg width="0" height="0" style={{ position: 'absolute' }}>
               <defs>
-                {/* Mask for map-container: white = visible. Card rect (hard) + dome circle (feathered) */}
-                <filter id="breakout-blur">
-                  <feGaussianBlur ref={breakoutBlurRef} stdDeviation="8" />
-                </filter>
-                <mask id="globe-breakout-mask" maskUnits="userSpaceOnUse">
-                  <rect ref={breakoutRectRef} x="0" y="0" width="0" height="0" fill="white" />
-                  <circle ref={breakoutCircleRef} cx="0" cy="0" r="0" fill="white" filter="url(#breakout-blur)" />
-                </mask>
-                {/* Mask for glass edge: white everywhere MINUS black circle where globe is */}
-                <filter id="glass-blur">
-                  <feGaussianBlur ref={glassMaskBlurRef} stdDeviation="12" />
-                </filter>
-                <mask id="glass-breakout-mask" maskUnits="userSpaceOnUse">
-                  <rect x="0" y="0" width="9999" height="9999" fill="white" />
-                  <circle ref={glassMaskCircleRef} cx="0" cy="0" r="0" fill="black" filter="url(#glass-blur)" />
-                </mask>
+                <clipPath id="globe-breakout-clip" clipPathUnits="userSpaceOnUse">
+                  <rect ref={breakoutRectRef} x="0" y="0" width="0" height="0" />
+                  <circle ref={breakoutCircleRef} cx="0" cy="0" r="0" />
+                </clipPath>
               </defs>
             </svg>
             <div className="map-container" ref={mapContainerRef} style={{ opacity: globeReady ? 1 : 0, transition: 'opacity 1.5s ease-in' }}>

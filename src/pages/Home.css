@@ -1116,17 +1116,17 @@
     overflow: visible;
     z-index: 20;
 }
-/* Extend canvas above card + mask to sphere dome shape (feathered via SVG blur) */
+/* Extend canvas above card + clip to sphere dome shape */
 .bento-cell.cell-map.globe-breakout .map-container {
     top: calc(-1 * var(--globe-breakout-px, 60px));
     height: calc(100% + var(--globe-breakout-px, 60px) + 10px);
-    -webkit-mask: url(#globe-breakout-mask);
-    mask: url(#globe-breakout-mask);
+    clip-path: url(#globe-breakout-clip);
+    z-index: 7; /* above glass edge (z:6) so globe renders over glass border */
 }
-/* Glass edge: SVG mask punches sphere-shaped hole so globe appears in front */
+/* Glass edge: fade out top where globe breaks through */
 .bento-cell.cell-map.globe-breakout .liquid-glass-edge {
-    -webkit-mask: url(#glass-breakout-mask);
-    mask: url(#glass-breakout-mask);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 12%);
+    mask-image: linear-gradient(to bottom, transparent 0%, black 12%);
 }
 .bento-cell.cell-map.globe-breakout .liquid-glass-edge::before,
 .bento-cell.cell-map.globe-breakout .liquid-glass-edge::after {
