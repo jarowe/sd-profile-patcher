@@ -1117,6 +1117,16 @@
     z-index: 20;
     clip-path: url(#globe-breakout-clip);
 }
+/* Extend the Three.js canvas above the card so the globe dome actually renders */
+.bento-cell.cell-map.globe-breakout .map-container {
+    top: calc(-1 * var(--globe-breakout-px, 60px));
+    height: calc(100% + var(--globe-breakout-px, 60px) + 10px);
+}
+/* Hide top glass border where globe breaks through */
+.bento-cell.cell-map.globe-breakout .liquid-glass-edge {
+    clip-path: inset(6px 0 0 0);
+    border-radius: 0 0 28px 28px;
+}
 
 /* ── Liquid Glass Edge Effect ── */
 .liquid-glass-edge {

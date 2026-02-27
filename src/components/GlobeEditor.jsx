@@ -119,7 +119,10 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     controlsFolder.add(proxy, 'globeBreakout').name('Globe Breakout').onChange((v) => {
       p.globeBreakout = v;
       const cell = document.querySelector('.cell-map');
-      if (cell) cell.classList.toggle('globe-breakout', v);
+      if (cell) {
+        cell.classList.toggle('globe-breakout', v);
+        if (v) cell.style.setProperty('--globe-breakout-px', `${p.globeBreakoutPx}px`);
+      }
     });
     controlsFolder.add(proxy, 'globeBreakoutClipPad', 0, 30, 1).name('Clip Padding').onChange((v) => {
       p.globeBreakoutClipPad = v;
@@ -624,6 +627,7 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
       const cell = document.querySelector('.cell-map');
       if (cell) {
         cell.classList.toggle('globe-breakout', !!p.globeBreakout);
+        if (p.globeBreakout) cell.style.setProperty('--globe-breakout-px', `${p.globeBreakoutPx}px`);
         cell.classList.toggle('glass-sweep-off', !p.glassSweepEnabled);
         cell.classList.toggle('glass-shimmer-off', !p.glassShimmerEnabled);
         cell.classList.toggle('inner-glow-off', !p.innerGlowEnabled);

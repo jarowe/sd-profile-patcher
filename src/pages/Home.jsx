@@ -2933,6 +2933,7 @@ export default function Home() {
           {/* WORLD MAP CELL */}
           <div className={`bento-cell cell-map${editorParams.current.globeBreakout ? ' globe-breakout' : ''}${!editorParams.current.glassSweepEnabled ? ' glass-sweep-off' : ''}${!editorParams.current.glassShimmerEnabled ? ' glass-shimmer-off' : ''}${!editorParams.current.innerGlowEnabled ? ' inner-glow-off' : ''}`}
             style={{
+              ...(editorParams.current.globeBreakout ? { '--globe-breakout-px': `${editorParams.current.globeBreakoutPx}px` } : {}),
               ...(editorParams.current.glassSweepOpacity !== undefined ? { '--glass-sweep-opacity': editorParams.current.glassSweepOpacity } : {}),
               ...(editorParams.current.glassShimmerOpacity !== undefined ? { '--glass-shimmer-opacity': editorParams.current.glassShimmerOpacity } : {}),
               '--badge-bg-opacity': editorParams.current.badgeBgOpacity,
