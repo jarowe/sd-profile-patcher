@@ -591,16 +591,39 @@ export default function DailyCipher({ showVault = false }) {
                             const isUnlocked = unlockedCards.includes(idx);
 
                             return (
-                                <motion.div
+                                <div
                                     key={idx}
                                     className={`collection-card ${isUnlocked ? 'unlocked' : 'locked'}`}
-                                    whileHover={isUnlocked ? { scale: 1.05, y: -5 } : {}}
                                     onClick={() => {
                                         if (isUnlocked) {
                                             setSelectedCard(item);
                                             playClickSound();
                                         }
                                     }}
+                                    onMouseMove={isUnlocked ? (e) => {
+                                        const card = e.currentTarget;
+                                        const rect = card.getBoundingClientRect();
+                                        const x = ((e.clientX - rect.left) / rect.width) * 100;
+                                        const y = ((e.clientY - rect.top) / rect.height) * 100;
+                                        const rotateX = ((y - 50) / 50) * -12;
+                                        const rotateY = ((x - 50) / 50) * 12;
+                                        card.style.transform = `perspective(600px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.08, 1.08, 1.08) translateY(-4px)`;
+                                        const foil = card.querySelector('.card-foil');
+                                        if (foil) {
+                                            foil.style.opacity = '1';
+                                            foil.style.background = `radial-gradient(circle at ${x}% ${y}%, rgba(255,255,255,0.5) 0%, rgba(220,215,255,0.15) 40%, transparent 70%)`;
+                                        }
+                                    } : undefined}
+                                    onMouseEnter={isUnlocked ? (e) => {
+                                        e.currentTarget.style.transition = 'none';
+                                    } : undefined}
+                                    onMouseLeave={isUnlocked ? (e) => {
+                                        const card = e.currentTarget;
+                                        card.style.transition = 'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease';
+                                        card.style.transform = '';
+                                        const foil = card.querySelector('.card-foil');
+                                        if (foil) foil.style.opacity = '0';
+                                    } : undefined}
                                 >
                                     {isUnlocked ? (
                                         <>
@@ -616,7 +639,7 @@ export default function DailyCipher({ showVault = false }) {
                                             <div className="locked-glitch"></div>
                                         </div>
                                     )}
-                                </motion.div>
+                                </div>
                             );
                         })}
                     </div>
