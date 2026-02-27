@@ -1157,6 +1157,7 @@ export default function Home() {
               lavaLampSpeed: { value: ll.lavaLampSpeed },
               lavaLampScale: { value: ll.lavaLampScale },
               lavaLampBlobSize: { value: ll.lavaLampBlobSize },
+              lavaLampFeather: { value: ll.lavaLampFeather },
             },
             vertexShader: `
               varying vec3 vWorldNormal;
@@ -1179,6 +1180,7 @@ export default function Home() {
               uniform float lavaLampSpeed;
               uniform float lavaLampScale;
               uniform float lavaLampBlobSize;
+              uniform float lavaLampFeather;
               varying vec3 vWorldNormal;
               varying vec3 vWorldPos;
               varying vec3 vViewPos;
@@ -1243,8 +1245,10 @@ export default function Home() {
                 float n2 = snoise(nPos * lavaLampScale * 0.7 + vec3(-t * 0.15, t * 0.25, -t * 0.1));
                 float n3 = snoise(nPos * lavaLampScale * 1.4 + vec3(t * 0.1, -t * 0.15, t * 0.2));
 
-                // Create blob shapes
-                float blob = smoothstep(0.0, 0.5 / lavaLampBlobSize, n1 * 0.5 + n2 * 0.3 + n3 * 0.2);
+                // Create blob shapes with feathered edges
+                float rawBlob = n1 * 0.5 + n2 * 0.3 + n3 * 0.2;
+                float blobEdge = 0.5 / lavaLampBlobSize;
+                float blob = smoothstep(blobEdge * (1.0 - lavaLampFeather), blobEdge * (1.0 + lavaLampFeather), rawBlob);
                 blob *= blob;
 
                 // Tri-color cycling through blobs

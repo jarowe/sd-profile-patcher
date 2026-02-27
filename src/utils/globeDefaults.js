@@ -151,6 +151,7 @@ export const GLOBE_DEFAULTS = {
   lavaLampScale: 1.5,
   lavaLampHeight: 102.5,
   lavaLampBlobSize: 3.0,
+  lavaLampFeather: 0.6,
 
   // ── Shader Lighting ──
   shaderAmbient: 0.07,
@@ -202,9 +203,9 @@ export const GLOBE_DEFAULTS = {
   planeSpeed: 1.0,
   wispSpeed: 1.0,
   satelliteScale: 0.4,
-  planeScale: 1.0,
-  carScale: 1.0,
-  wispScale: 1.0,
+  planeScale: 3.5,
+  carScale: 4.0,
+  wispScale: 3.0,
 
   // ── Overlay Graphics ──
   arcStroke: 0.5,

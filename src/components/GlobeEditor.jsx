@@ -92,6 +92,30 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     controlsFolder.add(proxy, 'animationPaused').name('Pause Animation').onChange(updateParam('animationPaused'));
     controlsFolder.add(proxy, 'timeOverrideHour', -1, 24, 0.25).name('Time of Day (UTC)').onChange(updateParam('timeOverrideHour'))
       .listen();
+
+    // Timezone quick-presets: sets UTC hour so noon falls over that region
+    // Formula: UTC hour = 12 + longitude/15 (solar noon at longitude)
+    const tzPresets = {
+      'Real-time': -1,
+      'Noon in New York (EST)': 17,      // -75° → 12+5=17
+      'Noon in Chicago (CST)': 18,       // -90° → 12+6=18
+      'Noon in Denver (MST)': 19,        // -105° → 12+7=19
+      'Noon in LA (PST)': 20,            // -120° → 12+8=20
+      'Noon in London (GMT)': 12,        // 0° → 12
+      'Noon in Paris (CET)': 11,         // 15° → 12-1=11
+      'Noon in Dubai (GST)': 8,          // 60° → 12-4=8
+      'Noon in Mumbai (IST)': 6.5,       // 82.5° → 12-5.5=6.5
+      'Noon in Tokyo (JST)': 3,          // 135° → 12-9=3
+      'Noon in Sydney (AEST)': 2,        // 150° → 12-10=2
+      'Noon in Auckland (NZST)': 0,      // 180° → 12-12=0
+    };
+    const tzProxy = { timezone: 'Real-time' };
+    controlsFolder.add(tzProxy, 'timezone', Object.keys(tzPresets)).name('Timezone Presets').onChange((tz) => {
+      const utcHour = tzPresets[tz];
+      proxy.timeOverrideHour = utcHour;
+      p.timeOverrideHour = utcHour;
+    });
+
     controlsFolder.add(proxy, 'globeOverflowTop', 0, 200, 1).name('Globe Overflow Top (px)').onChange((v) => {
       p.globeOverflowTop = v;
       const cell = document.querySelector('.cell-map');
@@ -275,6 +299,7 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     lavaFolder.add(proxy, 'lavaLampSpeed', 0.0, 1.0, 0.01).name('Speed').onChange(updateShaderUniform(getLavaLampMat, 'lavaLampSpeed'));
     lavaFolder.add(proxy, 'lavaLampScale', 0.5, 5.0, 0.1).name('Scale').onChange(updateShaderUniform(getLavaLampMat, 'lavaLampScale'));
     lavaFolder.add(proxy, 'lavaLampBlobSize', 0.5, 10.0, 0.1).name('Blob Size').onChange(updateShaderUniform(getLavaLampMat, 'lavaLampBlobSize'));
+    lavaFolder.add(proxy, 'lavaLampFeather', 0.0, 1.0, 0.01).name('Feather (Softness)').onChange(updateShaderUniform(getLavaLampMat, 'lavaLampFeather'));
     lavaFolder.close();
 
     // ══════════════════════════════════════════
@@ -348,10 +373,10 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     objectsFolder.add(proxy, 'satelliteSpeed', 0.0, 5.0, 0.1).name('Satellite Speed').onChange(updateParam('satelliteSpeed'));
     objectsFolder.add(proxy, 'planeSpeed', 0.0, 5.0, 0.1).name('Plane Speed').onChange(updateParam('planeSpeed'));
     objectsFolder.add(proxy, 'wispSpeed', 0.0, 5.0, 0.1).name('Wisp Speed').onChange(updateParam('wispSpeed'));
-    objectsFolder.add(proxy, 'satelliteScale', 0.1, 5.0, 0.1).name('Satellite Scale').onChange(updateParam('satelliteScale'));
-    objectsFolder.add(proxy, 'planeScale', 0.1, 5.0, 0.1).name('Plane Scale').onChange(updateParam('planeScale'));
-    objectsFolder.add(proxy, 'carScale', 0.1, 5.0, 0.1).name('Car Scale').onChange(updateParam('carScale'));
-    objectsFolder.add(proxy, 'wispScale', 0.1, 5.0, 0.1).name('Wisp Scale').onChange(updateParam('wispScale'));
+    objectsFolder.add(proxy, 'satelliteScale', 0.1, 15.0, 0.1).name('Satellite Scale').onChange(updateParam('satelliteScale'));
+    objectsFolder.add(proxy, 'planeScale', 0.1, 15.0, 0.1).name('Plane Scale').onChange(updateParam('planeScale'));
+    objectsFolder.add(proxy, 'carScale', 0.1, 15.0, 0.1).name('Car Scale').onChange(updateParam('carScale'));
+    objectsFolder.add(proxy, 'wispScale', 0.1, 15.0, 0.1).name('Wisp Scale').onChange(updateParam('wispScale'));
     objectsFolder.close();
 
     // ══════════════════════════════════════════
@@ -368,6 +393,10 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     bopFolder.add(proxy, 'bopWaterRipple', 0.0, 2.0, 0.01).name('Water Ripple').onChange(updateSurfaceUniform('bopWaterRipple'));
     bopFolder.add(proxy, 'bopEnvGlowBoost', 0.0, 10.0, 0.1).name('Env Glow Boost').onChange(updateShaderUniform(getEnvGlowMat, 'bopEnvGlowBoost'));
     bopFolder.add(proxy, 'bopLightShow').name('Light Show Mode').onChange(updateParam('bopLightShow'));
+    bopFolder.add({ fire() {
+      const g = globeRef.current;
+      if (g?.customUniforms?.prismPulse) g.customUniforms.prismPulse.value = 1.0;
+    } }, 'fire').name('Simulate Bop');
     bopFolder.close();
 
     // ══════════════════════════════════════════
