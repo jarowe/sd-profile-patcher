@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { Sparkles, Globe2, BookOpen, ArrowRight, ChevronLeft, ChevronRight, Instagram, Github, Linkedin, Quote } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { photos } from '../data/photos';
 import MusicCell from '../components/MusicCell';
 import confetti from 'canvas-confetti';
@@ -142,6 +142,206 @@ export default function Home() {
     if (el) setGlobeMounted(true);
   }, []);
 
+  // Shared uniforms for all globe shaders (surface, clouds, atmosphere, particles)
+  const sharedUniforms = useRef({
+    time: { value: 0 },
+    audioPulse: { value: 0 },
+    prismPulse: { value: 0.0 },
+    introIntensity: { value: 1.0 },
+    sunDir: { value: getSunDirection() }
+  });
+
+  // Create globe surface ShaderMaterial once (passed via globeMaterial prop)
+  // This is the CORRECT way to apply custom materials - via the official API,
+  // NOT via scene.traverse() material replacement which can silently fail.
+  const globeShaderMaterial = useMemo(() => {
+    const texLoader = new THREE.TextureLoader();
+    const earthTex = texLoader.load('//unpkg.com/three-globe/example/img/earth-blue-marble.jpg');
+    const nightTex = texLoader.load('//cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/textures/planets/earth_lights_2048.png');
+    const waterTex = texLoader.load('//unpkg.com/three-globe/example/img/earth-water.png');
+    const packedTex = texLoader.load('//cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/textures/planets/earth_bump_roughness_clouds_4096.jpg');
+
+    return new THREE.ShaderMaterial({
+      uniforms: {
+        earthMap: { value: earthTex },
+        nightMap: { value: nightTex },
+        waterMask: { value: waterTex },
+        packedTex: { value: packedTex },
+        time: sharedUniforms.current.time,
+        audioPulse: sharedUniforms.current.audioPulse,
+        prismPulse: sharedUniforms.current.prismPulse,
+        sunDir: sharedUniforms.current.sunDir
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        varying vec3 vNormal;
+        varying vec3 vWorldNormal;
+        varying vec3 vWorldPos;
+        varying vec3 vViewPos;
+        void main() {
+          vUv = uv;
+          vNormal = normalize(normalMatrix * normal);
+          vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+          vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+          vViewPos = (modelViewMatrix * vec4(position, 1.0)).xyz;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D earthMap;
+        uniform sampler2D nightMap;
+        uniform sampler2D waterMask;
+        uniform sampler2D packedTex;
+        uniform float time;
+        uniform float audioPulse;
+        uniform float prismPulse;
+        uniform vec3 sunDir;
+        varying vec2 vUv;
+        varying vec3 vNormal;
+        varying vec3 vWorldNormal;
+        varying vec3 vWorldPos;
+        varying vec3 vViewPos;
+
+        float hash21(vec2 p) {
+          p = fract(p * vec2(234.34, 435.345));
+          p += dot(p, p + 34.23);
+          return fract(p.x * p.y);
+        }
+        float vnoise(vec2 p) {
+          vec2 i = floor(p);
+          vec2 f = fract(p);
+          f = f * f * (3.0 - 2.0 * f);
+          return mix(
+            mix(hash21(i), hash21(i + vec2(1,0)), f.x),
+            mix(hash21(i + vec2(0,1)), hash21(i + vec2(1,1)), f.x),
+            f.y
+          );
+        }
+        float fbm(vec2 p) {
+          float v = 0.0; float a = 0.5;
+          mat2 rot = mat2(0.8, 0.6, -0.6, 0.8);
+          for (int i = 0; i < 5; i++) {
+            v += a * vnoise(p);
+            p = rot * p * 2.0;
+            a *= 0.5;
+          }
+          return v;
+        }
+
+        void main() {
+          vec4 dayCol = texture2D(earthMap, vUv);
+          vec3 nightCol = texture2D(nightMap, vUv).rgb;
+          float waterVal = texture2D(waterMask, vUv).r;
+          float isWater = smoothstep(0.3, 0.7, waterVal);
+          vec3 packed = texture2D(packedTex, vUv).rgb;
+
+          // All lighting in WORLD space so sun stays fixed as camera orbits
+          vec3 worldViewDir = normalize(cameraPosition - vWorldPos);
+          float NdotL = dot(vWorldNormal, sunDir);
+          float dayStrength = smoothstep(-0.25, 0.5, NdotL);
+          float dayLight = max(NdotL, 0.0);
+          float rawFresnel = clamp(1.0 - dot(worldViewDir, vWorldNormal), 0.0, 1.0);
+          vec3 halfDir = normalize(sunDir + worldViewDir);
+
+          // --- LAND: matte terrain + bump detail + night lights ---
+          float landFresnel = pow(rawFresnel, 3.5);
+          float bumpVal = packed.r;
+          float bumpLight = 1.0 + (bumpVal - 0.5) * 0.35 * dayStrength;
+          vec3 landDay = dayCol.rgb * dayLight * bumpLight + dayCol.rgb * landFresnel * 0.10 * dayStrength;
+          float roughness = packed.g;
+          float landSpec = (1.0 - roughness) * pow(max(dot(vWorldNormal, halfDir), 0.0), 60.0) * 0.12;
+          landDay += vec3(0.7, 0.75, 0.8) * landSpec;
+          // City lights: only real city pixels visible, noise below threshold = pure black
+          float lightPeak = max(max(nightCol.r, nightCol.g), nightCol.b);
+          float cityGate = smoothstep(0.06, 0.2, lightPeak);
+          vec3 landNight = nightCol * vec3(2.0, 1.8, 1.3) * cityGate;
+          landNight += vec3(1.0, 0.8, 0.4) * pow(lightPeak, 2.0) * cityGate * 2.0;
+          vec3 landColor = mix(landNight, landDay, dayStrength);
+
+          // --- WATER: animated ocean + tidal currents + specular + Fresnel ---
+          float lat = vUv.y * 3.14159 - 1.5708;
+          vec2 currentFlow = vec2(
+            sin(lat * 3.0) * 0.008 + sin(lat * 7.0 + time * 0.02) * 0.003,
+            cos(vUv.x * 6.28 + time * 0.015) * 0.004
+          );
+          float tide = sin(time * 0.03) * 0.003 + sin(time * 0.07 + vUv.x * 12.0) * 0.001;
+          vec2 tidalUv = vUv + currentFlow + vec2(tide, tide * 0.5);
+
+          vec2 waveUv = tidalUv * 1200.0;
+          vec2 bigWaveUv = tidalUv * 300.0;
+          float t = time * 0.12;
+
+          float bigW1 = fbm(bigWaveUv + vec2(t * 0.8, t * 0.5));
+          float bigW2 = fbm(bigWaveUv * 0.6 - vec2(t * 0.3, t * 0.6));
+          float tidalSurge = sin(time * 0.05 + vUv.y * 8.0) * 0.15;
+          float bigWaves = (bigW1 + bigW2) * 0.5 + tidalSurge * 0.1;
+
+          float w1 = fbm(waveUv + vec2(t, t * 0.7));
+          float w2 = fbm(waveUv * 0.7 - vec2(t * 0.5, t * 0.3));
+          float w3 = fbm(waveUv * 1.3 + vec2(t * 0.2, -t * 0.4)) * 0.3;
+          float waves = (w1 + w2) * 0.5 + w3;
+
+          float dx = fbm(waveUv + vec2(0.01, 0.0) + vec2(t, t*0.7)) - w1;
+          float dy = fbm(waveUv + vec2(0.0, 0.01) + vec2(t, t*0.7)) - w1;
+          float bdx = fbm(bigWaveUv + vec2(0.02, 0.0) + vec2(t*0.8, t*0.5)) - bigW1;
+          float bdy = fbm(bigWaveUv + vec2(0.0, 0.02) + vec2(t*0.8, t*0.5)) - bigW1;
+          vec3 waveN = normalize(vWorldNormal + vec3(dx + bdx * 2.0, dy + bdy * 2.0, 0.0) * 8.0);
+
+          float spec = pow(max(dot(waveN, halfDir), 0.0), 120.0);
+          float glare = pow(max(dot(waveN, halfDir), 0.0), 12.0);
+          float wFresnel = pow(1.0 - max(dot(worldViewDir, waveN), 0.0), 4.0);
+
+          vec3 deepSea = vec3(0.005, 0.02, 0.08);
+          vec3 midSea = vec3(0.02, 0.08, 0.22);
+          vec3 shallowSea = vec3(0.06, 0.18, 0.38);
+          vec3 oceanBase = mix(deepSea, midSea, waves);
+          oceanBase = mix(oceanBase, shallowSea, bigWaves * 0.4);
+          vec3 subsurface = vec3(0.0, 0.12, 0.25) * pow(max(NdotL, 0.0), 2.0) * bigWaves;
+          oceanBase += subsurface;
+          vec3 oceanCol = mix(dayCol.rgb * 0.35, oceanBase, 0.65);
+
+          vec3 skyReflection = mix(vec3(0.15, 0.3, 0.6), vec3(0.5, 0.65, 0.85), wFresnel);
+
+          vec3 waterDay = oceanCol * dayLight
+            + vec3(1.0, 0.95, 0.85) * spec * 2.5
+            + vec3(0.9, 0.85, 0.7) * glare * 0.5
+            + skyReflection * wFresnel * 0.5
+            + vec3(0.3, 0.5, 0.8) * waves * audioPulse * 0.3;
+          float cityGlow = max(max(nightCol.r, nightCol.g), nightCol.b);
+          vec3 waterNight = vec3(0.5, 0.4, 0.2) * smoothstep(0.04, 0.15, cityGlow) * cityGlow * 0.1;
+          vec3 waterColor = mix(waterNight, waterDay, dayStrength);
+
+          vec3 prismWater = vec3(
+            0.5 + 0.5 * sin(time * 2.0 + vUv.x * 20.0),
+            0.5 + 0.5 * sin(time * 2.0 + vUv.x * 20.0 + 2.094),
+            0.5 + 0.5 * sin(time * 2.0 + vUv.x * 20.0 + 4.189)
+          );
+          waterColor = mix(waterColor, prismWater * waterColor * 2.0, prismPulse * 0.3 * isWater);
+
+          vec3 finalColor = mix(landColor, waterColor, isWater);
+
+          // Cloud shadows from packed blue channel
+          float cloudDensity = smoothstep(0.2, 0.7, packed.b);
+          finalColor *= (1.0 - cloudDensity * 0.3 * dayStrength);
+
+          // --- TSL-style atmospheric blending on surface ---
+          vec3 atmosphereDayColor = vec3(0.3, 0.7, 1.0);
+          vec3 atmosphereTwilightColor = vec3(0.74, 0.29, 0.04);
+          vec3 atmosphereColor = mix(atmosphereTwilightColor, atmosphereDayColor, smoothstep(-0.25, 0.75, NdotL));
+          float atmosphereMix = clamp(smoothstep(-0.5, 1.0, NdotL) * pow(rawFresnel, 2.0), 0.0, 1.0);
+          finalColor = mix(finalColor, atmosphereColor, atmosphereMix * 0.45);
+
+          // Sunset glow at terminator
+          float sunsetGlow = smoothstep(-0.05, 0.3, NdotL) * smoothstep(0.5, 0.05, max(NdotL, 0.0));
+          finalColor += vec3(1.0, 0.35, 0.12) * sunsetGlow * 0.15;
+
+          gl_FragColor = vec4(finalColor, 1.0);
+        }
+      `,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const autoRotateTimer = useRef(null);
 
   // Auto-cycle through locations when globe is idle
@@ -249,226 +449,26 @@ export default function Home() {
         sunLight.position.set(200, 100, 200);
         scene.add(ambient, sunLight);
 
+        // Connect shared uniforms to globe instance (used by cloud, atmos, particle shaders)
         if (!globe.customUniforms) {
-          globe.customUniforms = {
-            time: { value: 0 },
-            audioPulse: { value: 0 },
-            prismPulse: { value: 0.0 },
-            introIntensity: { value: 1.0 },
-            sunDir: { value: getSunDirection() }
-          };
+          globe.customUniforms = sharedUniforms.current;
         }
         // Position lights to match real-time sun direction
         const initSunPos = globe.customUniforms.sunDir.value.clone().multiplyScalar(200);
         sunLight.position.copy(initSunPos);
         globe._sunLight = sunLight;
 
-        // --- B. Living Ocean Shader Material ---
-        if (!globe.oceanMaterialSet) {
-          const texLoader = new THREE.TextureLoader();
-          const earthTex = texLoader.load('//unpkg.com/three-globe/example/img/earth-blue-marble.jpg');
-          const nightTex = texLoader.load('//cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/textures/planets/earth_lights_2048.png');
-          const waterTex = texLoader.load('//unpkg.com/three-globe/example/img/earth-water.png');
-          // 4K packed texture: R=bump, G=roughness, B=clouds (Bobby Roe / three.js Journey approach)
-          const packedTex = texLoader.load('//cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/textures/planets/earth_bump_roughness_clouds_4096.jpg');
-          const oceanMat = new THREE.ShaderMaterial({
-            uniforms: {
-              earthMap: { value: earthTex },
-              nightMap: { value: nightTex },
-              waterMask: { value: waterTex },
-              packedTex: { value: packedTex },
-              time: globe.customUniforms.time,
-              audioPulse: globe.customUniforms.audioPulse,
-              prismPulse: globe.customUniforms.prismPulse,
-              sunDir: globe.customUniforms.sunDir
-            },
-            vertexShader: `
-              varying vec2 vUv;
-              varying vec3 vNormal;
-              varying vec3 vWorldNormal;
-              varying vec3 vWorldPos;
-              varying vec3 vViewPos;
-              void main() {
-                vUv = uv;
-                vNormal = normalize(normalMatrix * normal);
-                vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
-                vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
-                vViewPos = (modelViewMatrix * vec4(position, 1.0)).xyz;
-                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-              }
-            `,
-            fragmentShader: `
-              uniform sampler2D earthMap;
-              uniform sampler2D nightMap;
-              uniform sampler2D waterMask;
-              uniform sampler2D packedTex;
-              uniform float time;
-              uniform float audioPulse;
-              uniform float prismPulse;
-              uniform vec3 sunDir;
-              varying vec2 vUv;
-              varying vec3 vNormal;
-              varying vec3 vWorldNormal;
-              varying vec3 vWorldPos;
-              varying vec3 vViewPos;
-
-              float hash21(vec2 p) {
-                p = fract(p * vec2(234.34, 435.345));
-                p += dot(p, p + 34.23);
-                return fract(p.x * p.y);
-              }
-              float vnoise(vec2 p) {
-                vec2 i = floor(p);
-                vec2 f = fract(p);
-                f = f * f * (3.0 - 2.0 * f);
-                return mix(
-                  mix(hash21(i), hash21(i + vec2(1,0)), f.x),
-                  mix(hash21(i + vec2(0,1)), hash21(i + vec2(1,1)), f.x),
-                  f.y
-                );
-              }
-              float fbm(vec2 p) {
-                float v = 0.0; float a = 0.5;
-                mat2 rot = mat2(0.8, 0.6, -0.6, 0.8);
-                for (int i = 0; i < 5; i++) {
-                  v += a * vnoise(p);
-                  p = rot * p * 2.0;
-                  a *= 0.5;
-                }
-                return v;
-              }
-
-              void main() {
-                vec4 dayCol = texture2D(earthMap, vUv);
-                vec3 nightCol = texture2D(nightMap, vUv).rgb;
-                float waterVal = texture2D(waterMask, vUv).r;
-                float isWater = smoothstep(0.3, 0.7, waterVal);
-                vec3 packed = texture2D(packedTex, vUv).rgb;
-
-                // All lighting in WORLD space so sun stays fixed as camera orbits
-                vec3 worldViewDir = normalize(cameraPosition - vWorldPos);
-                float NdotL = dot(vWorldNormal, sunDir);
-                float dayStrength = smoothstep(-0.25, 0.5, NdotL);
-                float dayLight = max(NdotL, 0.0);
-                float rawFresnel = clamp(1.0 - dot(worldViewDir, vWorldNormal), 0.0, 1.0);
-                vec3 halfDir = normalize(sunDir + worldViewDir);
-
-                // --- LAND: matte terrain + bump detail + night lights ---
-                float landFresnel = pow(rawFresnel, 3.5);
-                float bumpVal = packed.r;
-                float bumpLight = 1.0 + (bumpVal - 0.5) * 0.35 * dayStrength;
-                vec3 landDay = dayCol.rgb * dayLight * bumpLight + dayCol.rgb * landFresnel * 0.10 * dayStrength;
-                float roughness = packed.g;
-                float landSpec = (1.0 - roughness) * pow(max(dot(vWorldNormal, halfDir), 0.0), 60.0) * 0.12;
-                landDay += vec3(0.7, 0.75, 0.8) * landSpec;
-                // City lights: only real city pixels visible, noise below threshold = pure black
-                float lightPeak = max(max(nightCol.r, nightCol.g), nightCol.b);
-                float cityGate = smoothstep(0.06, 0.2, lightPeak);
-                vec3 landNight = nightCol * vec3(2.0, 1.8, 1.3) * cityGate;
-                landNight += vec3(1.0, 0.8, 0.4) * pow(lightPeak, 2.0) * cityGate * 2.0;
-                vec3 landColor = mix(landNight, landDay, dayStrength);
-
-                // --- WATER: animated ocean + tidal currents + specular + Fresnel ---
-                // Ocean currents: large-scale flow patterns
-                float lat = vUv.y * 3.14159 - 1.5708;
-                vec2 currentFlow = vec2(
-                  sin(lat * 3.0) * 0.008 + sin(lat * 7.0 + time * 0.02) * 0.003,
-                  cos(vUv.x * 6.28 + time * 0.015) * 0.004
-                );
-                // Tidal pull (slow rhythmic surge)
-                float tide = sin(time * 0.03) * 0.003 + sin(time * 0.07 + vUv.x * 12.0) * 0.001;
-                vec2 tidalUv = vUv + currentFlow + vec2(tide, tide * 0.5);
-
-                vec2 waveUv = tidalUv * 1200.0;
-                vec2 bigWaveUv = tidalUv * 300.0;
-                float t = time * 0.12;
-
-                // Large ocean swells with tidal variation
-                float bigW1 = fbm(bigWaveUv + vec2(t * 0.8, t * 0.5));
-                float bigW2 = fbm(bigWaveUv * 0.6 - vec2(t * 0.3, t * 0.6));
-                float tidalSurge = sin(time * 0.05 + vUv.y * 8.0) * 0.15;
-                float bigWaves = (bigW1 + bigW2) * 0.5 + tidalSurge * 0.1;
-
-                // Fine detail ripples + crosshatch currents
-                float w1 = fbm(waveUv + vec2(t, t * 0.7));
-                float w2 = fbm(waveUv * 0.7 - vec2(t * 0.5, t * 0.3));
-                float w3 = fbm(waveUv * 1.3 + vec2(t * 0.2, -t * 0.4)) * 0.3;
-                float waves = (w1 + w2) * 0.5 + w3;
-
-                // Combined wave normals: big swells + fine ripples
-                float dx = fbm(waveUv + vec2(0.01, 0.0) + vec2(t, t*0.7)) - w1;
-                float dy = fbm(waveUv + vec2(0.0, 0.01) + vec2(t, t*0.7)) - w1;
-                float bdx = fbm(bigWaveUv + vec2(0.02, 0.0) + vec2(t*0.8, t*0.5)) - bigW1;
-                float bdy = fbm(bigWaveUv + vec2(0.0, 0.02) + vec2(t*0.8, t*0.5)) - bigW1;
-                vec3 waveN = normalize(vWorldNormal + vec3(dx + bdx * 2.0, dy + bdy * 2.0, 0.0) * 8.0);
-
-                float spec = pow(max(dot(waveN, halfDir), 0.0), 120.0);
-                float glare = pow(max(dot(waveN, halfDir), 0.0), 12.0);
-                float wFresnel = pow(1.0 - max(dot(worldViewDir, waveN), 0.0), 4.0);
-
-                // Ocean color with depth variation + subsurface glow
-                vec3 deepSea = vec3(0.005, 0.02, 0.08);
-                vec3 midSea = vec3(0.02, 0.08, 0.22);
-                vec3 shallowSea = vec3(0.06, 0.18, 0.38);
-                vec3 oceanBase = mix(deepSea, midSea, waves);
-                oceanBase = mix(oceanBase, shallowSea, bigWaves * 0.4);
-                // Subsurface scattering: sun-facing water glows from within
-                vec3 subsurface = vec3(0.0, 0.12, 0.25) * pow(max(NdotL, 0.0), 2.0) * bigWaves;
-                oceanBase += subsurface;
-                vec3 oceanCol = mix(dayCol.rgb * 0.35, oceanBase, 0.65);
-
-                // Sky reflection via Fresnel
-                vec3 skyReflection = mix(vec3(0.15, 0.3, 0.6), vec3(0.5, 0.65, 0.85), wFresnel);
-
-                vec3 waterDay = oceanCol * dayLight
-                  + vec3(1.0, 0.95, 0.85) * spec * 2.5
-                  + vec3(0.9, 0.85, 0.7) * glare * 0.5
-                  + skyReflection * wFresnel * 0.5
-                  + vec3(0.3, 0.5, 0.8) * waves * audioPulse * 0.3;
-                // Night water: black ocean with faint city light reflections
-                float cityGlow = max(max(nightCol.r, nightCol.g), nightCol.b);
-                vec3 waterNight = vec3(0.5, 0.4, 0.2) * smoothstep(0.04, 0.15, cityGlow) * cityGlow * 0.1;
-                vec3 waterColor = mix(waterNight, waterDay, dayStrength);
-
-                // Liquid glass shimmer on prism bop (water goes prismatic)
-                vec3 prismWater = vec3(
-                  0.5 + 0.5 * sin(time * 2.0 + vUv.x * 20.0),
-                  0.5 + 0.5 * sin(time * 2.0 + vUv.x * 20.0 + 2.094),
-                  0.5 + 0.5 * sin(time * 2.0 + vUv.x * 20.0 + 4.189)
-                );
-                waterColor = mix(waterColor, prismWater * waterColor * 2.0, prismPulse * 0.3 * isWater);
-
-                vec3 finalColor = mix(landColor, waterColor, isWater);
-
-                // Cloud shadows from packed blue channel
-                float cloudDensity = smoothstep(0.2, 0.7, packed.b);
-                finalColor *= (1.0 - cloudDensity * 0.3 * dayStrength);
-
-                // --- TSL-style atmospheric blending on surface ---
-                vec3 atmosphereDayColor = vec3(0.3, 0.7, 1.0);
-                vec3 atmosphereTwilightColor = vec3(0.74, 0.29, 0.04);
-                vec3 atmosphereColor = mix(atmosphereTwilightColor, atmosphereDayColor, smoothstep(-0.25, 0.75, NdotL));
-                float atmosphereMix = clamp(smoothstep(-0.5, 1.0, NdotL) * pow(rawFresnel, 2.0), 0.0, 1.0);
-                finalColor = mix(finalColor, atmosphereColor, atmosphereMix * 0.45);
-
-                // Sunset glow at terminator
-                float sunsetGlow = smoothstep(-0.05, 0.3, NdotL) * smoothstep(0.5, 0.05, max(NdotL, 0.0));
-                finalColor += vec3(1.0, 0.35, 0.12) * sunsetGlow * 0.15;
-
-                gl_FragColor = vec4(finalColor, 1.0);
-              }
-            `,
-          });
-
-          // Replace the globe's default material (any type - MeshPhong, MeshStandard, etc.)
+        // Find the globe mesh for raycasting (lens flare occlusion)
+        // Material is set via globeMaterial prop - no scene.traverse replacement needed
+        if (!globe._globeMesh) {
           scene.traverse((child) => {
-            if (child.isMesh && child.geometry?.parameters?.radius > 90 && child.material !== oceanMat) {
-              child.material = oceanMat;
-              globe._globeMesh = child;
+            if (child.isMesh && child.geometry && !child.userData?._custom) {
+              const params = child.geometry.parameters;
+              if (params && params.radius >= 99) {
+                globe._globeMesh = child;
+              }
             }
           });
-          // Only mark as set if we actually found and replaced the globe mesh
-          if (globe._globeMesh) globe.oceanMaterialSet = true;
         }
 
         // --- B2. Volumetric Cloud Layer (4K from packed texture blue channel) ---
@@ -580,9 +580,8 @@ export default function Home() {
 
         // (Aurora shell removed - was creating purple wash via additive blending over globe face)
 
-        // --- D. Dual Atmospheric Glow (tight rim + soft outer halo) ---
+        // --- D. Atmospheric Glow (tight rim + soft feathered halo) ---
         if (!globe.atmosShell) {
-          // Shared atmosphere vertex shader
           const atmosVert = `
             varying vec3 vWorldNormal;
             varying vec3 vWorldPos;
@@ -593,7 +592,7 @@ export default function Home() {
             }
           `;
 
-          // Layer 1: Tight bright rim (BackSide, r104 = TSL-style 4% larger)
+          // Layer 1: Tight rim glow hugging the globe (BackSide, r103)
           const rimMat = new THREE.ShaderMaterial({
             uniforms: { sunDir: globe.customUniforms.sunDir },
             vertexShader: atmosVert,
@@ -605,18 +604,25 @@ export default function Home() {
                 vec3 viewDir = normalize(vWorldPos - cameraPosition);
                 float fresnel = 1.0 - abs(dot(viewDir, vWorldNormal));
 
-                // Tight concentrated rim glow
-                float rim = pow(fresnel, 5.0) * 3.5;
+                // Concentrated rim glow (Franky pow technique)
+                float rim = pow(fresnel, 4.0) * 5.0;
 
-                // TSL atmosphere colors: saturated blue day + warm burnt orange twilight
+                // Atmosphere colors: blue day + warm orange twilight
                 float sunOri = dot(vWorldNormal, sunDir);
-                vec3 dayCol = vec3(0.25, 0.6, 1.0);
-                vec3 twilightCol = vec3(0.8, 0.32, 0.05);
-                vec3 color = mix(twilightCol, dayCol, smoothstep(-0.25, 0.75, sunOri));
+                vec3 dayCol = vec3(0.3, 0.65, 1.0);
+                vec3 twilightCol = vec3(0.85, 0.35, 0.06);
+                vec3 nightCol = vec3(0.05, 0.08, 0.2);
+                // Blend through twilight band
+                vec3 color = mix(nightCol, twilightCol, smoothstep(-0.5, 0.0, sunOri));
+                color = mix(color, dayCol, smoothstep(0.0, 0.6, sunOri));
 
-                // Sun mask with backlit twilight edge
-                float sunMask = smoothstep(-0.5, 1.0, sunOri);
-                float intensity = rim * sunMask;
+                // Sun mask: allows faint backlit rim on dark side edges
+                float sunMask = smoothstep(-0.8, 0.6, sunOri);
+                // Backlit edge: sun behind globe creates orange rim glow
+                float backlit = smoothstep(-0.3, -0.05, sunOri) * smoothstep(-0.8, -0.3, sunOri);
+                color += twilightCol * backlit * 0.5;
+
+                float intensity = rim * max(sunMask, backlit * 0.4);
 
                 gl_FragColor = vec4(color * intensity, intensity);
               }
@@ -626,11 +632,11 @@ export default function Home() {
             depthWrite: false,
             side: THREE.BackSide
           });
-          const rimMesh = new THREE.Mesh(new THREE.SphereGeometry(104, 64, 64), rimMat);
+          const rimMesh = new THREE.Mesh(new THREE.SphereGeometry(103, 64, 64), rimMat);
           rimMesh.renderOrder = 3;
           scene.add(rimMesh);
 
-          // Layer 2: Soft diffuse outer halo (BackSide, r115 = 15% larger)
+          // Layer 2: Soft feathered outer glow (BackSide, r108)
           const haloMat = new THREE.ShaderMaterial({
             uniforms: { sunDir: globe.customUniforms.sunDir },
             vertexShader: atmosVert,
@@ -642,17 +648,16 @@ export default function Home() {
                 vec3 viewDir = normalize(vWorldPos - cameraPosition);
                 float fresnel = 1.0 - abs(dot(viewDir, vWorldNormal));
 
-                // Softer, wider glow
-                float glow = pow(fresnel, 2.5) * 0.6;
+                // Very soft feathered falloff (not a hard ring)
+                float glow = pow(fresnel, 1.5) * 0.35;
 
-                // Same color scheme but softer
                 float sunOri = dot(vWorldNormal, sunDir);
                 vec3 dayCol = vec3(0.2, 0.5, 0.9);
                 vec3 twilightCol = vec3(0.6, 0.25, 0.04);
-                vec3 color = mix(twilightCol, dayCol, smoothstep(-0.3, 0.8, sunOri));
+                vec3 color = mix(twilightCol, dayCol, smoothstep(-0.2, 0.7, sunOri));
 
-                // Stronger sun masking on outer halo (less visible on dark side)
-                float sunMask = smoothstep(-0.3, 1.0, sunOri);
+                // Feathered sun mask with subtle dark-side backlit wrap
+                float sunMask = smoothstep(-0.6, 0.8, sunOri);
                 float intensity = glow * sunMask;
 
                 gl_FragColor = vec4(color * intensity, intensity);
@@ -663,7 +668,7 @@ export default function Home() {
             depthWrite: false,
             side: THREE.BackSide
           });
-          const haloMesh = new THREE.Mesh(new THREE.SphereGeometry(115, 48, 48), haloMat);
+          const haloMesh = new THREE.Mesh(new THREE.SphereGeometry(108, 48, 48), haloMat);
           haloMesh.renderOrder = 2;
           scene.add(haloMesh);
 
@@ -960,8 +965,13 @@ export default function Home() {
                 }
                 vec4 mv = modelViewMatrix * vec4(pos,1.0);
                 gl_Position = projectionMatrix * mv;
-                // Gentle prism glow-up (reduced from before)
-                float baseSize = (pType>0.5) ? aScale*(1.0 + audioPulse*3.0 + prismPulse*1.2) : aScale*(1.8+audioPulse*2.0);
+                // Stars twinkle: each star gets unique flicker based on position
+                float twinkle = 1.0;
+                if (pType < 0.5) {
+                  float starId = position.x * 73.1 + position.y * 127.3 + position.z * 57.7;
+                  twinkle = 0.4 + 0.6 * (0.5 + 0.5 * sin(time * (1.5 + fract(starId) * 3.0) + starId));
+                }
+                float baseSize = (pType>0.5) ? aScale*(1.0 + audioPulse*3.0 + prismPulse*1.2) : aScale*(1.8+audioPulse*2.0) * twinkle;
                 gl_PointSize = baseSize * pixelRatio * (300.0 / -mv.z);
               }
             `,
@@ -1617,8 +1627,7 @@ export default function Home() {
                     ref={handleGlobeRef}
                     width={globeSize.width}
                     height={globeSize.height}
-                    globeImageUrl="//unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
-                    bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
+                    globeMaterial={globeShaderMaterial}
                     backgroundColor="rgba(0,0,0,0)"
                     showAtmosphere={false}
 
