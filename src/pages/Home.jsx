@@ -2332,19 +2332,29 @@ export default function Home() {
                   // DOM coords are top-down (y=0 at top), GL UVs are bottom-up — flip Y
                   vec2 pixel = vec2(vUv.x * resolution.x, (1.0 - vUv.y) * resolution.y);
 
-                  // Open-top SDF: extend the card rectangle far above the canvas.
-                  // This keeps rounded corners at the bottom but never clips the dome above.
-                  float cardMidX = (cardRect.x + cardRect.z) * 0.5;
-                  float cardHalfW = (cardRect.z - cardRect.x) * 0.5;
-                  float cardBottom = cardRect.w;  // card bottom edge (DOM coords)
-                  // Pretend card top is 2000px above canvas top — effectively open
+                  // Original card SDF — detect whether pixel is inside the card area
+                  vec2 cardCenter = vec2((cardRect.x + cardRect.z) * 0.5, (cardRect.y + cardRect.w) * 0.5);
+                  vec2 cardHalf = vec2((cardRect.z - cardRect.x) * 0.5, (cardRect.w - cardRect.y) * 0.5);
+                  float dOrigCard = sdRoundedBox(pixel, cardCenter, cardHalf, cardRadius);
+                  float insideCard = 1.0 - smoothstep(-1.0, 1.0, dOrigCard);
+
+                  // Open-top SDF: card rect extended far above (never clips the dome)
+                  float cardMidX = cardCenter.x;
+                  float cardHalfW = cardHalf.x;
+                  float cardBottom = cardRect.w;
                   vec2 extCenter = vec2(cardMidX, (cardBottom - 2000.0) * 0.5);
                   vec2 extHalf = vec2(cardHalfW, (cardBottom + 2000.0) * 0.5);
                   float dRect = sdRoundedBox(pixel, extCenter, extHalf, cardRadius);
-
                   float maskAlpha = 1.0 - smoothstep(-0.5, 0.5, dRect);
-                  col *= maskAlpha;
-                  gl_FragColor = vec4(clamp(col, 0.0, 1.0), maskAlpha);
+
+                  // Above the card: use scene alpha so empty space stays transparent
+                  // (prevents opaque black canvas from covering nav bar / page content).
+                  // Inside the card: always opaque (it's a self-contained tile).
+                  float sceneAlpha = texture2D(tDiffuse, uv).a;
+                  float finalAlpha = maskAlpha * mix(sceneAlpha, 1.0, insideCard);
+
+                  col *= finalAlpha;
+                  gl_FragColor = vec4(clamp(col, 0.0, 1.0), finalAlpha);
                 } else {
                   gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
                 }
