@@ -472,7 +472,7 @@ export default function DailyCipher({ showVault = false }) {
         <div className={`cipher-vault-wrapper ${showVault ? 'with-vault' : ''}`}>
 
             {/* LEFT: CIPHER TERMINAL */}
-            <div className={`cipher-terminal ${isBonus ? 'bonus-mode' : ''}`}>
+            <div className={`cipher-terminal ${isBonus ? 'bonus-mode' : ''} ${gameState === 'playing' ? 'awaiting-input' : ''}`}>
                 <div className="terminal-header">
                     <div className="terminal-title">
                         {isBonus ? (
@@ -506,13 +506,17 @@ export default function DailyCipher({ showVault = false }) {
                         const guess = isCurrentRow ? currentGuess : guesses[rowIndex] || '';
                         const isSubmitted = rowIndex < guesses.length;
 
+                        const isActiveRow = isCurrentRow && gameState === 'playing';
+
                         return (
-                            <div key={rowIndex} className={`cipher-row ${isCurrentRow && shake ? 'shake' : ''}`}>
+                            <div key={rowIndex} className={`cipher-row ${isCurrentRow && shake ? 'shake' : ''} ${isActiveRow ? 'active-row' : ''}`}>
                                 {Array.from({ length: WORD_LENGTH }).map((_, colIndex) => {
                                     const char = guess[colIndex] || '';
+                                    const isActiveCursor = isActiveRow && colIndex === currentGuess.length && currentGuess.length < WORD_LENGTH;
                                     let classNames = 'cipher-cell';
                                     if (isBonus) classNames += ' bonus';
                                     if (char) classNames += ' filled';
+                                    if (isActiveCursor) classNames += ' active';
                                     if (isSubmitted) {
                                         classNames += ` submitted ${getCharClasses(char, colIndex, guess)}`;
                                     }

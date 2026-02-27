@@ -138,6 +138,66 @@
     color: #a1a1aa;
 }
 
+/* =========================================
+   ACTIVE INPUT INDICATORS
+   ========================================= */
+
+/* Blinking terminal cursor in the next empty cell */
+.cipher-cell.active {
+    border-color: rgba(124, 58, 237, 0.5);
+    background: rgba(124, 58, 237, 0.06);
+}
+
+.cipher-cell.active::after {
+    content: '';
+    position: absolute;
+    bottom: 5px;
+    left: 25%;
+    right: 25%;
+    height: 2.5px;
+    background: #7c3aed;
+    border-radius: 1px;
+    animation: cursorBlink 1s step-end infinite;
+}
+
+.cipher-cell.bonus.active {
+    border-color: rgba(251, 191, 36, 0.5);
+    background: rgba(251, 191, 36, 0.06);
+}
+
+.cipher-cell.bonus.active::after {
+    background: #fbbf24;
+}
+
+@keyframes cursorBlink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+
+/* Subtle glow on the active row */
+.cipher-row.active-row {
+    filter: drop-shadow(0 0 6px rgba(124, 58, 237, 0.15));
+}
+
+/* Breathing glow on the terminal border when awaiting input */
+.cipher-terminal.awaiting-input {
+    animation: terminalBreath 3s ease-in-out infinite;
+}
+
+.cipher-terminal.awaiting-input.bonus-mode {
+    animation: terminalBreathBonus 3s ease-in-out infinite;
+}
+
+@keyframes terminalBreath {
+    0%, 100% { box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3); }
+    50% { box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 20px rgba(124, 58, 237, 0.1); }
+}
+
+@keyframes terminalBreathBonus {
+    0%, 100% { box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3); }
+    50% { box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 20px rgba(251, 191, 36, 0.1); }
+}
+
 .terminal-footer {
     display: flex;
     justify-content: space-between;
