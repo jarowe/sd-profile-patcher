@@ -3041,7 +3041,7 @@ export default function Home() {
                   const domeCX = sX / scaleX - offsetX;
                   const domeCY = sY / scaleY - offsetY;
                   const dist = cam.position.length();
-                  const domeR = Math.max(ep.rimRadius || 103, 100);
+                  const domeR = Math.max(ep.haloRadius || 108, ep.rimRadius || 103, 100);
                   const angR = Math.asin(Math.min(domeR / dist, 1.0));
                   const fovR = cam.fov * Math.PI / 180;
                   const scrR = Math.tan(angR) / Math.tan(fovR / 2) * (canvasH / 2);
