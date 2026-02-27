@@ -127,6 +127,9 @@ export default function Home() {
   const mapContainerRef = useRef();
   const breakoutRectRef = useRef();
   const breakoutCircleRef = useRef();
+  const glassMaskCircleRef = useRef();
+  const breakoutBlurRef = useRef();
+  const glassMaskBlurRef = useRef();
   const [globeSize, setGlobeSize] = useState({ width: 0, height: 0 });
   const [globeMounted, setGlobeMounted] = useState(false);
   const [globeReady, setGlobeReady] = useState(false);
@@ -233,6 +236,9 @@ export default function Home() {
         waterWaveSpeed: { value: p.waterWaveSpeed },
         waterWaveScale: { value: p.waterWaveScale },
         waterCurrentStrength: { value: p.waterCurrentStrength },
+        waterNormalStrength: { value: p.waterNormalStrength },
+        waterDetailScale: { value: p.waterDetailScale },
+        waterBigWaveScale: { value: p.waterBigWaveScale },
         bopWaterRipple: { value: p.bopWaterRipple },
         // Surface Atmosphere
         atmosDayColor: { value: new THREE.Vector3(...p.atmosDayColor) },
@@ -304,6 +310,9 @@ export default function Home() {
         uniform float waterWaveSpeed;
         uniform float waterWaveScale;
         uniform float waterCurrentStrength;
+        uniform float waterNormalStrength;
+        uniform float waterDetailScale;
+        uniform float waterBigWaveScale;
         uniform float bopWaterRipple;
         // Atmosphere uniforms
         uniform vec3 atmosDayColor;
@@ -403,8 +412,8 @@ export default function Home() {
           float tide = sin(time * 0.03 * waterWaveSpeed) * 0.003 + sin(time * 0.07 * waterWaveSpeed + vUv.x * 12.0) * 0.001;
           vec2 tidalUv = vUv + currentFlow + vec2(tide, tide * 0.5);
 
-          vec2 waveUv = tidalUv * 1200.0 * waterWaveScale;
-          vec2 bigWaveUv = tidalUv * 300.0 * waterWaveScale;
+          vec2 waveUv = tidalUv * waterDetailScale * waterWaveScale;
+          vec2 bigWaveUv = tidalUv * waterBigWaveScale * waterWaveScale;
           float t = time * 0.12 * waterWaveSpeed;
 
           float bigW1 = fbm(bigWaveUv + vec2(t * 0.8, t * 0.5));
@@ -421,7 +430,7 @@ export default function Home() {
           float dy = fbm(waveUv + vec2(0.0, 0.01) + vec2(t, t*0.7)) - w1;
           float bdx = fbm(bigWaveUv + vec2(0.02, 0.0) + vec2(t*0.8, t*0.5)) - bigW1;
           float bdy = fbm(bigWaveUv + vec2(0.0, 0.02) + vec2(t*0.8, t*0.5)) - bigW1;
-          vec3 waveN = normalize(vWorldNormal + vec3(dx + bdx * 2.0, dy + bdy * 2.0, 0.0) * 8.0);
+          vec3 waveN = normalize(vWorldNormal + vec3(dx + bdx * 2.0, dy + bdy * 2.0, 0.0) * waterNormalStrength);
 
           float spec = pow(max(dot(waveN, halfDir), 0.0), waterSpecPow);
           float glare = pow(max(dot(waveN, halfDir), 0.0), waterGlarePow);
@@ -2539,7 +2548,7 @@ export default function Home() {
                 });
               }
 
-              // Globe breakout: project sphere to screen for SVG clipPath + glass mask
+              // Globe breakout: project sphere to screen for SVG masks
               if (ep.globeBreakout && breakoutCircleRef.current && breakoutRectRef.current) {
                 const cam = globe.camera();
                 if (cam && mapContainerRef.current) {
@@ -2559,26 +2568,29 @@ export default function Home() {
                   const screenRadius = Math.tan(angularRadius) / Math.tan(fovRad / 2) * (mapRect.height / 2);
 
                   const pad = ep.globeBreakoutClipPad || 4;
+                  const feather = ep.globeBreakoutFeather || 8;
 
                   // Offset from map-container to cell-map
                   const offsetX = mapRect.left - cellRect.left;
                   const offsetY = mapRect.top - cellRect.top;
 
-                  // SVG clipPath on map-container: coords in map-container space
+                  // Map-container mask: dome circle (feathered) + card rect (hard)
                   breakoutCircleRef.current.setAttribute('cx', screenX);
                   breakoutCircleRef.current.setAttribute('cy', screenY);
                   breakoutCircleRef.current.setAttribute('r', screenRadius + pad);
-
-                  // Rect = card body area in map-container coords
                   breakoutRectRef.current.setAttribute('x', -offsetX);
                   breakoutRectRef.current.setAttribute('y', -offsetY);
                   breakoutRectRef.current.setAttribute('width', cellRect.width);
                   breakoutRectRef.current.setAttribute('height', cellRect.height);
+                  if (breakoutBlurRef.current) breakoutBlurRef.current.setAttribute('stdDeviation', feather);
 
-                  // CSS custom properties for glass edge radial mask (cell-map coords)
-                  cellEl.style.setProperty('--globe-cx', `${screenX + offsetX}px`);
-                  cellEl.style.setProperty('--globe-cy', `${screenY + offsetY}px`);
-                  cellEl.style.setProperty('--globe-r', `${screenRadius + pad}px`);
+                  // Glass edge mask: black circle punches hole where globe is (cell-map coords)
+                  if (glassMaskCircleRef.current) {
+                    glassMaskCircleRef.current.setAttribute('cx', screenX + offsetX);
+                    glassMaskCircleRef.current.setAttribute('cy', screenY + offsetY);
+                    glassMaskCircleRef.current.setAttribute('r', screenRadius * 0.92);
+                  }
+                  if (glassMaskBlurRef.current) glassMaskBlurRef.current.setAttribute('stdDeviation', feather + 8);
                 }
               }
             }
@@ -2953,13 +2965,25 @@ export default function Home() {
               '--badge-bottom': `${editorParams.current.badgeBottom}rem`,
               '--badge-inset': `${editorParams.current.badgeInset}rem`,
             }}>
-            {/* SVG clipPath for globe breakout: rect (card body) + circle (globe dome) union */}
+            {/* SVG masks for globe breakout: dome clip (feathered) + glass hole */}
             <svg width="0" height="0" style={{ position: 'absolute' }}>
               <defs>
-                <clipPath id="globe-breakout-clip" clipPathUnits="userSpaceOnUse">
-                  <rect ref={breakoutRectRef} x="0" y="0" width="0" height="0" />
-                  <circle ref={breakoutCircleRef} cx="0" cy="0" r="0" />
-                </clipPath>
+                {/* Mask for map-container: white = visible. Card rect (hard) + dome circle (feathered) */}
+                <filter id="breakout-blur">
+                  <feGaussianBlur ref={breakoutBlurRef} stdDeviation="8" />
+                </filter>
+                <mask id="globe-breakout-mask" maskUnits="userSpaceOnUse">
+                  <rect ref={breakoutRectRef} x="0" y="0" width="0" height="0" fill="white" />
+                  <circle ref={breakoutCircleRef} cx="0" cy="0" r="0" fill="white" filter="url(#breakout-blur)" />
+                </mask>
+                {/* Mask for glass edge: white everywhere MINUS black circle where globe is */}
+                <filter id="glass-blur">
+                  <feGaussianBlur ref={glassMaskBlurRef} stdDeviation="12" />
+                </filter>
+                <mask id="glass-breakout-mask" maskUnits="userSpaceOnUse">
+                  <rect x="0" y="0" width="9999" height="9999" fill="white" />
+                  <circle ref={glassMaskCircleRef} cx="0" cy="0" r="0" fill="black" filter="url(#glass-blur)" />
+                </mask>
               </defs>
             </svg>
             <div className="map-container" ref={mapContainerRef} style={{ opacity: globeReady ? 1 : 0, transition: 'opacity 1.5s ease-in' }}>

@@ -1115,24 +1115,18 @@
 .bento-cell.cell-map.globe-breakout {
     overflow: visible;
     z-index: 20;
-    /* No clip-path here — clip is on map-container only so photo/msg/glass can overflow */
 }
-/* Extend canvas above card + clip to sphere dome shape */
+/* Extend canvas above card + mask to sphere dome shape (feathered via SVG blur) */
 .bento-cell.cell-map.globe-breakout .map-container {
     top: calc(-1 * var(--globe-breakout-px, 60px));
     height: calc(100% + var(--globe-breakout-px, 60px) + 10px);
-    clip-path: url(#globe-breakout-clip);
+    -webkit-mask: url(#globe-breakout-mask);
+    mask: url(#globe-breakout-mask);
 }
-/* Glass edge: sphere-shaped radial mask so globe appears in front of glass */
+/* Glass edge: SVG mask punches sphere-shaped hole so globe appears in front */
 .bento-cell.cell-map.globe-breakout .liquid-glass-edge {
-    -webkit-mask-image: radial-gradient(
-        circle var(--globe-r, 200px) at var(--globe-cx, 50%) var(--globe-cy, 40%),
-        transparent 80%, rgba(0,0,0,0.3) 88%, black 100%
-    );
-    mask-image: radial-gradient(
-        circle var(--globe-r, 200px) at var(--globe-cx, 50%) var(--globe-cy, 40%),
-        transparent 80%, rgba(0,0,0,0.3) 88%, black 100%
-    );
+    -webkit-mask: url(#glass-breakout-mask);
+    mask: url(#glass-breakout-mask);
 }
 .bento-cell.cell-map.globe-breakout .liquid-glass-edge::before,
 .bento-cell.cell-map.globe-breakout .liquid-glass-edge::after {

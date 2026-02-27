@@ -127,6 +127,9 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     controlsFolder.add(proxy, 'globeBreakoutClipPad', 0, 30, 1).name('Clip Padding').onChange((v) => {
       p.globeBreakoutClipPad = v;
     });
+    controlsFolder.add(proxy, 'globeBreakoutFeather', 0, 30, 1).name('Clip Feather').onChange((v) => {
+      p.globeBreakoutFeather = v;
+    });
 
     // ── Expedition Photo Card ──
     const photoFolder = controlsFolder.addFolder('Photo Card');
@@ -262,6 +265,9 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     waterFolder.add(proxy, 'waterWaveSpeed', 0.0, 5.0, 0.05).name('Wave Speed').onChange(updateSurfaceUniform('waterWaveSpeed'));
     waterFolder.add(proxy, 'waterWaveScale', 0.1, 3.0, 0.05).name('Wave Scale').onChange(updateSurfaceUniform('waterWaveScale'));
     waterFolder.add(proxy, 'waterCurrentStrength', 0.0, 3.0, 0.05).name('Current Strength').onChange(updateSurfaceUniform('waterCurrentStrength'));
+    waterFolder.add(proxy, 'waterNormalStrength', 0.0, 20.0, 0.1).name('Normal Strength').onChange(updateSurfaceUniform('waterNormalStrength'));
+    waterFolder.add(proxy, 'waterDetailScale', 100.0, 2000.0, 10).name('Detail Scale').onChange(updateSurfaceUniform('waterDetailScale'));
+    waterFolder.add(proxy, 'waterBigWaveScale', 50.0, 800.0, 5).name('Big Wave Scale').onChange(updateSurfaceUniform('waterBigWaveScale'));
     waterFolder.close();
 
     // ══════════════════════════════════════════

@@ -35,6 +35,9 @@ export const GLOBE_DEFAULTS = {
   waterWaveSpeed: 0.95,
   waterWaveScale: 3.0,
   waterCurrentStrength: 3.0,
+  waterNormalStrength: 8.0,
+  waterDetailScale: 1200.0,
+  waterBigWaveScale: 300.0,
 
   // ── Surface Atmosphere ──
   atmosDayColor: [0.3, 0.7, 1.0],
@@ -189,6 +192,7 @@ export const GLOBE_DEFAULTS = {
   globeBreakout: false,
   globeBreakoutPx: 60,
   globeBreakoutClipPad: 4,
+  globeBreakoutFeather: 8,
 
   // ── Expedition Photo Card ──
   photoCardTop: 12,
