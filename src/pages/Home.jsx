@@ -244,12 +244,10 @@ export default function Home() {
         // --- A. Cinematic Lighting Setup ---
         // Clean out default lights to own the scene fully
         scene.children.filter(c => c.type === 'DirectionalLight' || c.type === 'AmbientLight').forEach(l => scene.remove(l));
-        const ambient = new THREE.AmbientLight(0xffffff, 0.5); // Brighter base to show texture
-        const rimColor = new THREE.DirectionalLight(0x7c3aed, 2.5); // Deep purple rim
-        rimColor.position.set(-200, 100, -200);
-        const sunLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        const ambient = new THREE.AmbientLight(0xffffff, 0.15);
+        const sunLight = new THREE.DirectionalLight(0xffffff, 2.0);
         sunLight.position.set(200, 100, 200);
-        scene.add(ambient, rimColor, sunLight);
+        scene.add(ambient, sunLight);
 
         if (!globe.customUniforms) {
           globe.customUniforms = {
@@ -263,9 +261,7 @@ export default function Home() {
         // Position lights to match real-time sun direction
         const initSunPos = globe.customUniforms.sunDir.value.clone().multiplyScalar(200);
         sunLight.position.copy(initSunPos);
-        rimColor.position.copy(initSunPos.clone().negate().add(new THREE.Vector3(0, 100, 0)));
         globe._sunLight = sunLight;
-        globe._rimLight = rimColor;
 
         // --- B. Living Ocean Shader Material ---
         if (!globe.oceanMaterialSet) {
@@ -353,7 +349,7 @@ export default function Home() {
                 vec3 worldViewDir = normalize(cameraPosition - vWorldPos);
                 float NdotL = dot(vWorldNormal, sunDir);
                 float dayStrength = smoothstep(-0.25, 0.5, NdotL);
-                float dayLight = 0.08 + max(NdotL, 0.0) * 0.92;
+                float dayLight = 0.03 + max(NdotL, 0.0) * 0.97;
                 float rawFresnel = clamp(1.0 - dot(worldViewDir, vWorldNormal), 0.0, 1.0);
                 vec3 halfDir = normalize(sunDir + worldViewDir);
 
@@ -361,15 +357,15 @@ export default function Home() {
                 float landFresnel = pow(rawFresnel, 3.5);
                 float bumpVal = packed.r;
                 float bumpLight = 1.0 + (bumpVal - 0.5) * 0.35 * dayStrength;
-                vec3 landDay = dayCol.rgb * dayLight * bumpLight + dayCol.rgb * landFresnel * 0.10;
+                vec3 landDay = dayCol.rgb * dayLight * bumpLight + dayCol.rgb * landFresnel * 0.10 * dayStrength;
                 float roughness = packed.g;
                 float landSpec = (1.0 - roughness) * pow(max(dot(vWorldNormal, halfDir), 0.0), 60.0) * 0.12;
                 landDay += vec3(0.7, 0.75, 0.8) * landSpec;
-                // City lights: warm golden glow with exponential peak brightness
+                // City lights: warm golden glow (only amplify real city pixels, keep dark areas dark)
                 float lightPeak = max(max(nightCol.r, nightCol.g), nightCol.b);
-                vec3 warmLight = nightCol * vec3(1.2, 1.0, 0.7);
-                vec3 landNight = warmLight * 3.0 + warmLight * lightPeak * 5.0;
-                landNight += vec3(1.0, 0.7, 0.3) * pow(lightPeak, 3.0) * 2.0;
+                float cityMask = smoothstep(0.08, 0.25, lightPeak);
+                vec3 landNight = nightCol * vec3(1.1, 1.0, 0.85) * (1.0 + cityMask * 2.0);
+                landNight += vec3(1.0, 0.8, 0.4) * pow(lightPeak, 2.0) * cityMask * 2.0;
                 vec3 landColor = mix(landNight, landDay, dayStrength);
 
                 // --- WATER: animated ocean + tidal currents + specular + Fresnel ---
@@ -429,10 +425,10 @@ export default function Home() {
                   + vec3(0.9, 0.85, 0.7) * glare * 0.5
                   + skyReflection * wFresnel * 0.5
                   + vec3(0.3, 0.5, 0.8) * waves * audioPulse * 0.3;
-                // Night water reflects city light glow from nearby land
+                // Night water: near-black ocean with faint city light reflections
                 float cityGlow = max(max(nightCol.r, nightCol.g), nightCol.b);
-                vec3 waterNight = deepSea * 0.2 + vec3(0.01, 0.02, 0.05) * bigWaves
-                  + vec3(0.8, 0.6, 0.3) * cityGlow * 0.15;
+                vec3 waterNight = vec3(0.002, 0.004, 0.01)
+                  + vec3(0.5, 0.4, 0.2) * cityGlow * 0.08;
                 vec3 waterColor = mix(waterNight, waterDay, dayStrength);
 
                 // Liquid glass shimmer on prism bop (water goes prismatic)
@@ -454,7 +450,7 @@ export default function Home() {
                 vec3 atmosphereTwilightColor = vec3(0.74, 0.29, 0.04);
                 vec3 atmosphereColor = mix(atmosphereTwilightColor, atmosphereDayColor, smoothstep(-0.25, 0.75, NdotL));
                 float atmosphereMix = clamp(smoothstep(-0.5, 1.0, NdotL) * pow(rawFresnel, 2.0), 0.0, 1.0);
-                finalColor = mix(finalColor, atmosphereColor, atmosphereMix * 0.6);
+                finalColor = mix(finalColor, atmosphereColor, atmosphereMix * 0.45);
 
                 // Sunset glow at terminator
                 float sunsetGlow = smoothstep(-0.05, 0.3, NdotL) * smoothstep(0.5, 0.05, max(NdotL, 0.0));
@@ -530,7 +526,7 @@ export default function Home() {
                 // Sun illumination
                 float NdotL = dot(vWorldNormal, sunDir);
                 float dayFactor = smoothstep(-0.15, 0.5, NdotL);
-                float illumination = 0.08 + max(NdotL, 0.0) * 0.92;
+                float illumination = 0.02 + max(NdotL, 0.0) * 0.98;
 
                 // Lit clouds are bright white, shadow side is blue-gray
                 vec3 litCloud = vec3(1.0, 0.99, 0.96);
@@ -556,8 +552,8 @@ export default function Home() {
                 // Music-reactive cloud brightness
                 cloudColor += cloudColor * audioPulse * 0.15;
 
-                // Night side: clouds fade but thin wisp remains for realism
-                alpha *= max(dayFactor, 0.04);
+                // Night side: clouds invisible (dark side should be clean black)
+                alpha *= dayFactor;
 
                 // Bump alpha based on cloud thickness for volumetric feel
                 alpha = alpha * (0.7 + thickness * 0.3);
@@ -1228,7 +1224,7 @@ export default function Home() {
               globe.customUniforms.sunDir.value.copy(newSunDir);
               // Move directional lights to match sun
               if (globe._sunLight) globe._sunLight.position.copy(newSunDir.clone().multiplyScalar(200));
-              if (globe._rimLight) globe._rimLight.position.copy(newSunDir.clone().negate().add(new THREE.Vector3(0, 100, 0)));
+
 
               // Decay intro aurora (swirling orb fades over ~5 seconds)
               if (globe.customUniforms.introIntensity.value > 0) {
