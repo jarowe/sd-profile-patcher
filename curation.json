@@ -1,0 +1,5 @@
+{
+  "_comment": "Node curation state. Pipeline reads this to apply publish/hide. Managed via admin UI. Pipeline NEVER writes to this file.",
+  "hidden": [],
+  "visibility_overrides": {}
+}

@@ -1,0 +1,9 @@
+{
+  "_comment": "People allowed to appear publicly by name. Everyone else is labeled generically.",
+  "public": [],
+  "friends": [],
+  "minors": {
+    "firstNames": [],
+    "blockedPatterns": []
+  }
+}
