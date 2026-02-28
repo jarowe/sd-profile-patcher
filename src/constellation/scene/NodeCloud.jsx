@@ -31,19 +31,15 @@ function getConnectedIds(nodeId) {
 }
 
 /**
- * Get IDs of nodes matching a filter entity (nodes connected through that entity).
- * Finds all nodes that have the entity label in their connected edges' evidence
- * or whose title matches the entity label.
+ * Get IDs of nodes matching a filter entity.
  */
 function getFilteredNodeIds(filterEntity) {
   if (!filterEntity) return null;
   const matching = new Set();
 
-  // Find all nodes whose title matches the entity label
   for (const node of mockData.nodes) {
     if (node.title === filterEntity.value) {
       matching.add(node.id);
-      // Also add all connected nodes
       for (const edge of mockData.edges) {
         if (edge.source === node.id) matching.add(edge.target);
         if (edge.target === node.id) matching.add(edge.source);
@@ -56,10 +52,9 @@ function getFilteredNodeIds(filterEntity) {
 
 /**
  * Instanced mesh rendering all constellation nodes.
- * Uses InstancedBufferAttribute for per-instance color.
- * Breathing pulse animation via useFrame (when enabled).
- * Focus dimming: non-connected nodes dim to ~15% opacity on focus.
- * Entity filter dimming: non-matching nodes dim when filter active.
+ * Uses Three.js instanceColor (setColorAt) for per-instance colors.
+ * Breathing pulse animation via useFrame.
+ * Focus dimming: non-connected nodes dim to ~15% on focus.
  */
 export default function NodeCloud({ nodes, gpuConfig }) {
   const meshRef = useRef();
@@ -71,51 +66,38 @@ export default function NodeCloud({ nodes, gpuConfig }) {
   const focusedNodeId = useConstellationStore((s) => s.focusedNodeId);
   const filterEntity = useConstellationStore((s) => s.filterEntity);
 
-  // Pre-compute per-instance base colors
-  const baseColors = useMemo(() => {
-    const arr = new Float32Array(count * 3);
-    nodes.forEach((node, i) => {
-      tempColor.set(NODE_COLORS[node.type] || '#ffffff');
-      arr[i * 3] = tempColor.r;
-      arr[i * 3 + 1] = tempColor.g;
-      arr[i * 3 + 2] = tempColor.b;
-    });
-    return arr;
-  }, [nodes, count]);
-
   // Pre-compute base scales for breathing animation
   const baseScales = useMemo(
     () => nodes.map((n) => n.size),
     [nodes]
   );
 
-  // Working color array that gets modified for dimming
-  const colors = useMemo(() => new Float32Array(baseColors), [baseColors]);
-
-  // Set initial instance transforms AND color attribute imperatively
+  // Set initial instance transforms and per-instance colors
   useEffect(() => {
-    if (!meshRef.current) return;
+    const mesh = meshRef.current;
+    if (!mesh) return;
 
     nodes.forEach((node, i) => {
+      // Position + scale
       dummy.position.set(node.x, node.y, node.z);
       dummy.scale.setScalar(node.size);
       dummy.updateMatrix();
-      meshRef.current.setMatrixAt(i, dummy.matrix);
+      mesh.setMatrixAt(i, dummy.matrix);
+
+      // Per-instance color via Three.js instanceColor API
+      tempColor.set(NODE_COLORS[node.type] || '#ffffff');
+      mesh.setColorAt(i, tempColor);
     });
 
-    meshRef.current.instanceMatrix.needsUpdate = true;
-
-    // Imperatively set per-instance color attribute on the geometry
-    const geo = meshRef.current.geometry;
-    const colorAttr = new THREE.InstancedBufferAttribute(new Float32Array(baseColors), 3);
-    geo.setAttribute('color', colorAttr);
-
-    meshRef.current.computeBoundingSphere();
-  }, [nodes, baseColors]);
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    mesh.computeBoundingSphere();
+  }, [nodes]);
 
   // Focus dimming and entity filter dimming
   useEffect(() => {
-    if (!meshRef.current) return;
+    const mesh = meshRef.current;
+    if (!mesh || !mesh.instanceColor) return;
 
     let activeIds = null;
 
@@ -124,10 +106,6 @@ export default function NodeCloud({ nodes, gpuConfig }) {
     } else if (filterEntity) {
       activeIds = getFilteredNodeIds(filterEntity);
     }
-
-    // Update per-instance colors based on active state
-    const colorAttr = meshRef.current.geometry.getAttribute('color');
-    if (!colorAttr) return;
 
     for (let i = 0; i < count; i++) {
       const nodeId = nodes[i].id;
@@ -141,18 +119,18 @@ export default function NodeCloud({ nodes, gpuConfig }) {
         }
       }
 
-      colorAttr.array[i * 3] = Math.min(1, baseColors[i * 3] * dimFactor);
-      colorAttr.array[i * 3 + 1] = Math.min(1, baseColors[i * 3 + 1] * dimFactor);
-      colorAttr.array[i * 3 + 2] = Math.min(1, baseColors[i * 3 + 2] * dimFactor);
+      tempColor.set(NODE_COLORS[nodes[i].type] || '#ffffff');
+      tempColor.multiplyScalar(dimFactor);
+      mesh.setColorAt(i, tempColor);
     }
 
-    colorAttr.needsUpdate = true;
+    mesh.instanceColor.needsUpdate = true;
 
     // Update emissive intensity for focused node
     if (materialRef.current) {
       materialRef.current.emissiveIntensity = focusedNodeId ? 2.0 : 1.5;
     }
-  }, [focusedNodeId, filterEntity, nodes, count, baseColors]);
+  }, [focusedNodeId, filterEntity, nodes, count]);
 
   // Breathing pulse animation
   useFrame(({ clock }) => {
@@ -161,7 +139,7 @@ export default function NodeCloud({ nodes, gpuConfig }) {
     const time = clock.getElapsedTime();
 
     for (let i = 0; i < count; i++) {
-      const breathe = Math.sin(time * 0.5 + i * 0.3) * 0.05 + 1.0; // 0.95 - 1.05 range
+      const breathe = Math.sin(time * 0.5 + i * 0.3) * 0.05 + 1.0;
       const scale = baseScales[i] * breathe;
 
       meshRef.current.getMatrixAt(i, dummy.matrix);
@@ -210,7 +188,6 @@ export default function NodeCloud({ nodes, gpuConfig }) {
         emissive="white"
         emissiveIntensity={1.5}
         toneMapped={false}
-        vertexColors
       />
     </instancedMesh>
   );

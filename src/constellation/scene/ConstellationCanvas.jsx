@@ -9,55 +9,39 @@ import NodeCloud from './NodeCloud';
 import HoverLabel from './HoverLabel';
 import CameraController from './CameraController';
 import Starfield from './Starfield';
-import NebulaFog from './NebulaFog';
 
 /**
  * GPU tier-based configuration.
+ * Capped at tier 2 to keep texture/geometry count low and avoid WebGL context loss.
  */
 function getGPUConfig(tier) {
   if (tier <= 1) {
-    // LOW: Aggressive cuts for mobile/weak GPU
     return {
       bloom: false,
       pulseAnimation: false,
       starParticles: 0,
-      nebulaFog: false,
       dpr: 1,
       sphereSegments: 8,
     };
   }
-  if (tier === 2) {
-    // MEDIUM: Moderate effects
-    return {
-      bloom: true,
-      pulseAnimation: true,
-      starParticles: 4000,
-      nebulaFog: false,
-      dpr: 1.5,
-      sphereSegments: 12,
-    };
-  }
-  // HIGH (tier 3): Full effects
+  // Tier 2+ — bloom, stars, pulse (no nebula fog — it renders as ugly rectangles)
   return {
     bloom: true,
     pulseAnimation: true,
-    starParticles: 8000,
-    nebulaFog: true,
-    dpr: 2,
-    sphereSegments: 16,
+    starParticles: 4000,
+    dpr: Math.min(1.5, window.devicePixelRatio),
+    sphereSegments: 12,
   };
 }
 
 /**
  * Detect GPU tier synchronously before Canvas mounts.
- * Avoids creating a second WebGL context inside the Canvas tree.
  */
 function detectGPUTier() {
   const cores = navigator.hardwareConcurrency || 2;
   const mobile = /Mobi|Android/i.test(navigator.userAgent);
   if (mobile || cores <= 2) return 1;
-  if (cores <= 4) return 2;
-  return 3;
+  return 2; // cap at 2 — tier 3 creates too many resources for StrictMode double-mount
 }
 
 /**
@@ -85,29 +69,6 @@ export default function ConstellationCanvas() {
   // Helix vertical bounds for timeline scrubber
   const helixBounds = useMemo(() => getHelixBounds(layoutNodes), [layoutNodes]);
 
-  // Epoch centers for nebula fog
-  const epochCenters = useMemo(() => {
-    const epochMap = new Map();
-    for (const node of layoutNodes) {
-      if (!epochMap.has(node.epoch)) {
-        epochMap.set(node.epoch, { sumX: 0, sumY: 0, sumZ: 0, count: 0 });
-      }
-      const e = epochMap.get(node.epoch);
-      e.sumX += node.x;
-      e.sumY += node.y;
-      e.sumZ += node.z;
-      e.count += 1;
-    }
-    return Array.from(epochMap.entries()).map(([epoch, e], idx) => ({
-      epoch,
-      x: e.sumX / e.count,
-      y: e.sumY / e.count,
-      z: e.sumZ / e.count,
-      // Warm tones for older epochs, cooler for recent
-      color: ['#fbbf24', '#f59e0b', '#f87171', '#a78bfa', '#22d3ee'][idx] || '#a78bfa',
-    }));
-  }, [layoutNodes]);
-
   // Disposal verification on unmount
   useEffect(() => {
     return () => {
@@ -133,7 +94,6 @@ export default function ConstellationCanvas() {
       dpr={gpuConfig.dpr}
       onCreated={({ gl }) => {
         rendererRef.current = gl;
-        // Handle WebGL context loss gracefully
         const canvas = gl.domElement;
         canvas.addEventListener('webglcontextlost', (e) => {
           e.preventDefault();
@@ -174,11 +134,6 @@ export default function ConstellationCanvas() {
       />
 
       <Starfield starCount={gpuConfig.starParticles} />
-
-      <NebulaFog
-        epochCenters={epochCenters}
-        enabled={gpuConfig.nebulaFog}
-      />
 
       {gpuConfig.bloom && (
         <EffectComposer>
