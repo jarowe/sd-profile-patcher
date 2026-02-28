@@ -1132,10 +1132,14 @@
 .bento-cell.cell-map.globe-breakout {
     overflow: visible;
     z-index: 20;
+    /* Remove the cell's own border — .liquid-glass-edge provides the glass frame
+       and is independently masked so it fades at the top where the dome protrudes */
+    border-color: transparent;
 }
-/* Disable hover transform in breakout mode — shifts desync the PP mask */
+/* Disable hover transform + suppress the 1px outline shadow in breakout mode */
 .bento-cell.cell-map.globe-breakout:hover {
     transform: none;
+    box-shadow: 0 0 60px rgba(124, 58, 237, 0.15), 0 0 120px rgba(14, 165, 233, 0.05);
 }
 /* Canvas extends above the card so the dome can protrude freely.
    camera.setViewOffset() compensates to keep globe centered in card.
@@ -1151,12 +1155,13 @@
     display: none;
 }
 /* Globe dome breaks through glass at the top — fade glass overlays to transparent
-   at the top edge so the dome appears in front. Sides and bottom stay fully visible. */
+   over the top ~50px so the dome appears to push through in front of the glass.
+   Sides and bottom stay fully visible. */
 .bento-cell.cell-map.globe-breakout::after,
 .bento-cell.cell-map.globe-breakout .liquid-glass-edge,
 .bento-cell.cell-map.globe-breakout .globe-fog-layer {
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 6%);
-    mask-image: linear-gradient(to bottom, transparent 0%, black 6%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black 50px);
+    mask-image: linear-gradient(to bottom, transparent 0px, black 50px);
 }
 
 /* ── Liquid Glass Edge Effect ── */
