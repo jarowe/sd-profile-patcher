@@ -10,7 +10,7 @@ export const GLOBE_DEFAULTS = {
   cityGateMin: 0.215,
   cityGateMax: 0.37,
   cityLightColor: [0.996, 0.706, 0.302],
-  cityLightBoost: [0.0, 0.0, 0.0],
+  cityLightBoost: [0, 0, 0],
   cityGlowPow: 0.9,
   cityGlowMult: 1.5,
 
@@ -40,7 +40,7 @@ export const GLOBE_DEFAULTS = {
   waterBigWaveScale: 300.0,
 
   // ── Surface Atmosphere ──
-  atmosDayColor: [0.3, 0.7, 1.0],
+  atmosDayColor: [0.3, 0.7, 1],
   atmosTwilightColor: [0.74, 0.29, 0.04],
   atmosBlendMin: -0.25,
   atmosBlendMax: 0.75,
@@ -59,22 +59,22 @@ export const GLOBE_DEFAULTS = {
   cloudAlphaMin: 0.0,
   cloudAlphaMax: 1.0,
   cloudOpacity: 0.99,
-  cloudLitColor: [1.0, 0.99, 0.96],
+  cloudLitColor: [1, 0.99, 0.96],
   cloudShadowColor: [0.15, 0.18, 0.25],
   cloudDayFactorMin: -0.15,
   cloudDayFactorMax: 0.5,
-  cloudTerminatorColor: [1.0, 0.459, 0.102],
+  cloudTerminatorColor: [1, 0.459, 0.102],
   cloudTerminatorMult: 2.0,
   cloudRimPow: 3.5,
   cloudRimStrength: 0.3,
   cloudSubsurfaceColor: [0.15, 0.12, 0.08],
-  cloudSilverLiningColor: [1.0, 0.97, 0.93],
+  cloudSilverLiningColor: [1, 0.97, 0.93],
 
   // ── Atmosphere Rim ──
   rimRadius: 103,
   rimFresnelPow: 3.4,
   rimGlowMult: 1.5,
-  rimDayColor: [0.3, 0.65, 1.0],
+  rimDayColor: [0.3, 0.65, 1],
   rimTwilightColor: [0.85, 0.35, 0.06],
   rimNightColor: [0.05, 0.08, 0.2],
   rimNightToTwilightMin: -1.0,
@@ -119,7 +119,7 @@ export const GLOBE_DEFAULTS = {
 
   // ── Prismatic Glow Layer ──
   prismGlowEnabled: true,
-  prismGlowColor1: [0.2, 0.6, 1.0],
+  prismGlowColor1: [0.2, 0.6, 1],
   prismGlowColor2: [0.5, 0.1, 0.9],
   prismGlowColor3: [0.1, 0.9, 0.4],
   prismGlowIntensity: 1.3,
@@ -133,7 +133,7 @@ export const GLOBE_DEFAULTS = {
 
   // ── Environment Glow Layer ──
   envGlowEnabled: true,
-  envGlowColor1: [0.1, 0.4, 1.0],
+  envGlowColor1: [0.1, 0.4, 1],
   envGlowColor2: [0.7, 0.1, 0.9],
   envGlowColor3: [0.1, 0.9, 0.5],
   envGlowIntensity: 0.62,
@@ -221,16 +221,16 @@ export const GLOBE_DEFAULTS = {
   // ── Glass Border (PP shader liquid glass) ──
   glassThickness: 30,
   glassIntensity: 0.8,
-  glassTintColor: [0.4, 0.6, 1.0],
+  glassTintColor: [0.4, 0.6, 1],
 
   // ── Expedition Photo Card ──
-  photoCardTop: 12,
-  photoCardRight: -8,
+  photoCardTop: 2,
+  photoCardRight: -27,
   photoCardWidth: 160,
 
   // ── Message Bubble ──
-  msgBubbleBottom: 56,
-  msgBubbleRight: -8,
+  msgBubbleBottom: 68,
+  msgBubbleRight: -12,
 
   // ── Visibility Toggles ──
   satellitesVisible: true,
@@ -303,7 +303,7 @@ export const GLOBE_DEFAULTS = {
   sunRaysIntensity: 0.04,
   sunRaysLength: 3.4,
   sunRaysCount: 12,
-  sunRaysColor: [1.0, 0.95, 0.8],
+  sunRaysColor: [1, 0.95, 0.8],
 
   // ── God Rays (Screen-space PP radial blur) ──
   godRaysEnabled: true,
