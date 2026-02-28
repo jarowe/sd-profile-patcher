@@ -1,6 +1,16 @@
 import { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { X, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  X,
+  ChevronDown,
+  ChevronUp,
+  Calendar,
+  MapPin,
+  User,
+  Folder,
+  Lightbulb,
+  Star,
+} from 'lucide-react';
 import { useConstellationStore } from '../store';
 import mockData from '../data/mock-constellation.json';
 import EntityChip from './EntityChip';
@@ -16,14 +26,17 @@ const TYPE_COLORS = {
   milestone: { bg: 'rgba(251, 191, 36, 0.2)', text: '#fbbf24' },
 };
 
-/** Evidence type icons */
-const EVIDENCE_ICONS = {
-  temporal: 'calendar',
-  place: 'map-pin',
-  person: 'user',
-  project: 'folder',
-  idea: 'lightbulb',
+/** Evidence type icon components */
+const EVIDENCE_ICON_MAP = {
+  temporal: Calendar,
+  place: MapPin,
+  person: User,
+  project: Folder,
+  idea: Lightbulb,
 };
+
+/** Number of connections to show before "Show N more" */
+const INITIAL_CONNECTION_LIMIT = 5;
 
 /**
  * Format a date string to a human-readable format.
@@ -44,28 +57,73 @@ function formatDate(dateStr) {
 /**
  * Right sidebar detail panel for focused constellation node.
  * Slides in from right on desktop, bottom sheet on mobile.
- * Shows title, type badge, date, description, media, entity chips, and connection reasons.
+ * Shows title, type badge, date, description, media, entity chips,
+ * and enhanced "Because..." connection evidence with clickable node names.
  */
 export default function DetailPanel() {
   const focusedNodeId = useConstellationStore((s) => s.focusedNodeId);
   const clearFocus = useConstellationStore((s) => s.clearFocus);
+  const focusNode = useConstellationStore((s) => s.focusNode);
   const openLightbox = useConstellationStore((s) => s.openLightbox);
 
   const [becauseOpen, setBecauseOpen] = useState(false);
+  const [showAllConnections, setShowAllConnections] = useState(false);
 
-  // Find focused node and its edges
-  const { node, edges, entities } = useMemo(() => {
-    if (!focusedNodeId) return { node: null, edges: [], entities: [] };
+  // Find focused node and its edges, grouped by connected node
+  const { node, connectionGroups, entities } = useMemo(() => {
+    if (!focusedNodeId)
+      return { node: null, connectionGroups: [], entities: [] };
 
     const foundNode = mockData.nodes.find((n) => n.id === focusedNodeId);
-    if (!foundNode) return { node: null, edges: [], entities: [] };
+    if (!foundNode)
+      return { node: null, connectionGroups: [], entities: [] };
 
     // Find all edges connected to this node
     const connectedEdges = mockData.edges.filter(
       (e) => e.source === focusedNodeId || e.target === focusedNodeId
     );
 
-    // Extract unique entities (people, places, tags) from connected nodes
+    // Group edges by connected node, with node info and all evidence
+    const groupMap = new Map();
+    for (const edge of connectedEdges) {
+      const otherId =
+        edge.source === focusedNodeId ? edge.target : edge.source;
+      const otherNode = mockData.nodes.find((n) => n.id === otherId);
+      if (!otherNode) continue;
+
+      if (!groupMap.has(otherId)) {
+        groupMap.set(otherId, {
+          nodeId: otherId,
+          nodeTitle: otherNode.title,
+          nodeType: otherNode.type,
+          evidence: [],
+        });
+      }
+      // Add all evidence from this edge (cap at 5 per connection)
+      const group = groupMap.get(otherId);
+      for (const ev of edge.evidence) {
+        if (group.evidence.length < 5) {
+          group.evidence.push({
+            ...ev,
+            weight: edge.weight,
+          });
+        }
+      }
+    }
+
+    const groups = Array.from(groupMap.values());
+    // Sort by weight descending (strongest connections first)
+    groups.sort((a, b) => {
+      const avgA =
+        a.evidence.reduce((sum, e) => sum + (e.weight || 0), 0) /
+        a.evidence.length;
+      const avgB =
+        b.evidence.reduce((sum, e) => sum + (e.weight || 0), 0) /
+        b.evidence.length;
+      return avgB - avgA;
+    });
+
+    // Extract unique entities for chips
     const entityMap = new Map();
     for (const edge of connectedEdges) {
       const otherId =
@@ -73,7 +131,6 @@ export default function DetailPanel() {
       const otherNode = mockData.nodes.find((n) => n.id === otherId);
       if (!otherNode) continue;
 
-      // Group by type + title
       const key = `${otherNode.type}:${otherNode.title}`;
       if (!entityMap.has(key)) {
         entityMap.set(key, {
@@ -85,9 +142,7 @@ export default function DetailPanel() {
       entityMap.get(key).count += 1;
     }
 
-    // Count total connections per entity across full graph (not just this node)
     const entityList = Array.from(entityMap.values()).map((entity) => {
-      // Find how many total edges this entity's source node has
       const entityNode = mockData.nodes.find(
         (n) => n.title === entity.label && n.type === entity.type
       );
@@ -100,22 +155,37 @@ export default function DetailPanel() {
       return entity;
     });
 
-    // Sort: people first, then by count descending
     entityList.sort((a, b) => {
-      const typeOrder = { person: 0, place: 1, project: 2, idea: 3, moment: 4, milestone: 5 };
+      const typeOrder = {
+        person: 0,
+        place: 1,
+        project: 2,
+        idea: 3,
+        moment: 4,
+        milestone: 5,
+      };
       const aOrder = typeOrder[a.type] ?? 99;
       const bOrder = typeOrder[b.type] ?? 99;
       if (aOrder !== bOrder) return aOrder - bOrder;
       return b.count - a.count;
     });
 
-    return { node: foundNode, edges: connectedEdges, entities: entityList };
+    return { node: foundNode, connectionGroups: groups, entities: entityList };
   }, [focusedNodeId]);
 
-  // Reset because section when node changes
-  useMemo(() => setBecauseOpen(false), [focusedNodeId]);
+  // Reset states when node changes
+  useMemo(() => {
+    setBecauseOpen(false);
+    setShowAllConnections(false);
+  }, [focusedNodeId]);
 
   const typeStyle = node ? TYPE_COLORS[node.type] || TYPE_COLORS.moment : {};
+
+  // Determine visible connections
+  const visibleConnections = showAllConnections
+    ? connectionGroups
+    : connectionGroups.slice(0, INITIAL_CONNECTION_LIMIT);
+  const hiddenCount = connectionGroups.length - INITIAL_CONNECTION_LIMIT;
 
   return (
     <AnimatePresence>
@@ -222,15 +292,20 @@ export default function DetailPanel() {
             </div>
           )}
 
-          {/* Because section */}
-          {edges.length > 0 && (
+          {/* Enhanced Because section */}
+          {connectionGroups.length > 0 && (
             <div className="detail-panel__section">
               <button
                 className="detail-panel__because-toggle"
                 onClick={() => setBecauseOpen(!becauseOpen)}
                 aria-expanded={becauseOpen}
               >
-                <span>Because...</span>
+                <span>
+                  Because...{' '}
+                  <span className="detail-panel__because-count">
+                    ({connectionGroups.length})
+                  </span>
+                </span>
                 {becauseOpen ? (
                   <ChevronUp size={16} />
                 ) : (
@@ -247,23 +322,69 @@ export default function DetailPanel() {
                     exit={{ height: 0, opacity: 0 }}
                     transition={{ duration: 0.2 }}
                   >
-                    {edges.map((edge, i) => (
-                      <div key={i} className="detail-panel__evidence">
-                        {edge.evidence.map((ev, j) => (
-                          <div
-                            key={j}
-                            className="detail-panel__evidence-item"
+                    {visibleConnections.map((group) => {
+                      const connTypeStyle =
+                        TYPE_COLORS[group.nodeType] || TYPE_COLORS.moment;
+                      return (
+                        <div
+                          key={group.nodeId}
+                          className="detail-panel__connection-group"
+                        >
+                          {/* Connected node title (clickable to fly to) */}
+                          <button
+                            className="detail-panel__connection-title"
+                            onClick={() => focusNode(group.nodeId)}
+                            style={{ color: connTypeStyle.text }}
                           >
-                            <span className="detail-panel__evidence-type">
-                              {ev.type}
-                            </span>
-                            <span className="detail-panel__evidence-desc">
-                              {ev.description}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    ))}
+                            <span
+                              className="detail-panel__connection-dot"
+                              style={{ backgroundColor: connTypeStyle.text }}
+                            />
+                            {group.nodeTitle}
+                          </button>
+
+                          {/* Evidence items */}
+                          {group.evidence.map((ev, j) => {
+                            const IconComponent =
+                              EVIDENCE_ICON_MAP[ev.type] || Star;
+                            return (
+                              <div
+                                key={j}
+                                className="detail-panel__evidence-item"
+                              >
+                                <span className="detail-panel__evidence-icon">
+                                  <IconComponent size={12} />
+                                </span>
+                                <span className="detail-panel__evidence-desc">
+                                  {ev.description}
+                                </span>
+                                {ev.weight != null && (
+                                  <span className="detail-panel__evidence-weight">
+                                    <span
+                                      className="detail-panel__evidence-weight-bar"
+                                      style={{
+                                        width: `${Math.round(ev.weight * 100)}%`,
+                                      }}
+                                    />
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+
+                    {/* Show more button */}
+                    {hiddenCount > 0 && !showAllConnections && (
+                      <button
+                        className="detail-panel__show-more"
+                        onClick={() => setShowAllConnections(true)}
+                      >
+                        Show {hiddenCount} more connection
+                        {hiddenCount !== 1 ? 's' : ''}
+                      </button>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>

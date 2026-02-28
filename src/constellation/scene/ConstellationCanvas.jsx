@@ -8,6 +8,7 @@ import { useConstellationStore } from '../store';
 import { computeHelixLayout, getHelixCenter, getHelixBounds } from '../layout/helixLayout';
 import mockData from '../data/mock-constellation.json';
 import NodeCloud from './NodeCloud';
+import ConnectionLines from './ConnectionLines';
 import HoverLabel from './HoverLabel';
 import CameraController from './CameraController';
 import Starfield from './Starfield';
@@ -129,6 +130,8 @@ export default function ConstellationCanvas() {
       <HoverLabel />
 
       <ambientLight intensity={0.15} />
+
+      <ConnectionLines positions={layoutNodes} />
 
       <NodeCloud
         nodes={layoutNodes}
