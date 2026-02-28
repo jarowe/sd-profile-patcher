@@ -3401,6 +3401,21 @@ export default function Home() {
     return () => clearTimeout(timerId);
   }, []);
 
+  // Editor "Trigger Prism Peek" button support
+  useEffect(() => {
+    const handler = () => {
+      const sides = ['right', 'left', 'top'];
+      setPeekPosition({
+        cell: Math.floor(Math.random() * 4),
+        side: sides[Math.floor(Math.random() * sides.length)]
+      });
+      setPeekVisible(true);
+      setTimeout(() => setPeekVisible(false), 8000);
+    };
+    window.addEventListener('trigger-prism-peek', handler);
+    return () => window.removeEventListener('trigger-prism-peek', handler);
+  }, []);
+
   const handleCatchCharacter = useCallback(() => {
     setPeekVisible(false);
     playClickSound();

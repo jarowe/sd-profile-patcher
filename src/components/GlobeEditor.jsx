@@ -561,6 +561,9 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
       const g = globeRef.current;
       if (g?.customUniforms?.prismPulse) g.customUniforms.prismPulse.value = 1.0;
     } }, 'fire').name('Simulate Bop');
+    bopFolder.add({ triggerPeek() {
+      window.dispatchEvent(new CustomEvent('trigger-prism-peek'));
+    } }, 'triggerPeek').name('Trigger Prism Peek');
     bopFolder.close();
 
     // ══════════════════════════════════════════
