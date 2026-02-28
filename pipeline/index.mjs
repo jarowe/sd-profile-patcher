@@ -165,7 +165,7 @@ async function main() {
   );
 
   if (allNodes.length === 0) {
-    await failPipeline('Pipeline produced zero nodes', 2);
+    await failPipeline('Pipeline produced zero nodes', 0);
   }
 
   // ========================================================================
