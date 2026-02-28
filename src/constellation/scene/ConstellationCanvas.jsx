@@ -1,7 +1,9 @@
 import { useRef, useEffect, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
-import { EffectComposer, Bloom } from '@react-three/postprocessing';
+// Bloom disabled — EffectComposer creates ~15 render target textures which
+// causes WebGL context loss during React StrictMode double-mount.
+// TODO: Re-enable after adding production-only bloom or custom glow shader.
 import { useConstellationStore } from '../store';
 import { computeHelixLayout, getHelixCenter, getHelixBounds } from '../layout/helixLayout';
 import mockData from '../data/mock-constellation.json';
@@ -135,16 +137,7 @@ export default function ConstellationCanvas() {
 
       <Starfield starCount={gpuConfig.starParticles} />
 
-      {gpuConfig.bloom && (
-        <EffectComposer>
-          <Bloom
-            luminanceThreshold={1}
-            luminanceSmoothing={0.9}
-            intensity={0.5}
-            mipmapBlur
-          />
-        </EffectComposer>
-      )}
+      {/* Bloom disabled — see import comment. Nodes use emissive glow instead. */}
     </Canvas>
   );
 }
