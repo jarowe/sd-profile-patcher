@@ -700,57 +700,39 @@
 }
 
 .peek-character.peek-right {
-    right: -4px;
+    right: -60px;
     top: 50%;
 }
 
 .peek-character.peek-left {
-    left: -4px;
+    left: -60px;
     top: 40%;
 }
 
 .peek-character.peek-top {
     left: 50%;
-    top: 70px;
+    top: 40px;
 }
 
 /* 3D Glass Prism Container */
 .prism-3d {
     position: relative;
-    perspective: 500px;
-    transform-style: preserve-3d;
 }
 
-.peek-prism {
-    filter: drop-shadow(0 0 14px rgba(124, 58, 237, 0.8))
-            drop-shadow(0 0 35px rgba(56, 189, 248, 0.5))
-            drop-shadow(0 0 8px rgba(255, 255, 255, 0.35));
-    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    animation: prismFloat3D 5s ease-in-out infinite, prismGlow3D 8s linear infinite;
-    transform-origin: center 60%;
+.prism-3d-canvas-wrapper {
+    display: block;
 }
 
-.peek-prism:hover {
-    transform: scale(1.4) rotateY(25deg) rotateX(-8deg);
-    filter: drop-shadow(0 0 24px rgba(124, 58, 237, 1))
-            drop-shadow(0 0 50px rgba(56, 189, 248, 0.8))
-            drop-shadow(0 0 12px rgba(255, 255, 255, 0.6));
+.prism-loading-glow {
+    width: 220px;
+    height: 240px;
+    background: radial-gradient(ellipse at center, rgba(124, 58, 237, 0.3) 0%, transparent 70%);
+    animation: prismLoadPulse 1.5s ease-in-out infinite;
 }
 
-@keyframes prismFloat3D {
-    0%, 100% { transform: translateY(0) rotateY(0deg) rotateX(0deg) rotateZ(0deg); }
-    20% { transform: translateY(-5px) rotateY(15deg) rotateX(-4deg) rotateZ(2deg); }
-    40% { transform: translateY(-9px) rotateY(-8deg) rotateX(5deg) rotateZ(-1deg); }
-    60% { transform: translateY(-6px) rotateY(12deg) rotateX(-3deg) rotateZ(1.5deg); }
-    80% { transform: translateY(-3px) rotateY(-5deg) rotateX(2deg) rotateZ(-0.5deg); }
-}
-
-@keyframes prismGlow3D {
-    0% { filter: drop-shadow(0 0 14px rgba(124, 58, 237, 0.8)) drop-shadow(0 0 35px rgba(56, 189, 248, 0.5)) drop-shadow(0 0 8px rgba(255, 255, 255, 0.35)); }
-    25% { filter: drop-shadow(0 0 16px rgba(244, 114, 182, 0.8)) drop-shadow(0 0 40px rgba(34, 197, 94, 0.5)) drop-shadow(0 0 10px rgba(255, 255, 255, 0.4)); }
-    50% { filter: drop-shadow(0 0 18px rgba(56, 189, 248, 0.8)) drop-shadow(0 0 38px rgba(251, 191, 36, 0.5)) drop-shadow(0 0 8px rgba(255, 255, 255, 0.3)); }
-    75% { filter: drop-shadow(0 0 16px rgba(34, 197, 94, 0.8)) drop-shadow(0 0 40px rgba(124, 58, 237, 0.5)) drop-shadow(0 0 9px rgba(255, 255, 255, 0.35)); }
-    100% { filter: drop-shadow(0 0 14px rgba(124, 58, 237, 0.8)) drop-shadow(0 0 35px rgba(56, 189, 248, 0.5)) drop-shadow(0 0 8px rgba(255, 255, 255, 0.35)); }
+@keyframes prismLoadPulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.8; }
 }
 
 /* Sparkle trail particles */
