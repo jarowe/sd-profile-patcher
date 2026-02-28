@@ -55,7 +55,7 @@ Plans:
 
 Plans:
 - [x] 02-01-PLAN.md -- Instagram HTML parser with defensive parsing, EXIF stripping, GPS redaction, and shared canonical schema
-- [ ] 02-02-PLAN.md -- Carbonmade JSON parser, epoch configuration, and pipeline config
+- [x] 02-02-PLAN.md -- Carbonmade JSON parser, epoch configuration, and pipeline config
 - [ ] 02-03-PLAN.md -- Evidence-based edge generation, helix layout, pipeline orchestrator, and frontend data loader
 - [ ] 02-04-PLAN.md -- Privacy validation (fail-closed audit), visibility tiers, minors policy, and allowlist enforcement
 - [ ] 02-05-PLAN.md -- Thin admin page (pipeline status + publish/hide), pipeline resilience (last good snapshot)

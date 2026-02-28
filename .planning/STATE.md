@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in-progress
-last_updated: "2026-02-28T15:59:34Z"
+last_updated: "2026-02-28T16:05:00Z"
 progress:
   total_phases: 2
   completed_phases: 1
   total_plans: 9
-  completed_plans: 5
+  completed_plans: 6
 ---
 
 # Project State
@@ -18,34 +18,34 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-27)
 
 **Core value:** The Constellation must render real life data as an explorable, evidence-connected 3D experience -- every node real, every connection justified, every visit a discovery.
-**Current focus:** Phase 2 - Data Pipeline & Privacy (Instagram parser and shared pipeline utilities complete)
+**Current focus:** Phase 2 - Data Pipeline & Privacy (Carbonmade parser complete, edge generation next)
 
 ## Current Position
 
 Phase: 2 of 6 (Data Pipeline & Privacy)
-Plan: 1 of 5 in current phase (02-01 complete)
-Status: In progress -- pipeline foundation and Instagram parser complete, Carbonmade parser next
-Last activity: 2026-02-28 -- Completed 02-01-PLAN.md (Instagram parser + pipeline foundation)
+Plan: 2 of 5 in current phase (02-01 and 02-02 complete)
+Status: In progress -- both parsers complete (Instagram + Carbonmade), edge generation next
+Last activity: 2026-02-28 -- Completed 02-02-PLAN.md (Carbonmade parser + epoch config + pipeline config)
 
-Progress: [=====....] 56% (5/9 plans)
+Progress: [======...] 67% (6/9 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
-- Average duration: 14 min
-- Total execution time: 1.17 hours
+- Total plans completed: 6
+- Average duration: 13 min
+- Total execution time: 1.32 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1. Constellation Scene | 4/4 | 65 min | 16 min |
-| 2. Data Pipeline & Privacy | 1/5 | 5 min | 5 min |
+| 2. Data Pipeline & Privacy | 2/5 | 14 min | 7 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-02 (47 min), 01-03 (6 min), 01-04 (2 min), 02-01 (5 min)
-- Trend: Pipeline plans are fast -- mostly file creation with verification
+- Last 5 plans: 01-03 (6 min), 01-04 (2 min), 02-01 (5 min), 02-02 (9 min)
+- Trend: Pipeline plans are fast -- structured JSON parsing with minimal iteration
 
 *Updated after each plan completion*
 
@@ -85,6 +85,11 @@ Recent decisions affecting current work:
 - [02-01]: Instagram parser uses configurable selector strategy with discovery phase for format adaptation
 - [02-01]: Within-source dedup only (by sourceId hash) -- cross-source dedup deferred
 - [02-01]: assignEpoch from shared config/epochs.mjs module for centralized epoch assignment
+- [02-02]: Blog posts are 20 (not 31 estimated) -- actual count from archive used
+- [02-02]: Epoch ranges start at 2001 to capture AOTV experience entry
+- [02-02]: People extraction limited to 2-3 word proper names with stop-word filtering
+- [02-02]: Project date ranges use start year for epoch assignment
+- [02-02]: PIPELINE_CONFIG centralizes all pipeline paths, privacy defaults, and layout params
 
 ### Pending Todos
 
@@ -102,5 +107,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed 02-01-PLAN.md (Instagram parser + pipeline foundation)
+Stopped at: Completed 02-02-PLAN.md (Carbonmade parser + epoch config + pipeline config)
 Resume file: None
