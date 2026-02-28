@@ -7,6 +7,7 @@ import React, { Suspense } from 'react';
 import StarseedProject from './pages/StarseedProject';
 const UniversePage = React.lazy(() => import('./pages/UniversePage'));
 const ConstellationPage = React.lazy(() => import('./pages/ConstellationPage'));
+const AdminPage = React.lazy(() => import('./pages/Admin'));
 import GameOverlay from './components/GameOverlay';
 import Garden from './pages/Garden';
 import Now from './pages/Now';
@@ -41,6 +42,11 @@ function App() {
               <Route path="/constellation" element={
                 <Suspense fallback={<div style={{ color: 'white', padding: '2rem', textAlign: 'center' }}>Loading Constellation...</div>}>
                   <ConstellationPage />
+                </Suspense>
+              } />
+              <Route path="/admin" element={
+                <Suspense fallback={<div style={{ color: 'white', padding: '2rem', textAlign: 'center' }}>Loading Admin...</div>}>
+                  <AdminPage />
                 </Suspense>
               } />
             </Routes>

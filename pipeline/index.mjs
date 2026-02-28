@@ -165,8 +165,7 @@ async function main() {
   );
 
   if (allNodes.length === 0) {
-    log.info('Pipeline produced zero nodes -- skipping remaining phases');
-    process.exit(0);
+    await failPipeline('Pipeline produced zero nodes', 2);
   }
 
   // ========================================================================
