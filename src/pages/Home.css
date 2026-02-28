@@ -1154,14 +1154,14 @@
 .bento-cell.cell-map.globe-breakout::before {
     display: none;
 }
-/* Globe dome breaks through glass at the top — fade glass overlays to transparent
-   over the top ~50px so the dome appears to push through in front of the glass.
-   Sides and bottom stay fully visible. */
+/* In breakout mode the glass frame is rendered in the PP shader, which has
+   per-pixel Z-control: glass draws at card border but is suppressed wherever
+   the globe dome renders above the card, creating the "glass behind earth" illusion.
+   CSS overlays would create a visible horizontal band, so they are hidden. */
 .bento-cell.cell-map.globe-breakout::after,
 .bento-cell.cell-map.globe-breakout .liquid-glass-edge,
 .bento-cell.cell-map.globe-breakout .globe-fog-layer {
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black 50px);
-    mask-image: linear-gradient(to bottom, transparent 0px, black 50px);
+    display: none;
 }
 
 /* ── Liquid Glass Edge Effect ── */

@@ -2348,12 +2348,38 @@ export default function Home() {
                   float maskAlpha = 1.0 - smoothstep(-0.5, 0.5, dRect);
 
                   // Above the card: use scene alpha so empty space stays transparent
-                  // (prevents opaque black canvas from covering nav bar / page content).
-                  // Inside the card: always opaque (it's a self-contained tile).
                   float sceneAlpha = texture2D(tDiffuse, uv).a;
                   float finalAlpha = maskAlpha * mix(sceneAlpha, 1.0, insideCard);
 
+                  // Apply alpha to scene content (premultiplied)
                   col *= finalAlpha;
+
+                  // ── Shader glass frame: per-pixel Z-ordered border ──
+                  // Glass border + inner glow drawn at card boundary.
+                  // In the dome area above the card, glass is suppressed wherever
+                  // the globe sphere renders — creating the "glass behind earth" illusion.
+                  float bd = abs(dOrigCard);
+                  // Border line: ~2px bright edge
+                  float glassLine = smoothstep(2.0, 0.0, bd) * 0.18;
+                  // Inner glow: subtle inset shadow (only inside card, dOrigCard < 0)
+                  float glassGlow = smoothstep(50.0, 2.0, max(-dOrigCard, 0.0)) * 0.06;
+                  // Catch light along top edge
+                  float topness = smoothstep(cardCenter.y, cardRect.y, pixel.y);
+                  float catchLight = glassLine * topness * 0.4;
+
+                  // Dome suppression: outside the card where globe renders → glass hidden
+                  float outsideCard = smoothstep(-1.0, 3.0, dOrigCard);
+                  float glassMask = 1.0 - outsideCard * sceneAlpha;
+
+                  vec3 lineColor = vec3(0.6, 0.7, 1.0);
+                  vec3 glowColor = vec3(0.48, 0.23, 0.93);
+                  vec3 glassAdd = lineColor * (glassLine + catchLight) + glowColor * glassGlow;
+                  glassAdd *= glassMask;
+
+                  col += glassAdd;
+                  float glassAlpha = max(glassLine + catchLight, glassGlow) * glassMask;
+                  finalAlpha = max(finalAlpha, glassAlpha);
+
                   gl_FragColor = vec4(clamp(col, 0.0, 1.0), finalAlpha);
                 } else {
                   gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
