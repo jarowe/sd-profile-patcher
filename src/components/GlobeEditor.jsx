@@ -129,6 +129,8 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
       const cell = document.querySelector('.cell-map');
       if (cell && p.globeBreakout) cell.style.setProperty('--globe-breakout-px', `${v}px`);
     });
+    controlsFolder.add(proxy, 'glassClipTop', 0, 300, 1).name('Glass Clip Top (px)').onChange(updateParam('glassClipTop'));
+    controlsFolder.add(proxy, 'glassClipFeather', 0, 200, 1).name('Glass Clip Feather').onChange(updateParam('glassClipFeather'));
 
     // ── Expedition Photo Card ──
     const photoFolder = controlsFolder.addFolder('Photo Card');
