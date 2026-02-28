@@ -722,6 +722,7 @@
 .prism-3d-canvas-wrapper {
     display: block;
     overflow: visible;
+    margin: -30px;
 }
 
 .prism-loading-glow {
