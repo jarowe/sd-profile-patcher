@@ -13,7 +13,7 @@ This roadmap delivers the JAROWE Constellation in six phases: first the 3D scene
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Constellation Scene** - 3D rendering foundation with instanced nodes, camera controls, detail panel, and disposal utilities
-- [ ] **Phase 2: Data Pipeline & Privacy** - Instagram + Carbonmade parsers, build-time pipeline, privacy enforcement, constellation.json output, and thin admin slice (pipeline status + basic publish/hide)
+- [x] **Phase 2: Data Pipeline & Privacy** - Instagram + Carbonmade parsers, build-time pipeline, privacy enforcement, constellation.json output, and thin admin slice (pipeline status + basic publish/hide)
 - [ ] **Phase 3: Narrator & Guided Tour** - Event-driven narrator engine with guided cinematic tour and 150+ scripted narration lines
 - [ ] **Phase 4: Admin Dashboard** - Owner-only auth, curation UI, draft inbox, allowlist management, and server-side access control
 - [ ] **Phase 5: Automation** - Nightly cron ingest, Suno auto-ingest, music source adapters, and observability
@@ -58,7 +58,7 @@ Plans:
 - [x] 02-02-PLAN.md -- Carbonmade JSON parser, epoch configuration, and pipeline config
 - [x] 02-03-PLAN.md -- Evidence-based edge generation, helix layout, pipeline orchestrator, and frontend data loader
 - [x] 02-04-PLAN.md -- Privacy validation (fail-closed audit), visibility tiers, minors policy, and allowlist enforcement
-- [ ] 02-05-PLAN.md -- Thin admin page (pipeline status + publish/hide), pipeline resilience (last good snapshot)
+- [x] 02-05-PLAN.md -- Thin admin page (pipeline status + publish/hide), pipeline resilience (last good snapshot)
 
 ### Phase 3: Narrator & Guided Tour
 **Goal**: The constellation tells Jared's story -- a scripted narrator responds to exploration and a cinematic guided tour introduces new visitors to key life moments
@@ -133,7 +133,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Constellation Scene | 4/4 | Complete | 2026-02-28 |
-| 2. Data Pipeline & Privacy | 4/5 | In progress | - |
+| 2. Data Pipeline & Privacy | 5/5 | Complete | 2026-02-28 |
 | 3. Narrator & Guided Tour | 0/3 | Not started | - |
 | 4. Admin Dashboard | 0/4 | Not started | - |
 | 5. Automation | 0/3 | Not started | - |
@@ -141,4 +141,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 
 ---
 *Roadmap created: 2026-02-27*
-*Last updated: 2026-02-28 (02-04 complete -- privacy validation, visibility refinement, schema validation)*
+*Last updated: 2026-02-28 (Phase 2 complete -- 02-05 thin admin, pipeline resilience, Instagram path config)*

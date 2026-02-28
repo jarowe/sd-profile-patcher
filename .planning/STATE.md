@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in-progress
-last_updated: "2026-02-28T16:24:00Z"
+last_updated: "2026-02-28T16:44:00Z"
 progress:
   total_phases: 2
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 9
-  completed_plans: 8
+  completed_plans: 9
 ---
 
 # Project State
@@ -18,33 +18,33 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-27)
 
 **Core value:** The Constellation must render real life data as an explorable, evidence-connected 3D experience -- every node real, every connection justified, every visit a discovery.
-**Current focus:** Phase 2 - Data Pipeline & Privacy (privacy validation complete, thin admin slice remaining)
+**Current focus:** Phase 2 complete -- ready for Phase 3 (Narrator & Guided Tour)
 
 ## Current Position
 
-Phase: 2 of 6 (Data Pipeline & Privacy)
-Plan: 4 of 5 in current phase (02-01, 02-02, 02-03, 02-04 complete)
-Status: In progress -- pipeline produces 60 nodes with 88 edges, fail-closed privacy audit active, thin admin slice remaining
-Last activity: 2026-02-28 -- Completed 02-04-PLAN.md (privacy validation, visibility refinement, schema validation)
+Phase: 2 of 6 (Data Pipeline & Privacy) -- COMPLETE
+Plan: 5 of 5 in current phase (02-01, 02-02, 02-03, 02-04, 02-05 complete)
+Status: Phase 2 complete -- full pipeline operational with 60 nodes, 88 edges, fail-closed privacy, thin admin, and pipeline resilience
+Last activity: 2026-02-28 -- Completed 02-05-PLAN.md (thin admin, pipeline resilience, Instagram path config)
 
-Progress: [========.] 89% (8/9 plans)
+Progress: [=========] 100% (9/9 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
+- Total plans completed: 9
 - Average duration: 12 min
-- Total execution time: 1.54 hours
+- Total execution time: 1.74 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1. Constellation Scene | 4/4 | 65 min | 16 min |
-| 2. Data Pipeline & Privacy | 4/5 | 27 min | 7 min |
+| 2. Data Pipeline & Privacy | 5/5 | 39 min | 8 min |
 
 **Recent Trend:**
-- Last 5 plans: 02-01 (5 min), 02-02 (9 min), 02-03 (6 min), 02-04 (7 min)
+- Last 5 plans: 02-01 (5 min), 02-02 (9 min), 02-03 (6 min), 02-04 (7 min), 02-05 (12 min)
 - Trend: Pipeline plans consistently fast -- structured data processing with clear module boundaries
 
 *Updated after each plan completion*
@@ -100,6 +100,10 @@ Recent decisions affecting current work:
 - [02-04]: Privacy audit scans stringified output for forbidden patterns (DMs, contact graphs, close friends)
 - [02-04]: Curation.json supports both new format (hidden array + visibility_overrides) and legacy format (nodes map)
 - [02-04]: Pipeline extended to 13 phases with schema validation and privacy audit as final steps before write
+- [02-05]: Pipeline-status.json is write-only output; curation.json is read-only input (clean separation)
+- [02-05]: Admin auth is session-only env-var key (no localStorage) -- Phase 4 replaces with GitHub OAuth
+- [02-05]: Curation changes downloaded as JSON (no server-side write in Phase 2); Phase 4 adds proper API
+- [02-05]: Source paths configurable via INSTAGRAM_EXPORT_DIR and CARBONMADE_ARCHIVE_DIR env vars
 
 ### Pending Todos
 
@@ -111,12 +115,12 @@ Recent decisions affecting current work:
 
 ### Blockers/Concerns
 
-- Instagram export HTML not yet available at data-private/instagram/ -- parser verified with missing-directory graceful handling only
+- Instagram export HTML not yet available -- parser verified with missing-directory graceful handling, env var override available (INSTAGRAM_EXPORT_DIR)
 - Research flags Phase 4 (Auth.js v5 non-Next.js) and Phase 5 (Suno API) as needing deeper research during planning
 - WebGL context loss in dev mode (React StrictMode) required disabling Bloom -- production builds unaffected but dev experience is degraded
 
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed 02-04-PLAN.md (privacy validation, visibility refinement, schema validation)
+Stopped at: Completed 02-05-PLAN.md (thin admin, pipeline resilience, Instagram path config) -- Phase 2 complete
 Resume file: None
