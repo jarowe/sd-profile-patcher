@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, Component } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useConstellationStore } from '../constellation/store';
 import ConstellationCanvas from '../constellation/scene/ConstellationCanvas';
+import ListView from '../constellation/fallback/ListView';
 import Toolbar from '../constellation/ui/Toolbar';
 import TimelineScrubber from '../constellation/ui/TimelineScrubber';
 import DetailPanel from '../constellation/ui/DetailPanel';
@@ -26,6 +27,62 @@ class CanvasErrorBoundary extends Component {
     }
     return this.props.children;
   }
+}
+
+/**
+ * Auto-detect prompt for weak GPU devices.
+ * Shown once for tier 0-1 devices if user hasn't dismissed it.
+ */
+function AutoDetectPrompt() {
+  const gpuTier = useConstellationStore((s) => s.gpuTier);
+  const setViewMode = useConstellationStore((s) => s.setViewMode);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    // Only show for tier 0-1 GPUs
+    if (gpuTier === null || gpuTier > 1) return;
+
+    // Only show once per device
+    const dismissed = localStorage.getItem('constellation-autodetect-dismissed');
+    if (dismissed) return;
+
+    setVisible(true);
+  }, [gpuTier]);
+
+  if (!visible) return null;
+
+  const handleSwitch = () => {
+    setViewMode('2d');
+    localStorage.setItem('constellation-autodetect-dismissed', 'true');
+    setVisible(false);
+  };
+
+  const handleKeep = () => {
+    localStorage.setItem('constellation-autodetect-dismissed', 'true');
+    setVisible(false);
+  };
+
+  return (
+    <div className="autodetect-prompt">
+      <p className="autodetect-prompt__text">
+        Your device may have trouble with 3D. Switch to List View?
+      </p>
+      <div className="autodetect-prompt__actions">
+        <button
+          className="autodetect-prompt__btn autodetect-prompt__btn--primary"
+          onClick={handleSwitch}
+        >
+          Switch to List
+        </button>
+        <button
+          className="autodetect-prompt__btn"
+          onClick={handleKeep}
+        >
+          Keep 3D
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export default function ConstellationPage() {
@@ -141,10 +198,18 @@ export default function ConstellationPage() {
           <TimelineScrubber />
           <DetailPanel />
           <MediaLightbox />
+          <AutoDetectPrompt />
         </>
       ) : (
-        <div className="constellation-loading">
-          2D fallback coming in Plan 03
+        <div className="constellation-2d-layout">
+          <div className="constellation-2d-layout__toolbar">
+            <Toolbar />
+          </div>
+          <div className="constellation-2d-layout__content">
+            <ListView />
+          </div>
+          <DetailPanel />
+          <MediaLightbox />
         </div>
       )}
     </div>

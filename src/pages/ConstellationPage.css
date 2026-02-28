@@ -17,3 +17,109 @@
   pointer-events: none;
   z-index: 1;
 }
+
+/* 2D layout */
+.constellation-2d-layout {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.constellation-2d-layout__toolbar {
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+}
+
+/* In 2D mode, toolbar is inline at top rather than absolute positioned */
+.constellation-2d-layout__toolbar .constellation-toolbar {
+  position: relative;
+  top: auto;
+  right: auto;
+  justify-content: flex-end;
+  padding: 0.5rem 1rem;
+}
+
+.constellation-2d-layout__content {
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Auto-detect prompt toast */
+.autodetect-prompt {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  background: rgba(15, 15, 25, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 1rem 1.25rem;
+  max-width: 340px;
+  width: calc(100% - 2rem);
+  text-align: center;
+  animation: autodetect-slide-up 0.35s ease-out;
+}
+
+@keyframes autodetect-slide-up {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.autodetect-prompt__text {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.75);
+  line-height: 1.4;
+}
+
+.autodetect-prompt__actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.autodetect-prompt__btn {
+  padding: 0.4rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.6);
+  transition: background 0.2s, color 0.2s;
+}
+
+.autodetect-prompt__btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.autodetect-prompt__btn--primary {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.autodetect-prompt__btn--primary:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* Mobile: detail panel in 2D mode is bottom sheet */
+@media (max-width: 768px) {
+  .constellation-2d-layout__content {
+    /* Leave room for bottom-sheet panel if open */
+  }
+}

@@ -1,0 +1,297 @@
+.list-view {
+  padding: 1rem;
+  max-width: 800px;
+  margin: 0 auto;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  color: #fff;
+  box-sizing: border-box;
+}
+
+/* Search */
+.list-view__search-wrap {
+  position: relative;
+  margin-bottom: 0.75rem;
+  flex-shrink: 0;
+}
+
+.list-view__search-icon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(255, 255, 255, 0.3);
+  pointer-events: none;
+}
+
+.list-view__search {
+  width: 100%;
+  padding: 0.65rem 0.75rem 0.65rem 2.25rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: #fff;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s, background 0.2s;
+  box-sizing: border-box;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.list-view__search:focus {
+  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.list-view__search::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+/* Filter pills */
+.list-view__filters {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding-bottom: 0.25rem;
+}
+
+.list-view__filters::-webkit-scrollbar {
+  display: none;
+}
+
+.list-view__filter-pill {
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  text-transform: capitalize;
+}
+
+.list-view__filter-pill:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.list-view__filter-pill--active {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* Controls (count + sort) */
+.list-view__controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  flex-shrink: 0;
+}
+
+.list-view__result-count {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.list-view__sort-wrap {
+  position: relative;
+}
+
+.list-view__sort-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.72rem;
+  padding: 0.3rem 0.5rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.list-view__sort-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.list-view__sort-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 10;
+  background: rgba(15, 15, 25, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  overflow: hidden;
+  min-width: 140px;
+}
+
+.list-view__sort-option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.45rem 0.65rem;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.list-view__sort-option:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.list-view__sort-option--active {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Node list */
+.list-view__list {
+  flex: 1;
+  overflow-y: auto;
+  outline: none;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.list-view__list:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.2);
+  outline-offset: 2px;
+}
+
+/* Scrollbar */
+.list-view__list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.list-view__list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.list-view__list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+.list-view__empty {
+  padding: 3rem 1rem;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.25);
+  font-size: 0.85rem;
+}
+
+/* Row */
+.list-view__row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  transition: background 0.15s;
+  outline: none;
+}
+
+.list-view__row:last-child {
+  border-bottom: none;
+}
+
+.list-view__row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.list-view__row--active {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.list-view__row--active:focus-visible,
+.list-view__row:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.2);
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+
+.list-view__row--selected {
+  background: rgba(255, 255, 255, 0.08);
+  border-left: 3px solid rgba(255, 255, 255, 0.4);
+}
+
+.list-view__row-main {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.list-view__type-badge {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.list-view__row-title {
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.list-view__row-meta {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  padding-left: 0.1rem;
+}
+
+.list-view__row-date {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.list-view__row-connections {
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.2);
+  padding: 0.1rem 0.4rem;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 999px;
+}
+
+/* Mobile responsive */
+@media (max-width: 480px) {
+  .list-view {
+    padding: 0.75rem;
+  }
+
+  .list-view__filters {
+    flex-wrap: wrap;
+  }
+
+  .list-view__filter-pill {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.55rem;
+  }
+}
