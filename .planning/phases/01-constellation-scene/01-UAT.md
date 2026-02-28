@@ -1,5 +1,5 @@
 ---
-status: complete
+status: diagnosed
 phase: 01-constellation-scene
 source: [01-01-SUMMARY.md, 01-02-SUMMARY.md, 01-03-SUMMARY.md]
 started: 2026-02-28T02:00:00Z
@@ -89,9 +89,12 @@ skipped: 0
   reason: "User reported: hover label shows title only; type and date are missing."
   severity: major
   test: 2
-  root_cause: ""
-  artifacts: []
-  missing: []
+  root_cause: "HoverLabel.jsx intentionally renders only node.title (line 38); node.type and node.date are available but never accessed"
+  artifacts:
+    - path: "src/constellation/scene/HoverLabel.jsx"
+      issue: "Line 38 only renders {node.title}, ignoring type and date fields"
+  missing:
+    - "Add node.type and node.date rendering to HoverLabel.jsx alongside title"
   debug_session: ""
 
 - truth: "Timeline scrubber appears on the left side with epoch labels"
@@ -99,9 +102,13 @@ skipped: 0
   reason: "User reported: timeline scrubber is on the right side (not left). Drag behavior and epoch labels work."
   severity: cosmetic
   test: 5
-  root_cause: ""
-  artifacts: []
-  missing: []
+  root_cause: "CSS positions scrubber with right: 1.5rem instead of left; epoch labels also use right: 0"
+  artifacts:
+    - path: "src/constellation/ui/TimelineScrubber.css"
+      issue: "Line 3: right: 1.5rem instead of left; Line 23: epoch right: 0 instead of left"
+  missing:
+    - "Change right: 1.5rem to left: 1.5rem on .timeline-scrubber"
+    - "Change right: 0 to left: 0 on .timeline-scrubber__epoch"
   debug_session: ""
 
 - truth: "Clicking empty space clears focus and restores all nodes to full opacity"
@@ -109,7 +116,12 @@ skipped: 0
   reason: "User reported: ESC clears focus correctly, but clicking empty space does not clear focus/restore node opacity."
   severity: major
   test: 10
-  root_cause: ""
-  artifacts: []
-  missing: []
+  root_cause: "Canvas component missing onPointerMissed prop; no handler calls clearFocus() when user clicks empty 3D space"
+  artifacts:
+    - path: "src/constellation/scene/ConstellationCanvas.jsx"
+      issue: "Canvas lacks onPointerMissed handler (lines 90-145)"
+    - path: "src/constellation/scene/NodeCloud.jsx"
+      issue: "handleClick e.stopPropagation() prevents bubbling but no miss fallback"
+  missing:
+    - "Add onPointerMissed={(e) => clearFocus()} to Canvas component in ConstellationCanvas.jsx"
   debug_session: ""
