@@ -8,7 +8,7 @@
  */
 
 import sharp from 'sharp';
-import * as exifr from 'exifr';
+import exifr from 'exifr';
 import fs from 'fs/promises';
 import path from 'path';
 import { createLogger } from '../utils/logger.mjs';
