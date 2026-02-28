@@ -2,26 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: unknown
-last_updated: "2026-02-28T15:40:26.570Z"
+status: in-progress
+last_updated: "2026-02-28T15:59:34Z"
 progress:
   total_phases: 2
   completed_phases: 1
   total_plans: 9
-  completed_plans: 4
----
-
----
-gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: unknown
-last_updated: "2026-02-28T15:27:00.000Z"
-progress:
-  total_phases: 1
-  completed_phases: 1
-  total_plans: 4
-  completed_plans: 4
+  completed_plans: 5
 ---
 
 # Project State
@@ -31,33 +18,34 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-27)
 
 **Core value:** The Constellation must render real life data as an explorable, evidence-connected 3D experience -- every node real, every connection justified, every visit a discovery.
-**Current focus:** Phase 1 - Constellation Scene (UAT gaps closed)
+**Current focus:** Phase 2 - Data Pipeline & Privacy (Instagram parser and shared pipeline utilities complete)
 
 ## Current Position
 
-Phase: 1 of 6 (Constellation Scene) -- COMPLETE (including UAT gap closure)
-Plan: 4 of 4 in current phase (all plans complete)
-Status: Phase 1 fully complete -- all UAT gaps resolved, ready for Phase 2
-Last activity: 2026-02-28 -- Completed 01-04-PLAN.md (UAT gap closure)
+Phase: 2 of 6 (Data Pipeline & Privacy)
+Plan: 1 of 5 in current phase (02-01 complete)
+Status: In progress -- pipeline foundation and Instagram parser complete, Carbonmade parser next
+Last activity: 2026-02-28 -- Completed 02-01-PLAN.md (Instagram parser + pipeline foundation)
 
-Progress: [====................] 20% (4/20 plans)
+Progress: [=====....] 56% (5/9 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
-- Average duration: 17 min
-- Total execution time: 1.08 hours
+- Total plans completed: 5
+- Average duration: 14 min
+- Total execution time: 1.17 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1. Constellation Scene | 4/4 | 65 min | 16 min |
+| 2. Data Pipeline & Privacy | 1/5 | 5 min | 5 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (10 min), 01-02 (47 min), 01-03 (6 min), 01-04 (2 min)
-- Trend: Plan 04 was fastest -- three targeted edits with no iteration needed
+- Last 5 plans: 01-02 (47 min), 01-03 (6 min), 01-04 (2 min), 02-01 (5 min)
+- Trend: Pipeline plans are fast -- mostly file creation with verification
 
 *Updated after each plan completion*
 
@@ -92,20 +80,27 @@ Recent decisions affecting current work:
 - [01-04]: TYPE_COLORS map defines 6 node type colors for hover labels
 - [01-04]: onPointerMissed on Canvas for empty-space click-to-clear-focus
 - [01-04]: Date formatting uses en-US locale with short month format
+- [02-01]: 3 visibility tiers (public/friends/private) -- "redacted" is a transformation, not a tier
+- [02-01]: Default visibility is private -- allowlist promotes to public/friends
+- [02-01]: Instagram parser uses configurable selector strategy with discovery phase for format adaptation
+- [02-01]: Within-source dedup only (by sourceId hash) -- cross-source dedup deferred
+- [02-01]: assignEpoch from shared config/epochs.mjs module for centralized epoch assignment
 
 ### Pending Todos
 
 - Re-enable Bloom in production mode (conditional on StrictMode detection or environment)
 - Tune node colors (instanceColor * material.color blending makes colors muted)
 - Fix starfield rendering (Stars component count vs GPU tier)
+- Instagram parser selector tuning once actual HTML export is provided
 
 ### Blockers/Concerns
 
-- Research flags Phase 2 (Instagram export format), Phase 4 (Auth.js v5 non-Next.js), and Phase 5 (Suno API) as needing deeper research during planning
+- Instagram export HTML not yet available at data-private/instagram/ -- parser verified with missing-directory graceful handling only
+- Research flags Phase 4 (Auth.js v5 non-Next.js) and Phase 5 (Suno API) as needing deeper research during planning
 - WebGL context loss in dev mode (React StrictMode) required disabling Bloom -- production builds unaffected but dev experience is degraded
 
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed 01-04-PLAN.md (UAT gap closure)
+Stopped at: Completed 02-01-PLAN.md (Instagram parser + pipeline foundation)
 Resume file: None
