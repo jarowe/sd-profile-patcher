@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2026-02-27)
 ## Current Position
 
 Phase: 1 of 6 (Constellation Scene)
-Plan: 2 of 3 in current phase
-Status: In progress
-Last activity: 2026-02-27 -- Completed 01-02-PLAN.md (Camera fly-to, hover labels, detail panel, timeline scrubber, toolbar, lightbox, entity chips, ESC/back navigation)
+Plan: 3 of 3 in current phase
+Status: Phase 1 complete (awaiting checkpoint approval)
+Last activity: 2026-02-28 -- Completed 01-03-PLAN.md (Connection lines, enhanced Because evidence, 2D accessible list fallback)
 
-Progress: [==....................] 10% (2/20 plans)
+Progress: [===.................] 15% (3/20 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2
-- Average duration: 29 min
-- Total execution time: 0.95 hours
+- Total plans completed: 3
+- Average duration: 21 min
+- Total execution time: 1.05 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 1. Constellation Scene | 2/3 | 57 min | 29 min |
+| 1. Constellation Scene | 3/3 | 63 min | 21 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (10 min), 01-02 (47 min)
-- Trend: Plan 02 was significantly longer due to WebGL context loss bug-fix iterations
+- Last 5 plans: 01-01 (10 min), 01-02 (47 min), 01-03 (6 min)
+- Trend: Plan 03 was fast -- straightforward feature addition with no bug-fix iterations
 
 *Updated after each plan completion*
 
@@ -58,6 +58,11 @@ Recent decisions affecting current work:
 - [01-02]: Deferred Canvas mount with setTimeout to survive StrictMode unmount/remount cycle
 - [01-02]: Capped GPU tier at 2 and removed NebulaFog to reduce GPU pressure
 - [01-02]: Used Framer Motion AnimatePresence for panel slide-in/out and drag for mobile bottom sheet
+- [01-03]: Used Drei Line per edge (not batched LineSegments2) -- 209 edges within draw call budget
+- [01-03]: Line color [1.5, 1.5, 2.0] with toneMapped=false for luminous appearance without bloom
+- [01-03]: Because section groups evidence by connected node with clickable fly-to titles
+- [01-03]: ListView uses role=listbox with aria-selected and aria-live for screen reader compatibility
+- [01-03]: 2D mode shares DetailPanel and MediaLightbox via same Zustand store (no duplication)
 
 ### Pending Todos
 
@@ -72,6 +77,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-02-28T05:21:39Z
-Stopped at: Completed 01-02-PLAN.md
-Resume file: .planning/phases/01-constellation-scene/01-03-PLAN.md
+Last session: 2026-02-28T00:52:01Z
+Stopped at: Completed 01-03-PLAN.md (awaiting checkpoint approval)
+Resume file: None
