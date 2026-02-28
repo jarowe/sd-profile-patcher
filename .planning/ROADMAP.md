@@ -12,7 +12,7 @@ This roadmap delivers the JAROWE Constellation in six phases: first the 3D scene
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [x] **Phase 1: Constellation Scene** - 3D rendering foundation with instanced nodes, camera controls, detail panel, and disposal utilities
+- [ ] **Phase 1: Constellation Scene** - 3D rendering foundation with instanced nodes, camera controls, detail panel, and disposal utilities
 - [ ] **Phase 2: Data Pipeline & Privacy** - Instagram + Carbonmade parsers, build-time pipeline, privacy enforcement, constellation.json output, and thin admin slice (pipeline status + basic publish/hide)
 - [ ] **Phase 3: Narrator & Guided Tour** - Event-driven narrator engine with guided cinematic tour and 150+ scripted narration lines
 - [ ] **Phase 4: Admin Dashboard** - Owner-only auth, curation UI, draft inbox, allowlist management, and server-side access control
@@ -32,12 +32,13 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. User on a mobile device sees a simplified version (no ChromaticAberration, reduced effects, touch gestures work) without crashes or broken layout
   5. User can press ESC or browser back to cleanly exit the constellation with no broken state, and navigating away triggers proper GPU disposal (no memory leaks verified via renderer.info.memory)
   6. User who cannot use 3D (accessibility, old device) can switch to a 2D searchable node index with keyboard navigation
-**Plans:** 3 plans
+**Plans:** 4 plans
 
 Plans:
 - [x] 01-01-PLAN.md -- R3F scene setup, instanced mesh rendering, double-helix layout, starfield/nebula, GPU tier detection, and disposal utilities
 - [x] 01-02-PLAN.md -- Camera fly-to, hover labels, detail panel, timeline scrubber, toolbar, media lightbox, entity chips, ESC/back navigation
 - [x] 01-03-PLAN.md -- Connection lines with focus-aware opacity, "Because..." evidence lens, 2D accessible list fallback
+- [ ] 01-04-PLAN.md -- UAT gap closure: hover label type/date, timeline scrubber positioning, empty-space focus clear
 
 ### Phase 2: Data Pipeline & Privacy
 **Goal**: The constellation is populated with real life data from Instagram and Carbonmade exports, with privacy enforced at every layer -- the build fails if anything leaks. A thin admin slice validates the pipeline/curation workflow early.
@@ -131,7 +132,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Constellation Scene | 3/3 | Complete | 2026-02-28 |
+| 1. Constellation Scene | 3/4 | UAT gap closure | - |
 | 2. Data Pipeline & Privacy | 0/5 | Not started | - |
 | 3. Narrator & Guided Tour | 0/3 | Not started | - |
 | 4. Admin Dashboard | 0/4 | Not started | - |
@@ -140,4 +141,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 
 ---
 *Roadmap created: 2026-02-27*
-*Last updated: 2026-02-27 (Phase 1 complete)*
+*Last updated: 2026-02-28 (Phase 1 UAT gap closure plan added)*
