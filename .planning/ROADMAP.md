@@ -51,14 +51,14 @@ Plans:
   4. Connection lines in the constellation show evidence-based edges with signal weights, and each connection's detail panel shows 3-5 "Because..." reasons explaining why the connection exists
   5. The pipeline handles malformed or missing Instagram fields gracefully (logs warnings, never crashes), and if an API source fails, the last good snapshot is preserved
   6. A minimal admin view shows read-only pipeline run status (last run, success/fail, node counts) and basic publish/hide controls for nodes, de-risking the full admin dashboard in Phase 4
-**Plans**: TBD
+**Plans:** 5 plans
 
 Plans:
-- [ ] 02-01: Instagram parser with defensive parsing and EXIF/GPS privacy enforcement
-- [ ] 02-02: Carbonmade parser and canonical schema normalization
-- [ ] 02-03: Evidence-based edge generation, double-helix layout algorithm, and constellation.json emission
-- [ ] 02-04: Build-time privacy validation, visibility tiers, minors policy, and allowlist enforcement
-- [ ] 02-05: Thin admin slice -- read-only pipeline status view and basic publish/hide node controls
+- [ ] 02-01-PLAN.md -- Instagram HTML parser with defensive parsing, EXIF stripping, GPS redaction, and shared canonical schema
+- [ ] 02-02-PLAN.md -- Carbonmade JSON parser, epoch configuration, and pipeline config
+- [ ] 02-03-PLAN.md -- Evidence-based edge generation, helix layout, pipeline orchestrator, and frontend data loader
+- [ ] 02-04-PLAN.md -- Privacy validation (fail-closed audit), visibility tiers, minors policy, and allowlist enforcement
+- [ ] 02-05-PLAN.md -- Thin admin page (pipeline status + publish/hide), pipeline resilience (last good snapshot)
 
 ### Phase 3: Narrator & Guided Tour
 **Goal**: The constellation tells Jared's story -- a scripted narrator responds to exploration and a cinematic guided tour introduces new visitors to key life moments
@@ -133,7 +133,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Constellation Scene | 3/4 | UAT gap closure | - |
-| 2. Data Pipeline & Privacy | 0/5 | Not started | - |
+| 2. Data Pipeline & Privacy | 0/5 | Planned | - |
 | 3. Narrator & Guided Tour | 0/3 | Not started | - |
 | 4. Admin Dashboard | 0/4 | Not started | - |
 | 5. Automation | 0/3 | Not started | - |
@@ -141,4 +141,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 
 ---
 *Roadmap created: 2026-02-27*
-*Last updated: 2026-02-28 (Phase 1 UAT gap closure plan added)*
+*Last updated: 2026-02-28 (Phase 2 planned -- 5 plans in 4 waves)*
