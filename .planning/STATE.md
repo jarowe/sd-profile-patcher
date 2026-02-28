@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2026-02-27)
 ## Current Position
 
 Phase: 1 of 6 (Constellation Scene)
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: In progress
-Last activity: 2026-02-27 -- Completed 01-01-PLAN.md (R3F scene setup, instanced mesh, helix layout, starfield, nebula, GPU tier, disposal)
+Last activity: 2026-02-27 -- Completed 01-02-PLAN.md (Camera fly-to, hover labels, detail panel, timeline scrubber, toolbar, lightbox, entity chips, ESC/back navigation)
 
-Progress: [=.....................] 5% (1/20 plans)
+Progress: [==....................] 10% (2/20 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1
-- Average duration: 10 min
-- Total execution time: 0.17 hours
+- Total plans completed: 2
+- Average duration: 29 min
+- Total execution time: 0.95 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 1. Constellation Scene | 1/3 | 10 min | 10 min |
+| 1. Constellation Scene | 2/3 | 57 min | 29 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (10 min)
-- Trend: -
+- Last 5 plans: 01-01 (10 min), 01-02 (47 min)
+- Trend: Plan 02 was significantly longer due to WebGL context loss bug-fix iterations
 
 *Updated after each plan completion*
 
@@ -53,17 +53,25 @@ Recent decisions affecting current work:
 - [01-01]: Default to tier 2 (medium) config until GPU detection completes
 - [01-01]: Breathing pulse via useFrame scale modulation rather than shader uniforms
 - [01-01]: NebulaFog uses standard blending with very low opacity per MEMORY.md anti-pattern guidance
+- [01-02]: Used instanceColor attribute on geometry (not material) for focus dimming -- three.js auto-applies to material color
+- [01-02]: Disabled Bloom postprocessing to prevent WebGL context loss during React StrictMode double-mount
+- [01-02]: Deferred Canvas mount with setTimeout to survive StrictMode unmount/remount cycle
+- [01-02]: Capped GPU tier at 2 and removed NebulaFog to reduce GPU pressure
+- [01-02]: Used Framer Motion AnimatePresence for panel slide-in/out and drag for mobile bottom sheet
 
 ### Pending Todos
 
-None.
+- Re-enable Bloom in production mode (conditional on StrictMode detection or environment)
+- Tune node colors (instanceColor * material.color blending makes colors muted)
+- Fix starfield rendering (Stars component count vs GPU tier)
 
 ### Blockers/Concerns
 
 - Research flags Phase 2 (Instagram export format), Phase 4 (Auth.js v5 non-Next.js), and Phase 5 (Suno API) as needing deeper research during planning
+- WebGL context loss in dev mode (React StrictMode) required disabling Bloom -- production builds unaffected but dev experience is degraded
 
 ## Session Continuity
 
-Last session: 2026-02-27T23:27:49Z
-Stopped at: Completed 01-01-PLAN.md
-Resume file: .planning/phases/01-constellation-scene/01-02-PLAN.md
+Last session: 2026-02-28T05:21:39Z
+Stopped at: Completed 01-02-PLAN.md
+Resume file: .planning/phases/01-constellation-scene/01-03-PLAN.md
