@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Pipeline orchestrator: parse -> curation -> privacy -> connect -> layout -> emit
+ * Pipeline orchestrator: parse -> curation -> visibility -> privacy -> connect -> layout -> emit -> validate
  *
  * Produces:
  *   - public/data/constellation.graph.json  (nodes, edges, epochs)
@@ -14,6 +14,25 @@
  *   - deterministicStringify for all output files
  *   - No Math.random() -- seeded PRNG only
  *   - No timestamps in constellation data (only in pipeline-status.json)
+ *   - Privacy audit is the LAST step before declaring success (fail-closed)
+ *
+ * Pipeline execution order:
+ *   1. Parse (Instagram + Carbonmade) -- parsers set default visibility
+ *   2. Curation (read-only: hidden list + visibility overrides)
+ *   3. Visibility tier refinement (allowlist enforcement, most-restrictive-wins)
+ *   4. Allowlist name processing (replace non-public names with generic labels)
+ *   5. Minors guard (strip last names, remove GPS, redact blocked patterns)
+ *   6. Filter private nodes (remove from output)
+ *   7. EXIF strip + GPS redact
+ *   8. Edge generation
+ *   9. Layout computation
+ *  10. Build output JSON
+ *  11. Schema validation (fail on invalid)
+ *  12. Privacy audit (FAIL-CLOSED on any violation)
+ *  13. Write output files
+ *  14. Write pipeline-status.json
+ *
+ * Exit codes: 0 = success, 1 = privacy violation / schema error / failure
  */
 
 import fs from 'fs/promises';
@@ -27,6 +46,10 @@ import { generateEdges } from './edges/edge-generator.mjs';
 import { computePipelineLayout } from './layout/helix.mjs';
 import { stripAndVerify } from './privacy/exif-stripper.mjs';
 import { redactGPS } from './privacy/gps-redactor.mjs';
+import { assignVisibility, applyAllowlist, filterPrivateNodes } from './privacy/visibility.mjs';
+import { isMinor, enforceMinorsPolicy } from './privacy/minors-guard.mjs';
+import { auditPrivacy } from './validation/privacy-audit.mjs';
+import { validateSchema } from './validation/schema-validator.mjs';
 import { getEpochConfig } from './config/epochs.mjs';
 import { PIPELINE_CONFIG } from './config/pipeline-config.mjs';
 import { deterministicStringify } from './utils/deterministic.mjs';
@@ -85,7 +108,7 @@ async function main() {
     parseCarbonmade(carbonmadeDir),
   ]);
 
-  const allNodes = [...instagramResult.nodes, ...carbonmadeResult.nodes];
+  let allNodes = [...instagramResult.nodes, ...carbonmadeResult.nodes];
 
   log.info(
     `Parsed ${allNodes.length} total nodes ` +
@@ -103,55 +126,97 @@ async function main() {
   log.info('--- Phase 2: Curation ---');
 
   const curationFile = resolve(PIPELINE_CONFIG.curation.file);
-  let curation = await readJsonOrNull(curationFile);
+  const curation = await readJsonOrNull(curationFile);
+
+  // Extract curation overrides for the visibility phase
+  let curationVisibilityOverrides = {};
 
   if (curation) {
-    log.info(`Loaded curation.json with ${Object.keys(curation.nodes || {}).length} node overrides`);
+    // Handle the new curation.json format: { hidden: [], visibility_overrides: {} }
+    const hiddenIds = new Set(curation.hidden || []);
+    curationVisibilityOverrides = curation.visibility_overrides || {};
 
-    // Apply publish/hide overrides
-    const nodeOverrides = curation.nodes || {};
-    const hiddenIds = new Set();
-
-    for (const [nodeId, override] of Object.entries(nodeOverrides)) {
-      if (override.hidden === true) {
-        hiddenIds.add(nodeId);
-      }
-      if (override.visibility) {
-        const node = allNodes.find(n => n.id === nodeId);
-        if (node) {
-          node.visibility = override.visibility;
+    // Also support legacy format: { nodes: { [id]: { hidden, visibility } } }
+    if (curation.nodes) {
+      for (const [nodeId, override] of Object.entries(curation.nodes)) {
+        if (override.hidden === true) {
+          hiddenIds.add(nodeId);
+        }
+        if (override.visibility) {
+          curationVisibilityOverrides[nodeId] = override.visibility;
         }
       }
     }
 
     // Remove hidden nodes
     const beforeCount = allNodes.length;
-    const visibleNodes = allNodes.filter(n => !hiddenIds.has(n.id));
-    const hiddenCount = beforeCount - visibleNodes.length;
+    allNodes = allNodes.filter(n => !hiddenIds.has(n.id));
+    const hiddenCount = beforeCount - allNodes.length;
 
     if (hiddenCount > 0) {
-      log.info(`Curation: ${hiddenCount} nodes hidden, ${visibleNodes.length} visible`);
-      // Replace allNodes content with visible only
-      allNodes.length = 0;
-      allNodes.push(...visibleNodes);
+      log.info(`Curation: ${hiddenCount} nodes hidden, ${allNodes.length} visible`);
     }
+
+    log.info(
+      `Loaded curation.json: ${hiddenIds.size} hidden IDs, ` +
+      `${Object.keys(curationVisibilityOverrides).length} visibility overrides`
+    );
   } else {
     log.info('No curation.json found -- all nodes visible by default');
   }
 
-  // Load allowlist for privacy phase
+  // Load allowlist for privacy phases
   const allowlistFile = resolve(PIPELINE_CONFIG.allowlist.file);
-  const allowlist = await readJsonOrNull(allowlistFile);
-  if (allowlist) {
-    log.info(`Loaded allowlist.json with ${Object.keys(allowlist).length} entries`);
-  } else {
-    log.info('No allowlist.json found -- default visibility applies');
-  }
+  const allowlist = await readJsonOrNull(allowlistFile) || {
+    public: [],
+    friends: [],
+    minors: { firstNames: [], blockedPatterns: [] },
+  };
+
+  log.info(
+    `Loaded allowlist: ${allowlist.public?.length || 0} public, ` +
+    `${allowlist.friends?.length || 0} friends, ` +
+    `${allowlist.minors?.firstNames?.length || 0} minors`
+  );
 
   // ========================================================================
-  // Phase 3: PRIVACY (EXIF + GPS)
+  // Phase 3: VISIBILITY REFINEMENT (Phase 2 of two-phase visibility)
   // ========================================================================
-  log.info('--- Phase 3: Privacy ---');
+  log.info('--- Phase 3: Visibility Refinement ---');
+
+  // Apply visibility refinement to all nodes (most-restrictive-wins)
+  for (const node of allNodes) {
+    node.visibility = assignVisibility(node, allowlist, curationVisibilityOverrides);
+  }
+
+  // Apply allowlist name processing (replace non-public names with generic labels)
+  applyAllowlist(allNodes, allowlist);
+
+  // ========================================================================
+  // Phase 4: MINORS GUARD
+  // ========================================================================
+  log.info('--- Phase 4: Minors Guard ---');
+
+  let minorsProtected = 0;
+  for (const node of allNodes) {
+    const before = node._isMinor;
+    enforceMinorsPolicy(node, allowlist);
+    if (!before && node._isMinor) minorsProtected++;
+  }
+
+  log.info(`Minors guard: ${minorsProtected} node(s) had minors policy applied`);
+
+  // ========================================================================
+  // Phase 5: FILTER PRIVATE NODES
+  // ========================================================================
+  log.info('--- Phase 5: Filter Private Nodes ---');
+
+  allNodes = filterPrivateNodes(allNodes);
+
+  // ========================================================================
+  // Phase 6: PRIVACY (EXIF + GPS)
+  // ========================================================================
+  log.info('--- Phase 6: Privacy (EXIF + GPS) ---');
 
   const outputMediaDir = resolve(PIPELINE_CONFIG.output.mediaDir);
   let mediaProcessed = 0;
@@ -200,14 +265,14 @@ async function main() {
       node.media = processedMedia;
     }
 
-    // GPS redaction based on visibility tier
+    // GPS redaction based on visibility tier and minor status
     if (node.location) {
-      const isMinor = false; // TODO: integrate with allowlist minor flags
+      const nodeIsMinor = node._isMinor === true;
       const redacted = redactGPS(
         node.location?.lat,
         node.location?.lng,
         node.visibility,
-        isMinor
+        nodeIsMinor
       );
       node.location = redacted;
     }
@@ -216,9 +281,9 @@ async function main() {
   log.info(`Privacy: ${mediaProcessed} media files processed, ${mediaSkipped} skipped`);
 
   // ========================================================================
-  // Phase 4: EDGE GENERATION
+  // Phase 7: EDGE GENERATION
   // ========================================================================
-  log.info('--- Phase 4: Edge Generation ---');
+  log.info('--- Phase 7: Edge Generation ---');
 
   const { edges, stats: edgeStats } = await generateEdges(allNodes);
 
@@ -228,9 +293,9 @@ async function main() {
   );
 
   // ========================================================================
-  // Phase 5: LAYOUT
+  // Phase 8: LAYOUT
   // ========================================================================
-  log.info('--- Phase 5: Layout ---');
+  log.info('--- Phase 8: Layout ---');
 
   const { positions, helixParams, bounds } = computePipelineLayout(
     allNodes,
@@ -243,9 +308,9 @@ async function main() {
   );
 
   // ========================================================================
-  // Phase 6: EMIT
+  // Phase 9: BUILD OUTPUT
   // ========================================================================
-  log.info('--- Phase 6: Emit ---');
+  log.info('--- Phase 9: Build Output ---');
 
   // Sort nodes by id for deterministic output
   const sortedNodes = [...allNodes].sort((a, b) => a.id.localeCompare(b.id));
@@ -274,6 +339,45 @@ async function main() {
     bounds,
   };
 
+  // ========================================================================
+  // Phase 10: SCHEMA VALIDATION
+  // ========================================================================
+  log.info('--- Phase 10: Schema Validation ---');
+
+  const { valid: schemaValid, errors: schemaErrors } = validateSchema(graphData, layoutData);
+
+  if (!schemaValid) {
+    log.error('Schema validation failed -- aborting pipeline');
+    for (const err of schemaErrors) {
+      log.error(`  ${err}`);
+    }
+    process.exit(1);
+  }
+
+  // ========================================================================
+  // Phase 11: PRIVACY AUDIT (fail-closed, LAST step before write)
+  // ========================================================================
+  log.info('--- Phase 11: Privacy Audit ---');
+
+  const { violations, warnings: privacyWarnings } = auditPrivacy(graphData, {
+    allowlist,
+    gpsMaxDecimals: PIPELINE_CONFIG.privacy.gpsMaxDecimals,
+  });
+
+  if (violations.length > 0) {
+    log.error(`PRIVACY AUDIT FAILED: ${violations.length} violation(s)`);
+    for (const v of violations) {
+      log.error(`  ${v}`);
+    }
+    log.error('Pipeline aborted -- fix privacy violations before re-running');
+    process.exit(1);
+  }
+
+  // ========================================================================
+  // Phase 12: WRITE OUTPUT FILES
+  // ========================================================================
+  log.info('--- Phase 12: Write Output ---');
+
   // Ensure output directory exists
   const outputDir = path.dirname(resolve(PIPELINE_CONFIG.output.graphFile));
   await fs.mkdir(outputDir, { recursive: true });
@@ -287,6 +391,10 @@ async function main() {
     fs.writeFile(resolve(PIPELINE_CONFIG.output.layoutFile), layoutJson + '\n', 'utf8'),
   ]);
 
+  // ========================================================================
+  // Phase 13: PIPELINE STATUS (runtime metadata)
+  // ========================================================================
+
   // Compute stats by source, type, and visibility
   const bySource = {};
   const byType = {};
@@ -298,7 +406,7 @@ async function main() {
     byVisibility[node.visibility] = (byVisibility[node.visibility] || 0) + 1;
   }
 
-  // Write pipeline-status.json (runtime artifact, has timestamps)
+  // Write pipeline-status.json (runtime artifact, has timestamps -- NOT curation.json)
   const statusData = {
     lastRun: new Date().toISOString(),
     status: 'success',
@@ -308,6 +416,10 @@ async function main() {
       bySource,
       byType,
       byVisibility,
+      privacyAudit: {
+        violations: 0,
+        warnings: privacyWarnings.length,
+      },
     },
   };
 
@@ -338,6 +450,7 @@ async function main() {
   log.info(`Types: ${Object.entries(byType).map(([k, v]) => `${k}: ${v}`).join(', ')}`);
   log.info(`Visibility: ${Object.entries(byVisibility).map(([k, v]) => `${k}: ${v}`).join(', ')}`);
   log.info(`Media: ${mediaProcessed} processed, ${mediaSkipped} skipped`);
+  log.info(`Privacy: 0 violations, ${privacyWarnings.length} warnings`);
 
   printLogSummary();
 
