@@ -3,18 +3,22 @@
  *
  * Centralizes all paths, output locations, privacy defaults, layout parameters,
  * and determinism settings used across the data pipeline.
+ *
+ * Source directories can be overridden via environment variables:
+ *   INSTAGRAM_EXPORT_DIR  - Path to Instagram HTML export (default: data-private/instagram)
+ *   CARBONMADE_ARCHIVE_DIR - Path to Carbonmade JSON archive (default: carbonmade-archive)
  */
 
 export const PIPELINE_CONFIG = Object.freeze({
-  /** Data source directories */
+  /** Data source directories (overridable via env vars) */
   sources: {
     /** Instagram HTML export (gitignored, private) */
     instagram: {
-      dir: 'data-private/instagram',
+      dir: process.env.INSTAGRAM_EXPORT_DIR || 'data-private/instagram',
     },
     /** Carbonmade JSON archive (already in repo, read-only) */
     carbonmade: {
-      dir: 'carbonmade-archive',
+      dir: process.env.CARBONMADE_ARCHIVE_DIR || 'carbonmade-archive',
     },
   },
 
