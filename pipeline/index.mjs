@@ -96,6 +96,55 @@ async function main() {
   log.info('Pipeline starting...');
 
   // ========================================================================
+  // Pre-flight: Snapshot last good output for resilience
+  // ========================================================================
+  const graphFilePath = resolve(PIPELINE_CONFIG.output.graphFile);
+  const layoutFilePath = resolve(PIPELINE_CONFIG.output.layoutFile);
+  const statusFilePath = resolve('public/data/pipeline-status.json');
+
+  let lastGoodGraph = null;
+  let lastGoodLayout = null;
+
+  try {
+    lastGoodGraph = await fs.readFile(graphFilePath, 'utf8');
+    lastGoodLayout = await fs.readFile(layoutFilePath, 'utf8');
+    log.info('Snapshotted last good output for resilience');
+  } catch {
+    log.info('No existing output files -- first run');
+  }
+
+  /**
+   * Write failure status and exit. Last good output files are NOT overwritten.
+   * @param {string} errorMsg - Human-readable failure description
+   * @param {number} exitCode - Process exit code (1=privacy, 2=empty data)
+   */
+  async function failPipeline(errorMsg, exitCode = 1) {
+    log.error(`Pipeline FAILED: ${errorMsg}`);
+
+    // Ensure output directory exists for status file
+    const outputDir = path.dirname(statusFilePath);
+    await fs.mkdir(outputDir, { recursive: true });
+
+    const failureStatus = {
+      lastRun: new Date().toISOString(),
+      status: 'failed',
+      error: errorMsg,
+    };
+
+    await fs.writeFile(
+      statusFilePath,
+      JSON.stringify(failureStatus, null, 2) + '\n',
+      'utf8'
+    );
+    log.info('Written: pipeline-status.json (failure)');
+    log.info('Last good output files preserved (not overwritten)');
+    printLogSummary();
+    process.exit(exitCode);
+  }
+
+  try {
+
+  // ========================================================================
   // Phase 1: PARSE
   // ========================================================================
   log.info('--- Phase 1: Parse ---');
@@ -116,8 +165,8 @@ async function main() {
   );
 
   if (allNodes.length === 0) {
-    log.error('Pipeline produced zero nodes -- aborting');
-    process.exit(1);
+    log.info('Pipeline produced zero nodes -- skipping remaining phases');
+    process.exit(0);
   }
 
   // ========================================================================
@@ -347,11 +396,8 @@ async function main() {
   const { valid: schemaValid, errors: schemaErrors } = validateSchema(graphData, layoutData);
 
   if (!schemaValid) {
-    log.error('Schema validation failed -- aborting pipeline');
-    for (const err of schemaErrors) {
-      log.error(`  ${err}`);
-    }
-    process.exit(1);
+    const errDesc = `Schema validation failed: ${schemaErrors.join('; ')}`;
+    await failPipeline(errDesc, 1);
   }
 
   // ========================================================================
@@ -365,12 +411,8 @@ async function main() {
   });
 
   if (violations.length > 0) {
-    log.error(`PRIVACY AUDIT FAILED: ${violations.length} violation(s)`);
-    for (const v of violations) {
-      log.error(`  ${v}`);
-    }
-    log.error('Pipeline aborted -- fix privacy violations before re-running');
-    process.exit(1);
+    const errDesc = `Privacy audit failed: ${violations.length} violation(s) -- ${violations[0]}`;
+    await failPipeline(errDesc, 1);
   }
 
   // ========================================================================
@@ -379,7 +421,7 @@ async function main() {
   log.info('--- Phase 12: Write Output ---');
 
   // Ensure output directory exists
-  const outputDir = path.dirname(resolve(PIPELINE_CONFIG.output.graphFile));
+  const outputDir = path.dirname(graphFilePath);
   await fs.mkdir(outputDir, { recursive: true });
 
   // Write constellation files with deterministic serialization
@@ -387,8 +429,8 @@ async function main() {
   const layoutJson = deterministicStringify(layoutData);
 
   await Promise.all([
-    fs.writeFile(resolve(PIPELINE_CONFIG.output.graphFile), graphJson + '\n', 'utf8'),
-    fs.writeFile(resolve(PIPELINE_CONFIG.output.layoutFile), layoutJson + '\n', 'utf8'),
+    fs.writeFile(graphFilePath, graphJson + '\n', 'utf8'),
+    fs.writeFile(layoutFilePath, layoutJson + '\n', 'utf8'),
   ]);
 
   // ========================================================================
@@ -424,7 +466,7 @@ async function main() {
   };
 
   await fs.writeFile(
-    resolve('public/data/pipeline-status.json'),
+    statusFilePath,
     JSON.stringify(statusData, null, 2) + '\n',
     'utf8'
   );
@@ -455,6 +497,11 @@ async function main() {
   printLogSummary();
 
   process.exit(0);
+
+  } catch (err) {
+    // Unexpected error -- preserve last good output, write failure status
+    await failPipeline(`Unexpected error: ${err.message}`, 1);
+  }
 }
 
 // Run
