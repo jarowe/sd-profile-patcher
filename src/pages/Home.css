@@ -700,18 +700,18 @@
 }
 
 .peek-character.peek-right {
-    right: -60px;
+    right: -80px;
     top: 50%;
 }
 
 .peek-character.peek-left {
-    left: -60px;
+    left: -80px;
     top: 40%;
 }
 
 .peek-character.peek-top {
     left: 50%;
-    top: 40px;
+    top: 20px;
 }
 
 /* 3D Glass Prism Container */
@@ -724,8 +724,8 @@
 }
 
 .prism-loading-glow {
-    width: 220px;
-    height: 240px;
+    width: 280px;
+    height: 280px;
     background: radial-gradient(ellipse at center, rgba(124, 58, 237, 0.3) 0%, transparent 70%);
     animation: prismLoadPulse 1.5s ease-in-out infinite;
 }
