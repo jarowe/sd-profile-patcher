@@ -2180,6 +2180,8 @@ export default function Home() {
               breakoutEnabled: { value: 0.0 },
               cardRect: { value: new THREE.Vector4(0, 0, 1, 1) },
               cardRadius: { value: 28.0 },
+              breakoutSoftBlend: { value: 30.0 },
+              breakoutContentThresh: { value: 0.1 },
             },
             vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
             fragmentShader: `
@@ -2213,6 +2215,8 @@ export default function Home() {
               uniform float breakoutEnabled;
               uniform vec4 cardRect;
               uniform float cardRadius;
+              uniform float breakoutSoftBlend;
+              uniform float breakoutContentThresh;
               varying vec2 vUv;
 
               float hash12(vec2 p) {
@@ -2346,14 +2350,20 @@ export default function Home() {
                   float dRect = sdRoundedBox(pixel, extCenter, extHalf, cardRadius);
                   float maskAlpha = 1.0 - smoothstep(-0.5, 0.5, dRect);
 
-                  // Soft inside-card blend: transition from sceneAlpha to 1.0 over 30px
-                  // INSIDE the card boundary. This prevents the visible line where
-                  // PP-enhanced black (inside) meets transparent space (dome) — the
-                  // sharp 2px smoothstep was creating a hard edge visible on the globe.
+                  // Scene alpha: 1.0 for globe surface, <1.0 for atmosphere glow, ~0 for empty space
                   float sceneAlpha = texture2D(tDiffuse, uv).a;
-                  float edgeDist = max(-dOrigCard, 0.0); // positive inside card
-                  float softInside = smoothstep(0.0, 30.0, edgeDist);
-                  float finalAlpha = maskAlpha * mix(sceneAlpha, 1.0, softInside);
+
+                  // Soft inside-card blend: gradually force alpha to 1.0 deeper inside card
+                  float edgeDist = max(-dOrigCard, 0.0);
+                  float softInside = smoothstep(0.0, breakoutSoftBlend, edgeDist);
+
+                  // Content detection: any pixel with scene content stays fully opaque
+                  // in the dome area — prevents the visible line where col *= finalAlpha
+                  // would dim atmosphere glow differently at the card boundary
+                  float domeContent = smoothstep(0.0, breakoutContentThresh, sceneAlpha);
+
+                  // Final alpha: opaque if inside card OR has scene content, transparent only for empty dome space
+                  float finalAlpha = maskAlpha * max(domeContent, softInside);
 
                   col *= finalAlpha;
                   gl_FragColor = vec4(clamp(col, 0.0, 1.0), finalAlpha);
@@ -3025,6 +3035,8 @@ export default function Home() {
                     (offsetY + cellRect.height) * scaleY
                   );
                   ppu2.cardRadius.value = 28 * scaleX;
+                  ppu2.breakoutSoftBlend.value = (ep.breakoutSoftBlend != null ? ep.breakoutSoftBlend : 30) * scaleY;
+                  ppu2.breakoutContentThresh.value = ep.breakoutContentThreshold != null ? ep.breakoutContentThreshold : 0.1;
 
                   // Camera view offset: compensate for asymmetric canvas extension above card.
                   // Canvas is taller than card by breakoutPx at top and 10px at bottom.

@@ -131,6 +131,8 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     });
     controlsFolder.add(proxy, 'glassClipTop', 0, 300, 1).name('Glass Clip Top (px)').onChange(updateParam('glassClipTop'));
     controlsFolder.add(proxy, 'glassClipFeather', 0, 200, 1).name('Glass Clip Feather').onChange(updateParam('glassClipFeather'));
+    controlsFolder.add(proxy, 'breakoutSoftBlend', 0, 200, 1).name('PP Mask Blend (px)').onChange(updateParam('breakoutSoftBlend'));
+    controlsFolder.add(proxy, 'breakoutContentThreshold', 0, 1.0, 0.01).name('PP Content Thresh').onChange(updateParam('breakoutContentThreshold'));
 
     // ── Expedition Photo Card ──
     const photoFolder = controlsFolder.addFolder('Photo Card');

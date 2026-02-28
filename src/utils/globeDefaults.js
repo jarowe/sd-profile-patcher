@@ -215,6 +215,8 @@ export const GLOBE_DEFAULTS = {
   globeBreakoutPx: 60,
   glassClipTop: 0,
   glassClipFeather: 30,
+  breakoutSoftBlend: 30,
+  breakoutContentThreshold: 0.1,
 
   // ── Glass Border (PP shader liquid glass) ──
   glassThickness: 30,
