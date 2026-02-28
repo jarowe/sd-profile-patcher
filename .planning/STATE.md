@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in-progress
-last_updated: "2026-02-28T16:13:00Z"
+last_updated: "2026-02-28T16:24:00Z"
 progress:
   total_phases: 2
   completed_phases: 1
   total_plans: 9
-  completed_plans: 7
+  completed_plans: 8
 ---
 
 # Project State
@@ -18,33 +18,33 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-27)
 
 **Core value:** The Constellation must render real life data as an explorable, evidence-connected 3D experience -- every node real, every connection justified, every visit a discovery.
-**Current focus:** Phase 2 - Data Pipeline & Privacy (pipeline runs end-to-end, privacy validation and admin slice next)
+**Current focus:** Phase 2 - Data Pipeline & Privacy (privacy validation complete, thin admin slice remaining)
 
 ## Current Position
 
 Phase: 2 of 6 (Data Pipeline & Privacy)
-Plan: 3 of 5 in current phase (02-01, 02-02, 02-03 complete)
-Status: In progress -- pipeline produces 60 real nodes with 93 evidence-based edges, privacy validation and admin slice remaining
-Last activity: 2026-02-28 -- Completed 02-03-PLAN.md (pipeline orchestrator + edge generation + data loader)
+Plan: 4 of 5 in current phase (02-01, 02-02, 02-03, 02-04 complete)
+Status: In progress -- pipeline produces 60 nodes with 88 edges, fail-closed privacy audit active, thin admin slice remaining
+Last activity: 2026-02-28 -- Completed 02-04-PLAN.md (privacy validation, visibility refinement, schema validation)
 
-Progress: [=======..] 78% (7/9 plans)
+Progress: [========.] 89% (8/9 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
+- Total plans completed: 8
 - Average duration: 12 min
-- Total execution time: 1.42 hours
+- Total execution time: 1.54 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1. Constellation Scene | 4/4 | 65 min | 16 min |
-| 2. Data Pipeline & Privacy | 3/5 | 20 min | 7 min |
+| 2. Data Pipeline & Privacy | 4/5 | 27 min | 7 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-04 (2 min), 02-01 (5 min), 02-02 (9 min), 02-03 (6 min)
+- Last 5 plans: 02-01 (5 min), 02-02 (9 min), 02-03 (6 min), 02-04 (7 min)
 - Trend: Pipeline plans consistently fast -- structured data processing with clear module boundaries
 
 *Updated after each plan completion*
@@ -95,6 +95,11 @@ Recent decisions affecting current work:
 - [02-03]: Pipeline output (public/data/) gitignored as build artifacts
 - [02-03]: Frontend loader uses import.meta.env.BASE_URL for dual-deployment support
 - [02-03]: Pipeline-status.json is the only timestamped output (constellation data is timestamp-free)
+- [02-04]: Allowlist caps unknown people at friends (most-restrictive-wins)
+- [02-04]: Minors last-name stripping uses case-sensitive uppercase detection (not case-insensitive regex)
+- [02-04]: Privacy audit scans stringified output for forbidden patterns (DMs, contact graphs, close friends)
+- [02-04]: Curation.json supports both new format (hidden array + visibility_overrides) and legacy format (nodes map)
+- [02-04]: Pipeline extended to 13 phases with schema validation and privacy audit as final steps before write
 
 ### Pending Todos
 
@@ -102,6 +107,7 @@ Recent decisions affecting current work:
 - Tune node colors (instanceColor * material.color blending makes colors muted)
 - Fix starfield rendering (Stars component count vs GPU tier)
 - Instagram parser selector tuning once actual HTML export is provided
+- Populate allowlist.json with real names when user decides public visibility
 
 ### Blockers/Concerns
 
@@ -112,5 +118,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed 02-03-PLAN.md (pipeline orchestrator + edge generation + data loader)
+Stopped at: Completed 02-04-PLAN.md (privacy validation, visibility refinement, schema validation)
 Resume file: None
