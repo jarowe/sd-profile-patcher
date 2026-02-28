@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-02-28T01:04:55.176Z"
+last_updated: "2026-02-28T15:27:00.000Z"
 progress:
   total_phases: 1
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 4
+  completed_plans: 4
 ---
 
 # Project State
@@ -18,33 +18,33 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-27)
 
 **Core value:** The Constellation must render real life data as an explorable, evidence-connected 3D experience -- every node real, every connection justified, every visit a discovery.
-**Current focus:** Phase 1 - Constellation Scene
+**Current focus:** Phase 1 - Constellation Scene (UAT gaps closed)
 
 ## Current Position
 
-Phase: 1 of 6 (Constellation Scene) -- COMPLETE
-Plan: 3 of 3 in current phase (all plans complete)
-Status: Phase 1 complete -- ready for Phase 2
-Last activity: 2026-02-27 -- Phase 1 approved, 01-03 checkpoint verified
+Phase: 1 of 6 (Constellation Scene) -- COMPLETE (including UAT gap closure)
+Plan: 4 of 4 in current phase (all plans complete)
+Status: Phase 1 fully complete -- all UAT gaps resolved, ready for Phase 2
+Last activity: 2026-02-28 -- Completed 01-04-PLAN.md (UAT gap closure)
 
-Progress: [===.................] 15% (3/20 plans)
+Progress: [====................] 20% (4/20 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: 21 min
-- Total execution time: 1.05 hours
+- Total plans completed: 4
+- Average duration: 17 min
+- Total execution time: 1.08 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 1. Constellation Scene | 3/3 | 63 min | 21 min |
+| 1. Constellation Scene | 4/4 | 65 min | 16 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (10 min), 01-02 (47 min), 01-03 (6 min)
-- Trend: Plan 03 was fast -- straightforward feature addition with no bug-fix iterations
+- Last 5 plans: 01-01 (10 min), 01-02 (47 min), 01-03 (6 min), 01-04 (2 min)
+- Trend: Plan 04 was fastest -- three targeted edits with no iteration needed
 
 *Updated after each plan completion*
 
@@ -76,6 +76,9 @@ Recent decisions affecting current work:
 - [01-03]: Because section groups evidence by connected node with clickable fly-to titles
 - [01-03]: ListView uses role=listbox with aria-selected and aria-live for screen reader compatibility
 - [01-03]: 2D mode shares DetailPanel and MediaLightbox via same Zustand store (no duplication)
+- [01-04]: TYPE_COLORS map defines 6 node type colors for hover labels
+- [01-04]: onPointerMissed on Canvas for empty-space click-to-clear-focus
+- [01-04]: Date formatting uses en-US locale with short month format
 
 ### Pending Todos
 
@@ -90,6 +93,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-02-27
-Stopped at: Phase 1 complete -- 01-03 checkpoint approved
+Last session: 2026-02-28
+Stopped at: Completed 01-04-PLAN.md (UAT gap closure)
 Resume file: None
