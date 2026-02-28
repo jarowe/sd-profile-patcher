@@ -54,6 +54,7 @@ export default function ConstellationCanvas() {
   const rendererRef = useRef();
   const controlsRef = useRef();
   const setGpuTier = useConstellationStore((s) => s.setGpuTier);
+  const clearFocus = useConstellationStore((s) => s.clearFocus);
   const [gpuConfig] = useState(() => {
     const tier = detectGPUTier();
     setGpuTier(tier);
@@ -95,6 +96,7 @@ export default function ConstellationCanvas() {
         fov: 60,
       }}
       dpr={gpuConfig.dpr}
+      onPointerMissed={() => clearFocus()}
       onCreated={({ gl }) => {
         rendererRef.current = gl;
         const canvas = gl.domElement;
