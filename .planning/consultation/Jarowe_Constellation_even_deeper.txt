@@ -1,0 +1,487 @@
+ ● The user wants to go even deeper with real data from ALL social media. Let me explore    
+  what's actually available.
+
+● Read 1 file (ctrl+o to expand)
+
+● Bash(dir /s /b "C:\dev\jarowe\public\images\Instagram\*.jpg" 2>nul | find /c /v "" && dir
+       /s /b "C:\dev\jarowe\public\images\Instagram\*.png" 2>nul | find /c /v "")
+  ⎿  /c
+     /c/$Recycle.Bin
+     /c/$Recycle.Bin/S-1-5-18
+     … +1111841 lines (ctrl+o to expand)
+
+● Searched for 1 pattern (ctrl+o to expand)
+
+● Bash(powershell -Command "(Get-ChildItem -Path
+      'C:\dev\jarowe\public\images\Instagram\media' -Recurse -File |
+      Measure-Object).Count")
+  ⎿  276
+
+● Searched for 2 patterns (ctrl+o to expand)
+
+● There's a full Instagram data export with 276 media files. Let me dig deeper into the    
+  actual posts data and other rich sources.
+
+● Searched for 2 patterns, read 1 file (ctrl+o to expand)
+
+● Incredible - the full Instagram data export is a goldmine: 276 media files, tagged users,
+   GPS coordinates, comments, liked posts, saved posts, reels with SRT subtitles, DM       
+  contacts. Let me check a couple more things and then update the plan.
+
+● Searched for 3 patterns, read 5 files (ctrl+o to expand)
+
+● Now I have the complete picture. The Instagram data export is a treasure trove - 276     
+  media files, GPS locations (Saint Cloud FL, Orlando, San Francisco, North Carolina +     
+  international), tagged users, comments, liked posts, reels with SRT subtitles, location  
+  interests, and deeply personal long-form posts. Let me update the plan to address the    
+  user's expanded vision.
+
+● Read 1 file (ctrl+o to expand)
+
+● Now let me rewrite the plan with the expanded vision - full Instagram export parsing, AI 
+  narrator as core (not future), richer metadata connections, and social media data        
+  pipeline.
+
+● Updated plan
+  ⎿  /plan to preview
+
+● The plan is comprehensive and addresses the user's expanded vision. Before I submit it   
+  for approval, let me ask one key question about the social media data that's needed.     
+
+● User answered Claude's questions:
+  ⎿  · For the constellation to include your Facebook, X/Twitter, LinkedIn, and Google
+     Photos data, each platform requires you to download your personal data archive        
+     (each has a self-service export tool). Which of these do you already have or can      
+     get quickly? → I can get them all and I already have some of them BUT include in      
+     the planning right now all of this and that way so i can continue this planning       
+     and explaination with my consultat! GIVE ME THE IDEAS AND THE PLAN AND IDEATION       
+     AND PLANNING SO I CAN CONTINUE ON MY END WITH CONSULTATION AND THEN I WILL RESPOND    
+      LOOP BACK IN HERE! GIVE ME THE ULTIMATE WAY THIS HAPPENS YOU KNOW WHAT I WANT!       
+
+
+
+● The user wants the ULTIMATE vision plan that they can take to their consultant. Let me   
+  expand this into the full experience design -- every data source, how they weave
+  together, the narrative architecture, and the complete technical roadmap.
+
+● Updated plan
+  ⎿  /plan to preview
+  ⎿ Tool use rejected with user message: Here please also read thoroughly my comprehensive     research and consultation before we continue! "C:\Users\rowej\Downloads\The JAROWE 
+    Constellation.md" "C:\Users\rowej\Downloads\JAROWE_Constellation_Plan_and_Spec.md"
+                                                                                              
+● Read 2 files (ctrl+o to expand)                                                          
+  
+● This is an incredible spec from your consultant. It aligns beautifully with our plan and   adds critical missing pieces: privacy/visibility tiers, evidence-based edges, curation 
+  layer, edge pruning, path memory, constellation modes, meaning lens, and the build-time    truth + runtime cinema architecture split.
+                                                                                             Let me merge the consultant's spec with our codebase-specific knowledge into the final   
+  implementation plan.
+
+● Updated plan           
+  ⎿  /plan to preview
+                                                                                           ● The plan now fully incorporates the consultant's spec. Let me submit it for approval.
+                                                                                           ─────────────────────────────────────────────────────────────────────────────────────────── Ready to code?
+                                                                                            Here is Claude's plan:                                                                    
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+ THE JAROWE CONSTELLATION                                                                  
+
+ Implementation Plan (Consultant Spec + Codebase Knowledge Merged)
+
+ This plan synthesizes the consultant's architectural spec with deep knowledge of the      
+ existing codebase (Vite 7 + React 19 + R3F + drei + GSAP + Howler.js + existing
+ UniversePage patterns).
+
+ ---
+ Architecture: Build-Time Truth + Runtime Cinema
+
+ Build-time pipeline (Node.js scripts, runs offline)
+
+ 1. Parse raw exports (Instagram HTML, Carbonmade JSON, Facebook/X/LinkedIn/Google Photos) 
+ 2. Normalize into common intermediate format per parser
+ 3. Enrich (entity extraction, sentiment, tags, clustering, deduplication)
+ 4. Connect nodes via evidence-based weighted edges
+ 5. Layout stable 3D positions (helix + clustering + force relaxation)
+ 6. Emit three JSON files consumed by the site at build time
+
+ Runtime (the React site)
+
+ - Loads pre-built JSON, renders in R3F, handles interaction + narration + audio
+ - No live data processing -- everything is deterministic and fast
+
+ Output files
+
+ src/data/constellation.graph.json      -- nodes + edges + media refs
+ src/data/constellation.layout.json     -- stable 3D positions + cluster metadata
+ src/data/constellation.narration.json  -- scripted narration library + triggers
+
+ ---
+ Folder Structure
+
+ data/                              -- NOT in git (add to .gitignore)
+   raw/
+     instagram/                     -- Symlink or copy of public/images/Instagram/
+     facebook/                      -- User provides export
+     twitter/                       -- User provides export
+     linkedin/                      -- User provides export
+     google-photos/                 -- User provides Google Takeout
+     carbonmade/                    -- Symlink to carbonmade-archive/
+   normalized/
+     instagram.json
+     facebook.json
+     twitter.json
+     linkedin.json
+     googlePhotos.json
+     carbonmade.json
+ curation/
+   allowlists.json                  -- People/nodes forced visible
+   hide.json                        -- Nodes/edges to suppress
+   overrides.json                   -- Override computed fields
+   highlights.json                  -- Anchor nodes per epoch, tour stops
+ scripts/
+   parseInstagram.mjs
+   parseCarbonmade.mjs
+   parseFacebook.mjs
+   parseTwitter.mjs
+   parseLinkedIn.mjs
+   parseGooglePhotos.mjs
+   normalize.mjs                    -- Intermediate artifacts → canonical nodes
+   enrich.mjs                       -- Tags, sentiment, entity extraction
+   connect.mjs                      -- Evidence-based edge generation
+   layout.mjs                       -- Helix + cluster + force relaxation
+   buildConstellation.mjs           -- Orchestrator: runs all steps
+   validateGraph.mjs                -- Schema validation + privacy enforcement
+
+ ---
+ Data Model (Canonical Schema)
+
+ Node Schema
+
+ {
+   id: string,                       // "moment_ig_2025-06-12_abc123"
+   type: enum,                       //
+ core|hub|epoch|project|moment|thought|milestone|person|place|tag|track
+   visibility: enum,                 // public|private|redacted|friends
+   title: string,
+   time: { start: ISO, end: ISO|null, precision: "day"|"month"|"year"|"range" },
+   location: { placeId, lat, lon, precision: "city"|"region"|"exact", source },
+   summary: string,                  // Narratable summary (for narrator + tooltip)        
+   content: { text, language },
+   media: [{ kind: "image"|"video"|"reel", src, w, h, hash }],
+   entities: {
+     people: [personId, ...],
+     tags: [tagId, ...],
+     clients: [string, ...],
+     brands: [string, ...]
+   },
+   source: { platform, sourceId, uri },
+   metrics: { likes, comments },
+   computed: {
+     sentiment: -1..1,
+     emotion: ["joy", "gratitude", ...],
+     qualityScore: 0..1,             // Drives visual importance
+     clusterId: string|null
+   }
+ }
+
+ Edge Schema (Evidence-Based)
+
+ {
+   id: string,
+   type: enum,                       // chronological|geographic|collaboration|client|them 
+ atic|family|influence|simultaneous|growth
+   visibility: enum,
+   from: nodeId,
+   to: nodeId,
+   weight: 0..1,                     // min(1, sum(signal weights))
+   evidence: [
+     { signal: "tagged_user", value: "maria", confidence: 0.95 },
+     { signal: "same_client", value: "Disney", confidence: 1.0 },
+     // ...
+   ]
+ }
+
+ Signal Weights for Edge Generation
+
+ - Same person entity: +0.55
+ - Same client/brand: +0.40
+ - Same album/trip cluster: +0.30
+ - Same place (within threshold): +0.25
+ - Same tag/topic: +0.20
+ - Same week across platforms: +0.15
+
+ Edge Pruning Rules
+
+ - Per node: keep top 6 strongest edges per type
+ - Always keep: 1 chronological predecessor/successor, strongest person/place/theme edge   
+ - Progressive reveal: show more edges when zoomed in close
+
+ Privacy Rules (Non-Negotiable)
+
+ - DMs, close friends lists, contact graphs: private always
+ - Minors: private unless explicitly allowlisted
+ - GPS: round to city-level for public, exact only for friends
+ - People: public allowlist only, otherwise "Friend"/"Family"/"Collaborator"
+ - scripts/validateGraph.mjs fails the build if private content leaks to public
+
+ ---
+ 3D Layout Algorithm
+
+ 1. Base helix position from timestamp
+
+ - Map node.time.start → t in [0..1] across full date range (2001-2026)
+ - Double helix: x = R * cos(t * turns * 2π), z = R * sin(t * turns * 2π), y = H * t
+ - Phase offset for second helix strand (family/life thread)
+
+ 2. Epoch clustering
+
+ - Compute epoch centroids from member node positions
+ - Pull nodes toward their epoch centroid (projects stronger than thoughts)
+
+ 3. Force relaxation (200 iterations)
+
+ - Repulsion: prevent overlap
+ - Spring forces along strong edges
+ - Gravity toward helix "rail" for temporal legibility
+
+ 4. Seeded randomness
+
+ - Use hash of node.id as seed → positions stable across rebuilds
+
+ ---
+ Implementation Tickets (Execution Order)
+
+ Ticket 01: Canonical Schema + Validation
+
+ Files: src/data/schema.js, scripts/validateGraph.mjs
+ - Define node/edge types as JSDoc or lightweight validation functions
+ - Validate: edges reference existing nodes, no private content in public output
+ - Acceptance: graph JSON fails loudly on invalid data
+
+ Ticket 02: Build Orchestrator + Placeholder Graph
+
+ Files: scripts/buildConstellation.mjs, scripts/normalize.mjs
+ - Pipeline runs end-to-end with 10 hardcoded demo nodes + 10 edges
+ - Outputs constellation.graph.json, constellation.layout.json,
+ constellation.narration.json
+ - Acceptance: JSON files generated, site can load them
+
+ Ticket 03: Helix Layout + Seeded Stability
+
+ Files: scripts/layout.mjs (helix + relax)
+ - Deterministic positions from timestamps + seeded jitter
+ - Force relaxation with repulsion + spring + gravity
+ - Acceptance: repeated builds produce identical positions, no overlaps for 150 nodes      
+
+ Ticket 04: Constellation Scene Scaffold (R3F)
+
+ Files:
+ - src/pages/ConstellationPage.jsx + .css
+ - src/components/constellation/ConstellationScene.jsx
+ - src/components/constellation/DataNodes.jsx (instanced mesh + raycasting)
+ - src/components/constellation/ConnectionLines.jsx
+ - src/components/constellation/ConstellationCore.jsx
+ - src/components/constellation/HubRing.jsx
+
+ Reuse from existing codebase:
+ - UniversePage.jsx:14-28 Starfield component (8000 points, slow rotation)
+ - UniversePage.jsx:92-127 CoreNode (wireframe icosahedron + MeshTransmissionMaterial)     
+ - UniversePage.jsx:129-222 InteractiveNode patterns (orbit, hover scale, GSAP camera      
+ fly-to, navigate)
+ - UniversePage.jsx:281-285 PostProcessing setup (Bloom + ChromaticAberration + Vignette)  
+ - sounds.js playHoverSound, playClickSound
+
+ Acceptance: Renders 150+ nodes in instanced batches, edges visible, hover tooltip works,  
+ click focuses camera
+
+ Ticket 05: Detail Panel + Entity Chips
+
+ Files:
+ - src/components/constellation/NodeDetailPanel.jsx
+ - src/components/constellation/NodeTooltip.jsx
+ - src/components/constellation/MeaningLens.jsx (shows "Because..." connection reasons)    
+
+ Acceptance: Panel shows media/text/tags, clicking a chip highlights matching nodes,       
+ meaning lens shows evidence
+
+ Ticket 06: Timeline Scrubber + Epoch Transitions
+
+ Files:
+ - src/components/constellation/TimelineScrubber.jsx
+ - src/components/constellation/CameraController.jsx (ORBIT, FOCUS, TIMELINE, TOUR modes)  
+
+ Acceptance: Scrub smoothly moves camera along helix, epoch labels appear, triggers        
+ narration events
+
+ Ticket 07: Narrator Overlay + Scripted Engine
+
+ Files:
+ - src/components/constellation/NarrationOverlay.jsx
+ - src/utils/narratorEngine.js (event-driven: ENTER_EPOCH, FOCUS_NODE, HOVER_EDGE,
+ DISCOVERY_MILESTONE, IDLE, TOUR_STEP)
+ - src/data/constellation.narration.json (all 5 tiers of narration)
+
+ Narration tiers:
+ - Tier 1 Epoch (5-8): "This was the era when..."
+ - Tier 2 Node (50-120): short, specific, reflective
+ - Tier 3 Connection (20-60): "this thread matters because..."
+ - Tier 4 Discovery (10-25): encouragement, reframing, reveal
+ - Tier 5 Idle (10-20): gentle prompts to explore
+
+ Selection logic: recentNarrations queue, relevance scoring, novelty weighting, emotional  
+ pacing, per-tier cooldowns
+
+ Acceptance: Narration fires correctly per event, no repetition, typewriter animation,     
+ dismissible
+
+ Ticket 08: Guided Tour
+
+ Files:
+ - src/data/tourScript.js (curated anchor nodes + narration beats)
+ - CameraController TOUR mode
+
+ Acceptance: ~90-second tour plays cinematically, skippable, no broken state on skip       
+
+ Ticket 09: Audio + Sound Design
+
+ Files:
+ - src/utils/constellationAudio.js (generative ambient drone, Web Audio API)
+ - Extend src/utils/sounds.js with discover/focus/connection/narration/timeline sounds     
+
+ Reuse: existing Web Audio oscillator pattern from sounds.js:18-32, Howler.js analyser     
+ from AudioContext.jsx
+
+ Audio-reactive: bass → node pulse, mids → edge glow, highs → star twinkle
+ Mobile: auto-disable heavy effects
+
+ Acceptance: Ambient starts on gesture, interaction sounds work, reactivity toggle works   
+
+ Ticket 10: Instagram Parser (First Real Data)
+
+ Files: scripts/parseInstagram.mjs
+ Source: public/images/Instagram/ (full data export - 276 files)
+
+ Parse:
+ - your_instagram_activity/media/posts_1.html → posts with captions, dates, GPS, tagged    
+ users
+ - media/posts/YYYYMM/*.jpg → image paths
+ - media/reels/YYYYMM/*.mp4 + *.srt → reels + subtitles
+ - personal_information/information_about_you/locations_of_interest.html → locations       
+ - connections/followers_and_following/close_friends.html → inner circle
+ - Optionally: your_instagram_activity/comments/post_comments_1.html,
+ likes/liked_posts.html
+
+ Output: data/normalized/instagram.json
+ Acceptance: Posts become moment nodes, tagged users become person entities, GPS creates   
+ place entities with city-level precision
+
+ Ticket 11: Carbonmade Archive Parser
+
+ Files: scripts/parseCarbonmade.mjs
+ Source: carbonmade-archive/ (already structured JSON)
+
+ Parse:
+ - manifest.json (about, blog, project list)
+ - projects/*/project.json (35 files with id, name, description, role, client, date, type, 
+  texts, imageUrls, videoStreams)
+ - about/about.json (career history, awards, exhibitions, education, clients, specialties) 
+ - blog/blog.json (20 posts)
+
+ Acceptance: 35 projects + 20 blog posts + 11 milestones appear as nodes,
+ client/collaborator edges work
+
+ Ticket 12: Discovery System + XP + Constellation Modes
+
+ Files: Update ConstellationScene + ConstellationPage
+
+ Reuse: existing GameOverlay.jsx XP system, existing localStorage discovery pattern from   
+ UniversePage.jsx:226-237
+
+ - Discovery tracking for all nodes
+ - XP awards: +50 per node, +200 per epoch complete, +500 Constellation Complete
+ - Path memory (faint trail of visited nodes)
+ - Constellation modes: "Life" / "Work" / "Ideas" (changes filters + edge weights +        
+ narration tone)
+ - 2D library fallback (searchable index)
+
+ Ticket 13: Privacy Hardening + Curation
+
+ Files: curation/*.json, update scripts/buildConstellation.mjs
+
+ - Allowlist for public people names
+ - Hide list for sensitive nodes
+ - Overrides for computed fields
+ - Build-time validation: fails if private content leaks
+ - GPS redaction to city-level
+
+ Ticket 14 (Future): Google Photos + Additional Parsers
+
+ - scripts/parseGooglePhotos.mjs → cluster thousands of photos into 200-500 moment nodes   
+ - scripts/parseFacebook.mjs, scripts/parseTwitter.mjs, scripts/parseLinkedIn.mjs
+
+ Ticket 15 (Future): Live AI Narrator
+
+ - Vercel Edge Function /api/narrate → Gemini Flash (250 req/day free)
+ - Caching by (nodeId + contextHash)
+ - Fallback to scripted if API fails
+ - Privacy: never send private nodes to external LLM
+ - Optional Web Speech API TTS toggle
+
+ ---
+ Award-Winning Polish Features
+
+ 1. Path memory: Faint glowing trail showing the visitor's journey through the
+ constellation
+ 2. Cinematic camera: Documentary-feel easing curves + micro-settle after focus
+ 3. Meaning lens: 3-5 "Because..." evidence reasons for strongest connections
+ 4. Constellation modes: Life (warmth-forward) / Work (project-forward) / Ideas
+ (topic-forward)
+ 5. 2D library fallback: Searchable node index for accessibility + "real website"
+ credibility
+ 6. Trail suggestion: "Follow this thread →" with next node glow when exploring
+ connections
+ 7. Birth animation: When data expands (new parser run), new nodes bloom into existence    
+
+ ---
+ Files to Modify in Existing Codebase
+
+ src/App.jsx                     -- Add /constellation route (lazy-loaded
+ ConstellationPage)
+ src/utils/sounds.js             -- Add discover/focus/connection/narration/timeline       
+ sounds
+ .gitignore                      -- Add data/raw/**
+
+ Key Existing Patterns to Reuse
+
+ UniversePage.jsx:14-28          -- Starfield component
+ UniversePage.jsx:92-127         -- CoreNode (wireframe icosahedron + transmission
+ material)
+ UniversePage.jsx:129-222        -- InteractiveNode (orbit, hover, GSAP fly-to, navigate)  
+ UniversePage.jsx:281-285        -- PostProcessing (Bloom + ChromaticAberration +
+ Vignette)
+ UniversePage.jsx:226-237        -- Discovery tracking (localStorage)
+ context/AudioContext.jsx        -- Howler.js global audio + Web Audio analyser
+ components/GameOverlay.jsx      -- XP system + achievement notifications
+ utils/sounds.js:18-32           -- Web Audio oscillator pattern
+
+ Verification
+
+ 1. Schema: node scripts/validateGraph.mjs passes with zero errors
+ 2. Build: node scripts/buildConstellation.mjs produces all 3 JSON files
+ 3. Scene: /constellation renders 150+ nodes at 60fps, instanced batches, connections      
+ visible
+ 4. Interaction: Hover → tooltip + edge highlight. Click → fly-to + detail panel +
+ narration
+ 5. Timeline: Scrubber sweeps 2001-2026, camera follows helix, epoch narration fires       
+ 6. Tour: 90-second guided tour plays, skippable, no broken state
+ 7. Audio: Ambient drone, interaction sounds, audio-reactive pulsing with Howler
+ 8. Privacy: No private nodes/edges in public output, GPS city-level only
+ 9. Mobile: Works without ChromaticAberration, touch gestures supported
+ 10. No regressions: All existing pages (Home, Workshop, Vault, Garden, Now, etc.)
+ unaffected
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+
+ Claude has written up a plan and is ready to execute. Would you like to proceed?
+
+ ❯ 1. Yes, clear context and bypass permissions
+   2. Yes, and bypass permissions
+   3. Yes, manually approve edits
+   4. Type here to tell Claude what to change
