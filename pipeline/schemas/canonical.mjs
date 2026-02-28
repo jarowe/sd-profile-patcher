@@ -5,6 +5,8 @@
  * which matches mock-constellation.json for drop-in replacement.
  */
 
+import { assignEpoch } from '../config/epochs.mjs';
+
 /** Valid node types (matching mock-constellation.json) */
 export const NODE_TYPES = Object.freeze([
   'milestone',
@@ -23,37 +25,6 @@ export const VISIBILITY_TIERS = Object.freeze([
   'friends',
   'private',
 ]);
-
-/** Default epoch configuration.
- *  Maps date ranges to epoch labels, matching mock-constellation.json. */
-export const DEFAULT_EPOCHS = Object.freeze([
-  { id: 'early-years', label: 'Early Years', start: 2001, end: 2010 },
-  { id: 'college', label: 'College', start: 2010, end: 2014 },
-  { id: 'career-start', label: 'Career Start', start: 2014, end: 2018 },
-  { id: 'growth', label: 'Growth', start: 2018, end: 2022 },
-  { id: 'present', label: 'Present', start: 2022, end: 2026 },
-]);
-
-/**
- * Determine the epoch label for a given date string.
- * @param {string} dateStr - ISO date string "YYYY-MM-DD"
- * @param {Array} epochs - Epoch configuration array (default: DEFAULT_EPOCHS)
- * @returns {string} Epoch label or "Unknown"
- */
-export function getEpoch(dateStr, epochs = DEFAULT_EPOCHS) {
-  if (!dateStr) return 'Unknown';
-  const year = new Date(dateStr).getFullYear();
-  if (isNaN(year)) return 'Unknown';
-  for (const epoch of epochs) {
-    if (year >= epoch.start && year < epoch.end) {
-      return epoch.label;
-    }
-  }
-  // If year matches the last epoch's end year, include it in the last epoch
-  const last = epochs[epochs.length - 1];
-  if (year === last.end) return last.label;
-  return 'Unknown';
-}
 
 /**
  * Factory function to create a canonical node object.
@@ -87,11 +58,11 @@ export function createCanonicalNode(fields = {}) {
     type,
     title: fields.title || '',
     date,
-    epoch: fields.epoch || getEpoch(date),
+    epoch: fields.epoch || assignEpoch(date),
     description: fields.description || '',
     media: Array.isArray(fields.media) ? fields.media : [],
     connections: Array.isArray(fields.connections) ? fields.connections : [],
-    size: typeof fields.size === 'number' ? fields.size : 0.8,
+    size: typeof fields.size === 'number' ? fields.size : 1.0,
     isHub: Boolean(fields.isHub),
     source: fields.source || '',
     sourceId: fields.sourceId || '',
