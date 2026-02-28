@@ -30,16 +30,22 @@ class CanvasErrorBoundary extends Component {
 
 export default function ConstellationPage() {
   const viewMode = useConstellationStore((s) => s.viewMode);
-  const [loading, setLoading] = useState(true);
+  const [canvasReady, setCanvasReady] = useState(false);
   const navigate = useNavigate();
 
   // Refs for back-button history state management
   const hasConstellationState = useRef(false);
 
-  // Brief loading state while Canvas mounts
+  // Delay Canvas mount by one frame to survive React StrictMode's
+  // mount-unmount-remount cycle. Without this, StrictMode creates and
+  // destroys a WebGL context (with 18+ bloom textures) before the
+  // real mount, causing THREE.WebGLRenderer: Context Lost.
   useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 100);
-    return () => clearTimeout(timer);
+    const id = requestAnimationFrame(() => setCanvasReady(true));
+    return () => {
+      cancelAnimationFrame(id);
+      setCanvasReady(false);
+    };
   }, []);
 
   // ---- Layered ESC key handler ----
@@ -121,14 +127,16 @@ export default function ConstellationPage() {
     <div className="constellation-page">
       {viewMode === '3d' ? (
         <>
-          {loading && (
+          {!canvasReady && (
             <div className="constellation-loading">
               Initializing Constellation...
             </div>
           )}
-          <CanvasErrorBoundary>
-            <ConstellationCanvas />
-          </CanvasErrorBoundary>
+          {canvasReady && (
+            <CanvasErrorBoundary>
+              <ConstellationCanvas />
+            </CanvasErrorBoundary>
+          )}
           <Toolbar />
           <TimelineScrubber />
           <DetailPanel />
