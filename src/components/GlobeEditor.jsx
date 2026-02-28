@@ -310,6 +310,11 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     waterFolder.add(proxy, 'waterNormalStrength', 0.0, 20.0, 0.1).name('Normal Strength').onChange(updateSurfaceUniform('waterNormalStrength'));
     waterFolder.add(proxy, 'waterDetailScale', 100.0, 2000.0, 10).name('Detail Scale').onChange(updateSurfaceUniform('waterDetailScale'));
     waterFolder.add(proxy, 'waterBigWaveScale', 50.0, 800.0, 5).name('Big Wave Scale').onChange(updateSurfaceUniform('waterBigWaveScale'));
+    waterFolder.add(proxy, 'waterCausticsStrength', 0.0, 1.0, 0.01).name('Caustics').onChange(updateSurfaceUniform('waterCausticsStrength'));
+    waterFolder.add(proxy, 'waterSunGlitter', 0.0, 2.0, 0.05).name('Sun Glitter').onChange(updateSurfaceUniform('waterSunGlitter'));
+    waterFolder.add(proxy, 'waterFoamStrength', 0.0, 1.0, 0.01).name('Foam / Whitecaps').onChange(updateSurfaceUniform('waterFoamStrength'));
+    waterFolder.addColor(proxy, 'waterSubsurfaceColor').name('Subsurface Color').onChange(updateSurfaceColor('waterSubsurfaceColor'));
+    waterFolder.add(proxy, 'waterSubsurfaceStrength', 0.0, 1.0, 0.01).name('Subsurface Strength').onChange(updateSurfaceUniform('waterSubsurfaceStrength'));
     waterFolder.close();
 
     // ══════════════════════════════════════════
@@ -436,11 +441,27 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     // SUN RAYS (3D volumetric light beams)
     // ══════════════════════════════════════════
     const sunRaysFolder = gui.addFolder('Sun Rays');
-    sunRaysFolder.add(proxy, 'sunRaysIntensity', 0.0, 2.0, 0.01).name('Intensity').onChange(updateParam('sunRaysIntensity'));
-    sunRaysFolder.add(proxy, 'sunRaysLength', 0.5, 10.0, 0.1).name('Ray Length').onChange(updateParam('sunRaysLength'));
+    sunRaysFolder.add(proxy, 'sunRaysEnabled').name('Enabled').onChange(updateParam('sunRaysEnabled'));
+    sunRaysFolder.add(proxy, 'sunRaysIntensity', 0.0, 2.0, 0.01).name('Intensity').onChange((v) => {
+      p.sunRaysIntensity = v;
+      const srm = globeRef.current?.sunRaysMat;
+      if (srm) srm.uniforms.rayIntensity.value = v;
+    });
+    sunRaysFolder.add(proxy, 'sunRaysLength', 0.5, 10.0, 0.1).name('Ray Length').onChange((v) => {
+      p.sunRaysLength = v;
+      const srm = globeRef.current?.sunRaysMat;
+      if (srm) srm.uniforms.rayLength.value = v;
+    });
+    sunRaysFolder.add(proxy, 'sunRaysCount', 4, 24, 1).name('Ray Count').onChange((v) => {
+      p.sunRaysCount = v;
+      const srm = globeRef.current?.sunRaysMat;
+      if (srm) srm.uniforms.rayCount.value = v;
+    });
     sunRaysFolder.addColor(proxy, 'sunRaysColor').name('Ray Color').onChange((hex) => {
       const rgb = hexToRgb(hex);
       p.sunRaysColor = rgb;
+      const srm = globeRef.current?.sunRaysMat;
+      if (srm) srm.uniforms.rayColor.value.set(...rgb);
     });
     sunRaysFolder.close();
 

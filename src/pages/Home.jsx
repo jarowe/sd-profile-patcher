@@ -234,6 +234,11 @@ export default function Home() {
         waterNormalStrength: { value: p.waterNormalStrength },
         waterDetailScale: { value: p.waterDetailScale },
         waterBigWaveScale: { value: p.waterBigWaveScale },
+        waterCausticsStrength: { value: p.waterCausticsStrength },
+        waterSunGlitter: { value: p.waterSunGlitter },
+        waterFoamStrength: { value: p.waterFoamStrength },
+        waterSubsurfaceColor: { value: new THREE.Vector3(...p.waterSubsurfaceColor) },
+        waterSubsurfaceStrength: { value: p.waterSubsurfaceStrength },
         bopWaterRipple: { value: p.bopWaterRipple },
         // Surface Atmosphere
         atmosDayColor: { value: new THREE.Vector3(...p.atmosDayColor) },
@@ -308,6 +313,11 @@ export default function Home() {
         uniform float waterNormalStrength;
         uniform float waterDetailScale;
         uniform float waterBigWaveScale;
+        uniform float waterCausticsStrength;
+        uniform float waterSunGlitter;
+        uniform float waterFoamStrength;
+        uniform vec3 waterSubsurfaceColor;
+        uniform float waterSubsurfaceStrength;
         uniform float bopWaterRipple;
         // Atmosphere uniforms
         uniform vec3 atmosDayColor;
@@ -356,6 +366,15 @@ export default function Home() {
             a *= 0.5;
           }
           return v;
+        }
+
+        // Animated caustics: two warped cell layers that create dancing light
+        float caustic(vec2 uv, float t) {
+          vec2 p1 = uv * 8.0 + vec2(t * 0.4, t * 0.3);
+          vec2 p2 = uv * 11.0 - vec2(t * 0.3, t * 0.5);
+          float c1 = length(fract(p1 + vec2(vnoise(p1 * 0.5), vnoise(p1 * 0.5 + 7.0))) - 0.5);
+          float c2 = length(fract(p2 + vec2(vnoise(p2 * 0.5), vnoise(p2 * 0.5 + 13.0))) - 0.5);
+          return pow(1.0 - min(c1, c2), 3.0);
         }
 
         void main() {
@@ -433,16 +452,35 @@ export default function Home() {
 
           vec3 oceanBase = mix(deepSeaColor, midSeaColor, waves);
           oceanBase = mix(oceanBase, shallowSeaColor, bigWaves * 0.4);
-          vec3 subsurface = vec3(0.0, 0.12, 0.25) * pow(max(NdotL, 0.0), 2.0) * bigWaves;
-          oceanBase += subsurface;
+
+          // Subsurface scattering: light transmitting through water
+          float sssNdotL = pow(max(NdotL, 0.0), 2.0);
+          vec3 subsurface = waterSubsurfaceColor * sssNdotL * waterSubsurfaceStrength;
+          subsurface += waterSubsurfaceColor * 0.5 * pow(max(dot(worldViewDir, -sunDir), 0.0), 4.0) * waterSubsurfaceStrength;
+          oceanBase += subsurface * (0.5 + bigWaves);
+
+          // Caustics: dancing light patterns on sunlit water
+          float caust = caustic(tidalUv * 80.0, t * 3.0) * waterCausticsStrength;
+          oceanBase += vec3(0.6, 0.8, 1.0) * caust * sssNdotL * 0.8;
+
           vec3 oceanCol = mix(dayCol.rgb * 0.35, oceanBase, 0.65);
 
           vec3 skyReflection = mix(vec3(0.15, 0.3, 0.6), vec3(0.5, 0.65, 0.85), wFresnel);
 
+          // Sun glitter: sparkling micro-reflections across the water
+          float glitterNoise = hash21(floor(tidalUv * 4000.0 + time * 2.0));
+          float glitter = pow(glitterNoise, 80.0) * spec * waterSunGlitter * 8.0;
+
+          // Foam: whitecap hints at wave peaks
+          float foamMask = smoothstep(waterFoamStrength > 0.0 ? 0.55 : 999.0, 0.75, waves + bigWaves * 0.3);
+          vec3 foamColor = vec3(0.85, 0.9, 0.95) * foamMask * waterFoamStrength * dayLight;
+
           vec3 waterDay = oceanCol * dayLight
             + vec3(1.0, 0.95, 0.85) * spec * waterSpecMult
             + vec3(0.9, 0.85, 0.7) * glare * waterGlareMult
+            + vec3(1.0, 0.98, 0.9) * glitter
             + skyReflection * wFresnel * 0.5
+            + foamColor
             + vec3(0.3, 0.5, 0.8) * waves * audioPulse * 0.3;
           float cityGlow = max(max(nightCol.r, nightCol.g), nightCol.b);
           vec3 waterNight = vec3(0.5, 0.4, 0.2) * smoothstep(0.04, 0.15, cityGlow) * cityGlow * 0.1;
@@ -1630,14 +1668,16 @@ export default function Home() {
           globe.lensFlare = { main: mainFlare, rays, halo, anamorphic, artifacts };
         }
 
-        // --- D3. Sun Rays (3D volumetric light beams from sun position) ---
+        // --- D3. Sun Rays (animated volumetric light beams from sun) ---
         if (!globe.sunRaysMesh) {
           const srp = editorParams.current;
+          const sunRaysGeo = new THREE.PlaneGeometry(1, 1);
           const sunRaysMat = new THREE.ShaderMaterial({
             uniforms: {
               time: globe.customUniforms.time,
               rayIntensity: { value: srp.sunRaysIntensity },
               rayLength: { value: srp.sunRaysLength },
+              rayCount: { value: srp.sunRaysCount },
               rayColor: { value: new THREE.Vector3(...srp.sunRaysColor) },
             },
             vertexShader: `
@@ -1651,24 +1691,66 @@ export default function Home() {
               uniform float time;
               uniform float rayIntensity;
               uniform float rayLength;
+              uniform float rayCount;
               uniform vec3 rayColor;
               varying vec2 vUv;
+
+              // Hash for noise
+              float hash(float n) { return fract(sin(n) * 43758.5453); }
+              float hash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+
+              // 1D noise
+              float noise(float p) {
+                float i = floor(p);
+                float f = fract(p);
+                f = f * f * (3.0 - 2.0 * f);
+                return mix(hash(i), hash(i + 1.0), f);
+              }
+
               void main() {
                 vec2 centered = vUv - 0.5;
                 float dist = length(centered);
                 float angle = atan(centered.y, centered.x);
-                // Multi-layer radial rays
+
+                // Variable-width animated rays with noise modulation
                 float rays = 0.0;
-                rays += pow(abs(cos(angle * 6.0 + time * 0.08)), 40.0);
-                rays += pow(abs(cos(angle * 12.0 - time * 0.04)), 80.0) * 0.4;
-                rays += pow(abs(cos(angle * 3.0 + time * 0.12 + 1.0)), 20.0) * 0.3;
-                // Radial falloff
-                float falloff = exp(-dist * rayLength);
-                // Core glow
-                float core = exp(-dist * 12.0) * 0.5;
-                float alpha = (rays * falloff + core) * rayIntensity;
+                float nRays = max(rayCount, 4.0);
+
+                // Primary rays: thick, slow-moving
+                for (float i = 0.0; i < 24.0; i++) {
+                  if (i >= nRays) break;
+                  float rayAngle = i * 6.2831853 / nRays;
+                  float width = 0.02 + 0.015 * hash(i * 7.3); // varying widths
+                  float shimmer = 1.0 + 0.3 * noise(time * 0.5 + i * 3.7); // animated flicker
+                  float intensity = (1.0 + 0.5 * sin(i * 2.4)) * shimmer; // brightness variation
+                  float angleDiff = abs(mod(angle - rayAngle + 3.14159, 6.28318) - 3.14159);
+                  rays += intensity * exp(-angleDiff * angleDiff / (width * width));
+                }
+                rays /= nRays * 0.5; // normalize
+
+                // Secondary fine rays: thin, faster shimmer
+                float fineRays = 0.0;
+                fineRays += pow(abs(cos(angle * nRays * 0.5 + time * 0.1)), 60.0) * 0.4;
+                fineRays += pow(abs(cos(angle * nRays + time * 0.06)), 120.0) * 0.2;
+                fineRays *= (1.0 + 0.5 * noise(time * 0.8 + angle * 3.0)); // noise modulation
+                rays += fineRays;
+
+                // Radial falloff with noise-modulated edge
+                float noiseEdge = 1.0 + 0.15 * noise(angle * 5.0 + time * 0.2);
+                float falloff = exp(-dist * rayLength * noiseEdge);
+
+                // Bright core glow
+                float core = exp(-dist * 15.0) * 0.6;
+                float halo = exp(-dist * 4.0) * 0.15;
+
+                float alpha = (rays * falloff + core + halo) * rayIntensity;
                 alpha *= smoothstep(0.5, 0.0, dist);
-                gl_FragColor = vec4(rayColor * alpha, alpha);
+
+                // Warm color gradient: hotter near center, cooler at edges
+                vec3 col = mix(rayColor * 1.3, rayColor * 0.7, dist * 2.0);
+                col += vec3(0.1, 0.05, 0.0) * core * 3.0; // warm core
+
+                gl_FragColor = vec4(col * alpha, alpha);
               }
             `,
             transparent: true,
@@ -1677,57 +1759,18 @@ export default function Home() {
             depthTest: false,
             side: THREE.DoubleSide,
           });
-          const sunRaysMesh = new THREE.Sprite(new THREE.SpriteMaterial({
-            map: (() => {
-              // Create ray texture via offscreen render
-              const size = 512;
-              const c = document.createElement('canvas');
-              c.width = c.height = size;
-              const ctx = c.getContext('2d');
-              const cx = size / 2, cy = size / 2;
-              // Draw radial rays
-              for (let i = 0; i < 24; i++) {
-                const a = (Math.PI * 2 / 24) * i;
-                const len = size * 0.48;
-                const g = ctx.createLinearGradient(cx, cy, cx + Math.cos(a) * len, cy + Math.sin(a) * len);
-                g.addColorStop(0, 'rgba(255,245,220,0.4)');
-                g.addColorStop(0.2, 'rgba(255,230,180,0.15)');
-                g.addColorStop(0.5, 'rgba(255,220,160,0.04)');
-                g.addColorStop(1, 'rgba(255,200,100,0)');
-                ctx.save();
-                ctx.translate(cx, cy);
-                ctx.rotate(a);
-                ctx.fillStyle = g;
-                ctx.beginPath();
-                const w = (i % 3 === 0) ? 3 : 1.5;
-                ctx.moveTo(0, -w);
-                ctx.lineTo(len, -w * 0.3);
-                ctx.lineTo(len, w * 0.3);
-                ctx.lineTo(0, w);
-                ctx.closePath();
-                ctx.fill();
-                ctx.restore();
-              }
-              // Core glow
-              const cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.15);
-              cg.addColorStop(0, 'rgba(255,250,240,0.6)');
-              cg.addColorStop(0.5, 'rgba(255,240,200,0.2)');
-              cg.addColorStop(1, 'rgba(255,220,150,0)');
-              ctx.fillStyle = cg;
-              ctx.fillRect(0, 0, size, size);
-              return new THREE.CanvasTexture(c);
-            })(),
-            transparent: true,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
-            depthTest: false,
-            opacity: srp.sunRaysIntensity,
-          }));
+          const sunRaysMesh = new THREE.Mesh(sunRaysGeo, sunRaysMat);
+          sunRaysMesh.renderOrder = 999;
           const sunPos = globe.customUniforms.sunDir.value.clone().multiplyScalar(800);
           sunRaysMesh.position.copy(sunPos);
           sunRaysMesh.scale.set(600, 600, 1);
+          // Billboard: always face camera
+          sunRaysMesh.onBeforeRender = function(renderer, scene, camera) {
+            this.quaternion.copy(camera.quaternion);
+          };
           scene.add(sunRaysMesh);
           globe.sunRaysMesh = sunRaysMesh;
+          globe.sunRaysMat = sunRaysMat;
         }
 
         // --- E. Tri-Layer Particles (TINY twinkling magic + deep stars + reaction bursts) ---
@@ -2285,20 +2328,29 @@ export default function Home() {
                   col = mix(col, bleed, colorBleed * 0.3);
                 }
 
-                // God rays: radial blur toward sun screen position
+                // God rays: noise-modulated volumetric radial blur
                 if (godRaysEnabled > 0.5) {
-                  vec2 delta = (uv - sunScreenPos) * (1.0 / 60.0 * godRaysDensity);
+                  vec2 sunToUv = uv - sunScreenPos;
+                  float sunDist = length(sunToUv);
+                  float sunAngle = atan(sunToUv.y, sunToUv.x);
+                  vec2 delta = sunToUv * (1.0 / 60.0 * godRaysDensity);
                   vec2 tc = uv;
                   float illumDecay = 1.0;
                   vec3 godRayColor = vec3(0.0);
                   for (int i = 0; i < 60; i++) {
                     tc -= delta;
+                    // Noise modulation: organic ray density variation
+                    float fi = float(i);
+                    float noiseVal = fract(sin(dot(tc * 100.0 + fi * 0.1, vec2(12.9898, 78.233))) * 43758.5453);
+                    float rayNoise = 0.7 + 0.3 * noiseVal;
                     vec3 s = texture2D(tDiffuse, clamp(tc, 0.0, 1.0)).rgb;
-                    s *= illumDecay * godRaysWeight;
+                    s *= illumDecay * godRaysWeight * rayNoise;
                     godRayColor += s;
                     illumDecay *= godRaysDecay;
                   }
-                  col += godRayColor * godRaysExposure;
+                  // Warm atmospheric color tint near sun
+                  vec3 warmTint = mix(vec3(1.0, 0.95, 0.85), vec3(1.0, 0.7, 0.4), smoothstep(0.0, 0.6, sunDist));
+                  col += godRayColor * godRaysExposure * warmTint;
                 }
 
                 // Color grading: brightness, contrast, saturation
@@ -2606,13 +2658,19 @@ export default function Home() {
                 globe.cloudMesh.rotation.x = Math.sin(elTs * 0.03) * 0.005;
               }
 
-              // Animate sun rays (3D volumetric beams) — uses flare occlusion for hiding behind globe
+              // Animate sun rays (volumetric shader beams) — uses flare occlusion for hiding behind globe
               if (globe.sunRaysMesh) {
                 const sunRayVis = 1.0 - (globe._flareOcclusion || 0);
                 globe.sunRaysMesh.visible = ep.sunRaysEnabled && sunRayVis > 0.01;
                 globe.sunRaysMesh.position.copy(newSunDir.clone().multiplyScalar(800));
-                globe.sunRaysMesh.material.opacity = ep.sunRaysIntensity * sunRayVis;
-                globe.sunRaysMesh.material.rotation = elTs * 0.01;
+                // Update shader uniforms
+                const srm = globe.sunRaysMat;
+                if (srm) {
+                  srm.uniforms.rayIntensity.value = ep.sunRaysIntensity * sunRayVis;
+                  srm.uniforms.rayLength.value = ep.sunRaysLength;
+                  srm.uniforms.rayCount.value = ep.sunRaysCount;
+                  if (Array.isArray(ep.sunRaysColor)) srm.uniforms.rayColor.value.set(...ep.sunRaysColor);
+                }
                 const breathe = 1.0 + Math.sin(elTs * 0.3) * 0.05;
                 const baseScale = ep.sunRaysLength * 200;
                 globe.sunRaysMesh.scale.set(baseScale * breathe, baseScale * breathe, 1);

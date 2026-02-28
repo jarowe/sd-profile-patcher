@@ -38,6 +38,11 @@ export const GLOBE_DEFAULTS = {
   waterNormalStrength: 8.0,
   waterDetailScale: 1200.0,
   waterBigWaveScale: 300.0,
+  waterCausticsStrength: 0.3,
+  waterSunGlitter: 0.4,
+  waterFoamStrength: 0.15,
+  waterSubsurfaceColor: [0.0, 0.4, 0.3],
+  waterSubsurfaceStrength: 0.25,
 
   // ── Surface Atmosphere ──
   atmosDayColor: [0.3, 0.7, 1],
