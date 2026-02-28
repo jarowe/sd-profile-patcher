@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in-progress
-last_updated: "2026-02-28T16:05:00Z"
+last_updated: "2026-02-28T16:13:00Z"
 progress:
   total_phases: 2
   completed_phases: 1
   total_plans: 9
-  completed_plans: 6
+  completed_plans: 7
 ---
 
 # Project State
@@ -18,34 +18,34 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-27)
 
 **Core value:** The Constellation must render real life data as an explorable, evidence-connected 3D experience -- every node real, every connection justified, every visit a discovery.
-**Current focus:** Phase 2 - Data Pipeline & Privacy (Carbonmade parser complete, edge generation next)
+**Current focus:** Phase 2 - Data Pipeline & Privacy (pipeline runs end-to-end, privacy validation and admin slice next)
 
 ## Current Position
 
 Phase: 2 of 6 (Data Pipeline & Privacy)
-Plan: 2 of 5 in current phase (02-01 and 02-02 complete)
-Status: In progress -- both parsers complete (Instagram + Carbonmade), edge generation next
-Last activity: 2026-02-28 -- Completed 02-02-PLAN.md (Carbonmade parser + epoch config + pipeline config)
+Plan: 3 of 5 in current phase (02-01, 02-02, 02-03 complete)
+Status: In progress -- pipeline produces 60 real nodes with 93 evidence-based edges, privacy validation and admin slice remaining
+Last activity: 2026-02-28 -- Completed 02-03-PLAN.md (pipeline orchestrator + edge generation + data loader)
 
-Progress: [======...] 67% (6/9 plans)
+Progress: [=======..] 78% (7/9 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
-- Average duration: 13 min
-- Total execution time: 1.32 hours
+- Total plans completed: 7
+- Average duration: 12 min
+- Total execution time: 1.42 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1. Constellation Scene | 4/4 | 65 min | 16 min |
-| 2. Data Pipeline & Privacy | 2/5 | 14 min | 7 min |
+| 2. Data Pipeline & Privacy | 3/5 | 20 min | 7 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-03 (6 min), 01-04 (2 min), 02-01 (5 min), 02-02 (9 min)
-- Trend: Pipeline plans are fast -- structured JSON parsing with minimal iteration
+- Last 5 plans: 01-04 (2 min), 02-01 (5 min), 02-02 (9 min), 02-03 (6 min)
+- Trend: Pipeline plans consistently fast -- structured data processing with clear module boundaries
 
 *Updated after each plan completion*
 
@@ -90,6 +90,11 @@ Recent decisions affecting current work:
 - [02-02]: People extraction limited to 2-3 word proper names with stop-word filtering
 - [02-02]: Project date ranges use start year for epoch assignment
 - [02-02]: PIPELINE_CONFIG centralizes all pipeline paths, privacy defaults, and layout params
+- [02-03]: Bonus signals shared-place (0.25) and shared-client (0.35) added for richer evidence
+- [02-03]: Pruning keeps top 6 edges per node per signal type (diverse edge types)
+- [02-03]: Pipeline output (public/data/) gitignored as build artifacts
+- [02-03]: Frontend loader uses import.meta.env.BASE_URL for dual-deployment support
+- [02-03]: Pipeline-status.json is the only timestamped output (constellation data is timestamp-free)
 
 ### Pending Todos
 
@@ -107,5 +112,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed 02-02-PLAN.md (Carbonmade parser + epoch config + pipeline config)
+Stopped at: Completed 02-03-PLAN.md (pipeline orchestrator + edge generation + data loader)
 Resume file: None

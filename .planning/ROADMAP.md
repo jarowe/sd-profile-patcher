@@ -56,7 +56,7 @@ Plans:
 Plans:
 - [x] 02-01-PLAN.md -- Instagram HTML parser with defensive parsing, EXIF stripping, GPS redaction, and shared canonical schema
 - [x] 02-02-PLAN.md -- Carbonmade JSON parser, epoch configuration, and pipeline config
-- [ ] 02-03-PLAN.md -- Evidence-based edge generation, helix layout, pipeline orchestrator, and frontend data loader
+- [x] 02-03-PLAN.md -- Evidence-based edge generation, helix layout, pipeline orchestrator, and frontend data loader
 - [ ] 02-04-PLAN.md -- Privacy validation (fail-closed audit), visibility tiers, minors policy, and allowlist enforcement
 - [ ] 02-05-PLAN.md -- Thin admin page (pipeline status + publish/hide), pipeline resilience (last good snapshot)
 
@@ -132,8 +132,8 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Constellation Scene | 3/4 | UAT gap closure | - |
-| 2. Data Pipeline & Privacy | 0/5 | Planned | - |
+| 1. Constellation Scene | 4/4 | Complete | 2026-02-28 |
+| 2. Data Pipeline & Privacy | 3/5 | In progress | - |
 | 3. Narrator & Guided Tour | 0/3 | Not started | - |
 | 4. Admin Dashboard | 0/4 | Not started | - |
 | 5. Automation | 0/3 | Not started | - |
@@ -141,4 +141,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 
 ---
 *Roadmap created: 2026-02-27*
-*Last updated: 2026-02-28 (Phase 2 planned -- 5 plans in 4 waves)*
+*Last updated: 2026-02-28 (02-03 complete -- pipeline orchestrator + edge generation)*
