@@ -204,6 +204,18 @@ export const GLOBE_DEFAULTS = {
   cloudMeshRadius: 100.8,
   cloudRotationSpeed: 0.012,
 
+  // ── Camera ──
+  cameraStartAlt: 3.0,
+  cameraStartLatOffset: 25,
+  cameraStartLngOffset: -50,
+  cameraIntroAlt: 1.5,
+  cameraIntroSpeed: 4000,
+  cameraLocationAlt: 1.2,
+  cameraLocationSpeed: 2500,
+  cameraCycleInterval: 8000,
+  cameraBopZoomPunch: 0.15,
+  cameraBopShakeIntensity: 0.3,
+
   // ── Time Control ──
   timeOverrideHour: -1,
 

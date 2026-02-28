@@ -134,6 +134,44 @@ export default function GlobeEditor({ editorParams, globeRef, globeShaderMateria
     controlsFolder.add(proxy, 'breakoutSoftBlend', 0, 200, 1).name('PP Mask Blend (px)').onChange(updateParam('breakoutSoftBlend'));
     controlsFolder.add(proxy, 'breakoutContentThreshold', 0, 1.0, 0.01).name('PP Content Thresh').onChange(updateParam('breakoutContentThreshold'));
 
+    // ── Camera ──
+    const cameraFolder = controlsFolder.addFolder('Camera');
+    cameraFolder.add(proxy, 'cameraStartAlt', 0.5, 8.0, 0.1).name('Start Altitude').onChange(updateParam('cameraStartAlt'));
+    cameraFolder.add(proxy, 'cameraStartLatOffset', -90, 90, 1).name('Start Lat Offset').onChange(updateParam('cameraStartLatOffset'));
+    cameraFolder.add(proxy, 'cameraStartLngOffset', -180, 180, 1).name('Start Lng Offset').onChange(updateParam('cameraStartLngOffset'));
+    cameraFolder.add(proxy, 'cameraIntroAlt', 0.5, 5.0, 0.1).name('Intro Altitude').onChange(updateParam('cameraIntroAlt'));
+    cameraFolder.add(proxy, 'cameraIntroSpeed', 500, 10000, 100).name('Intro Speed (ms)').onChange(updateParam('cameraIntroSpeed'));
+    cameraFolder.add(proxy, 'cameraLocationAlt', 0.3, 5.0, 0.05).name('Location Altitude').onChange(updateParam('cameraLocationAlt'));
+    cameraFolder.add(proxy, 'cameraLocationSpeed', 500, 8000, 100).name('Location Fly Speed').onChange(updateParam('cameraLocationSpeed'));
+    cameraFolder.add(proxy, 'cameraCycleInterval', 3000, 30000, 500).name('Cycle Interval (ms)').onChange((v) => {
+      p.cameraCycleInterval = v;
+      // Restart cycle with new interval
+      const g = globeRef.current;
+      if (g) {
+        if (g._cycleTimer) clearInterval(g._cycleTimer);
+      }
+    });
+    cameraFolder.add(proxy, 'cameraBopZoomPunch', 0.0, 1.0, 0.01).name('Bop Zoom Punch').onChange(updateParam('cameraBopZoomPunch'));
+    cameraFolder.add(proxy, 'cameraBopShakeIntensity', 0.0, 2.0, 0.05).name('Bop Shake').onChange(updateParam('cameraBopShakeIntensity'));
+    cameraFolder.add({ flyToStart() {
+      const g = globeRef.current;
+      if (!g) return;
+      const ep = editorParams.current;
+      const first = window._expeditions?.[0];
+      if (first) g.pointOfView({ lat: first.lat + (ep.cameraStartLatOffset ?? 25), lng: first.lng + (ep.cameraStartLngOffset ?? -50), altitude: ep.cameraStartAlt ?? 3.0 }, 0);
+    } }, 'flyToStart').name('Preview Start Position');
+    cameraFolder.add({ flyIntro() {
+      const g = globeRef.current;
+      if (!g) return;
+      const ep = editorParams.current;
+      const first = window._expeditions?.[0];
+      if (first) {
+        g.pointOfView({ lat: first.lat + (ep.cameraStartLatOffset ?? 25), lng: first.lng + (ep.cameraStartLngOffset ?? -50), altitude: ep.cameraStartAlt ?? 3.0 }, 0);
+        setTimeout(() => g.pointOfView({ lat: first.lat, lng: first.lng, altitude: ep.cameraIntroAlt ?? 1.5 }, ep.cameraIntroSpeed ?? 4000), 200);
+      }
+    } }, 'flyIntro').name('Replay Intro');
+    cameraFolder.close();
+
     // ── Expedition Photo Card ──
     const photoFolder = controlsFolder.addFolder('Photo Card');
     photoFolder.add(proxy, 'photoCardTop', -40, 80, 1).name('Top (px)').onChange(updateParam('photoCardTop'));

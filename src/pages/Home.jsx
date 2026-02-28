@@ -500,18 +500,19 @@ export default function Home() {
           const controls = globeRef.current.controls();
           if (controls) controls.enableZoom = false; // Disable zoom during transit
 
-          globeRef.current.pointOfView({ lat: loc.lat, lng: loc.lng, altitude: 1.2 }, 2500);
+          const ep = editorParams.current;
+          globeRef.current.pointOfView({ lat: loc.lat, lng: loc.lng, altitude: ep.cameraLocationAlt ?? 1.2 }, ep.cameraLocationSpeed ?? 2500);
           setHoveredMarker(loc);
 
           // Clear marker tooltip after a moment
           setTimeout(() => {
             if (controls) controls.enableZoom = true;
             if (!isUserInteracting.current) setHoveredMarker(null);
-          }, 3500);
+          }, (ep.cameraLocationSpeed ?? 2500) + 1000);
           return next;
         });
       }
-    }, 8000);
+    }, editorParams.current.cameraCycleInterval ?? 8000);
   }, []);
 
   // Globe initialization via useEffect + globeMounted (proven reliable approach)
@@ -2118,11 +2119,13 @@ export default function Home() {
         // ------------------------------------------------------------------
         // CINEMATIC ENTRANCE - fade reveal + sweeping camera
         // ------------------------------------------------------------------
+        window._expeditions = expeditions; // expose for editor preview buttons
         if (!hasAnimatedIn.current) {
           hasAnimatedIn.current = true;
           const first = expeditions[0];
           // Position camera BEFORE revealing (container starts at opacity 0)
-          globe.pointOfView({ lat: first.lat + 25, lng: first.lng - 50, altitude: 3.0 }, 0);
+          const ep0 = editorParams.current;
+          globe.pointOfView({ lat: first.lat + (ep0.cameraStartLatOffset ?? 25), lng: first.lng + (ep0.cameraStartLngOffset ?? -50), altitude: ep0.cameraStartAlt ?? 3.0 }, 0);
 
           // Reveal the globe (CSS opacity transition handles the fade)
           requestAnimationFrame(() => setGlobeReady(true));
@@ -2130,7 +2133,7 @@ export default function Home() {
           // Begin cinematic sweep
           setTimeout(() => {
             if (!globeRef.current) return;
-            globeRef.current.pointOfView({ lat: first.lat, lng: first.lng, altitude: 1.5 }, 4000);
+            globeRef.current.pointOfView({ lat: first.lat, lng: first.lng, altitude: ep0.cameraIntroAlt ?? 1.5 }, ep0.cameraIntroSpeed ?? 4000);
 
             setTimeout(() => {
               if (globeRef.current) {
@@ -2567,6 +2570,27 @@ export default function Home() {
                  const ppv = globe.customUniforms.prismPulse.value;
                  const decay = ep.bopDecayRate || 0.08;
                  globe.customUniforms.prismPulse.value = Math.max(0, ppv - dt * (decay + ppv * (decay * 0.75)));
+
+                 // Camera bop effects: zoom punch + shake
+                 const cam = globe.camera();
+                 if (cam) {
+                   const zoomPunch = (ep.cameraBopZoomPunch ?? 0.15) * ppv;
+                   cam.fov = 50 - zoomPunch * 8; // subtle FOV punch (default 50)
+                   cam.updateProjectionMatrix();
+
+                   const shakeInt = (ep.cameraBopShakeIntensity ?? 0.3) * ppv * ppv;
+                   if (shakeInt > 0.001) {
+                     cam.position.x += (Math.random() - 0.5) * shakeInt;
+                     cam.position.y += (Math.random() - 0.5) * shakeInt;
+                   }
+                 }
+              } else {
+                // Reset FOV when no bop
+                const cam = globe.camera();
+                if (cam && Math.abs(cam.fov - 50) > 0.01) {
+                  cam.fov += (50 - cam.fov) * 0.1;
+                  cam.updateProjectionMatrix();
+                }
               }
 
               if (window.globalAnalyser) {
@@ -3183,7 +3207,8 @@ export default function Home() {
     setActiveExpedition(newIdx);
     const loc = expeditions[newIdx];
     if (globeRef.current) {
-      globeRef.current.pointOfView({ lat: loc.lat, lng: loc.lng, altitude: 1.2 }, 1500);
+      const ep = editorParams.current;
+      globeRef.current.pointOfView({ lat: loc.lat, lng: loc.lng, altitude: ep.cameraLocationAlt ?? 1.2 }, Math.round((ep.cameraLocationSpeed ?? 2500) * 0.6));
     }
     setHoveredMarker(loc);
     playClickSound();
